@@ -1,5 +1,4 @@
 # syntax=docker/dockerfile:1
-# syntax=docker/dockerfile:1
 ARG PYTHON_VERSION=3.11.6
 FROM python:$PYTHON_VERSION-slim AS base
 
@@ -9,9 +8,9 @@ ENV PYTHONFAULTHANDLER=1 \
     PYTHONUNBUFFERED=1 \
     POETRY_VERSION=1.7.1
 
-# Install Poetry and Poe the Poet
+# Install Poetry, Poe the Poet, and pre-commit
 RUN --mount=type=cache,target=/root/.cache/pip/ \
-    pip install poetry==$POETRY_VERSION poethepoet
+    pip install poetry==$POETRY_VERSION poethepoet pre-commit
 
 # Install curl, compilers, and GDAL dependencies.
 RUN rm /etc/apt/apt.conf.d/docker-clean

@@ -131,6 +131,7 @@ class Nest(models.Model):
     """Model for a Vespa velutina nest."""
 
     id = models.AutoField(primary_key=True)
+    external_id = models.CharField(max_length=255)
     creation_datetime = models.DateTimeField(auto_now_add=True)
     source = models.CharField(max_length=2, choices=SourceEnum.choices, default=SourceEnum.OBSERVATIONS_API)
     status = models.CharField(max_length=2, choices=NestStatusEnum.choices, default=NestStatusEnum.UNTREATED)

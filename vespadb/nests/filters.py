@@ -1,6 +1,5 @@
 """Filters for the Nest model."""
 
-from django.contrib.gis.db import models
 from rest_framework_gis.filterset import GeoFilterSet
 
 from vespadb.nests.models import Nest

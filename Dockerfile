@@ -61,6 +61,7 @@ RUN --mount=type=cache,target=/root/.cache/pypoetry/ \
     poetry install --only main --no-interaction --no-ansi
 
 COPY . .
+RUN chmod +x manage.py
 
 ENTRYPOINT ["/opt/vespadb-env/bin/poe"]
 CMD ["serve"]

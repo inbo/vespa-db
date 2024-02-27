@@ -1,0 +1,44 @@
+version: "3.9"
+
+services:
+  devcontainer:
+    build:
+      context: .
+      args:
+        PYTHON_VERSION: ${PYTHON_VERSION:-3.11.6}
+      target: dev
+    stdin_open: true
+    tty: true
+    volumes:
+      - .:/workspaces/vespadb/
+
+  app:
+    build:
+      context: .
+      target: app
+    tty: true
+    ports:
+      - "8001:8000"
+    volumes:
+      - .:/workspaces/vespadb/
+    command: [ "serve", "--dev" ]
+    working_dir: /workspaces/vespadb/
+    environment:
+      - PYTHONPATH=/workspaces/vespadb
+
+  db:
+    image: postgis/postgis:latest
+    environment:
+      POSTGRES_DB: vespadb
+      POSTGRES_USER: vespauser
+      POSTGRES_PASSWORD: vespauserpassword
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+
+
+networks:
+  default:
+    name: vespadb-network

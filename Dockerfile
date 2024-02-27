@@ -52,6 +52,12 @@ RUN sh -c "$(curl -fsSL https://starship.rs/install.sh)" -- "--yes" && \
     # && echo 'poe --help' >> ~/.zshrc \
     && zsh -c 'source ~/.zshrc'
 
+# Copy poetry and project configuration files to the container
+COPY poetry.lock* pyproject.toml /workspaces/vespadb/
+
+# Install the project dependencies - make sure to use the virtual environment
+RUN poetry install --no-root --no-interaction --no-ansi
+
 CMD ["zsh"]
 
 FROM base AS app

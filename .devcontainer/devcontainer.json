@@ -23,7 +23,7 @@
         "ms-python.mypy-type-checker",
         "ms-python.python",
         "henriiik.vscode-ruff",
-        "charliermarsh.ruff",
+        "charliermarsh.ruff-vscode",
         "ryanluker.vscode-coverage-gutters",
         "tamasfe.even-better-toml",
         "visualstudioexptteam.vscodeintellicode",

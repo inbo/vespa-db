@@ -56,20 +56,6 @@ RUN --mount=type=cache,target=/var/cache/apt/ \
     # Mark the workspace as safe for git
     git config --system --add safe.directory '*'
 
-<<<<<<< Updated upstream
-# Setup Docker repository and install Docker CLI
-RUN curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg && \
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null && \
-    apt-get update && apt-get install --yes --no-install-recommends docker-ce-cli
-
-# Install starship prompt and configure Git
-RUN sh -c "$(curl -fsSL https://starship.rs/install.sh)" -- "--yes" && \
-    git config --system --add safe.directory '*' && \
-    echo 'eval "$(starship init zsh)"' >> ~/.zshrc \
-    # Commented out to avoid build failure. Uncomment if poe-the-poet is installed and configured correctly.
-    # && echo 'poe --help' >> ~/.zshrc \
-    && zsh -c 'source ~/.zshrc'
-=======
 # Install the run time Python dependencies in the virtual environment.
 COPY poetry.lock* pyproject.toml /workspaces/vespadb/
 RUN --mount=type=cache,target=/root/.cache/pypoetry/ \
@@ -81,7 +67,6 @@ RUN git init && pre-commit install --install-hooks && \
     echo 'eval "$(starship init zsh)"' >> ~/.zshrc && \
     echo 'poe --help' >> ~/.zshrc && \
     zsh -c 'source ~/.zshrc'
->>>>>>> Stashed changes
 
 # Copy poetry and project configuration files to the container
 COPY poetry.lock* pyproject.toml /workspaces/vespadb/

@@ -1,13 +1,12 @@
 """Views for the nests app."""
 
 import csv
-from typing import ClassVar
 
 from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import AllowAny, BasePermission, IsAuthenticatedOrReadOnly
+from rest_framework.permissions import AllowAny, BasePermission, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
@@ -22,15 +21,15 @@ from vespadb.permissions import IsAdmin, IsUser
 class NestsViewSet(viewsets.ModelViewSet):
     """ViewSet for the Nest model."""
 
-    queryset: ClassVar = Nest.objects.all()
-    serializer_class: ClassVar[type[BaseSerializer]] = NestSerializer
-    permission_classes: ClassVar[list[type[BasePermission]]] = [IsAuthenticatedOrReadOnly]
-    filter_backends: ClassVar[list[type[DjangoFilterBackend]]] = [
+    queryset = Nest.objects.all()
+    serializer_class = NestSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [
         DjangoFilterBackend,
         filters.OrderingFilter,
         DistanceToPointFilter,
     ]
-    filterset_fields: ClassVar[list[str]] = [
+    filterset_fields = [
         "location",
         "reported_datetime",
         "status",
@@ -38,7 +37,7 @@ class NestsViewSet(viewsets.ModelViewSet):
         "public_domain",
     ]
     filterset_class = NestFilter
-    ordering_fields: ClassVar[list[str]] = ["reported_datetime", "status"]
+    ordering_fields = ["reported_datetime", "status"]
     distance_filter_field = "location"
     distance_filter_convert_meters = True
 
@@ -67,7 +66,7 @@ class NestsViewSet(viewsets.ModelViewSet):
         -------
             List[BasePermission]: A list of permission instances that should be applied to the action.
         """
-        if self.action in {"update", "partial_update"}:
+        if self.action in {"create", "update", "partial_update"}:
             permission_classes = [IsUser()]
         elif self.action == "destroy":
             permission_classes = [IsAdmin()]

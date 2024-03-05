@@ -9,7 +9,7 @@ const app = Vue.createApp({
             nests: [], // Will hold nests data fetched from server
             map: null, // Reference to the map
             markers: [], // Array to keep track of markers
-            showModal: false,
+            isModalVisible: false,
         };
     },
     methods: {
@@ -124,14 +124,14 @@ const app = Vue.createApp({
             // Enable edit mode
             this.isEditing = true;
         },
-        showLoginModal() {
+        showModal() {
             console.log("Showing login modal");
-            this.showModal = true;
+            this.isModalVisible = true;
         },
 
-        closeLoginModal() {
+        hideModal() {
             console.log("Closing login modal");
-            this.showModal = false;
+            this.isModalVisible = false;
         },
     },
     mounted() {
@@ -140,11 +140,3 @@ const app = Vue.createApp({
     }
 });
 app.mount('#app');
-
-function showLoginModal() {
-    document.getElementById('loginModal').style.display = 'block';
-}
-
-function closeLoginModal() {
-    document.getElementById('loginModal').style.display = 'none';
-}

@@ -20,12 +20,12 @@
                 {{ username }}
                 <button @click="logout">Logout</button>
             </span>
-            <a href="#" onclick="showLoginModal()"
+            <a href="#" @click="showModal"
                 style="float: right; color: white; text-decoration: none; padding: 10px;">Login</a>
         </div>
-        <div id="loginModal" class="modal">
+        <div v-if="isModalVisible" class="modal" style="display: flex;">
             <div class="modal-content">
-                <span onclick="closeLoginModal()" class="close">&times;</span>
+                <span @click="hideModal" class="close">&times;</span>
                 <h2>Login</h2>
                 <input v-model="username" type="text" placeholder="Gebruikersnaam" />
                 <input v-model="password" type="password" placeholder="Wachtwoord" />

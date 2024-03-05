@@ -7,6 +7,8 @@ const app = Vue.createApp({
             username: '',
             password: '',
             nests: [], // Will hold nests data fetched from server
+            map: null, // Reference to the map
+            markers: [], // Array to keep track of markers
             showModal: false,
         };
     },
@@ -24,34 +26,45 @@ const app = Vue.createApp({
                 }
                 const data = await response.json();
                 this.nests = data;
-                this.initializeMapAndMarkers(); // Initialize map after fetching nests
+                if (!this.map) {
+                    this.initializeMapAndMarkers(); // Initialize map after fetching nests for the first time
+                } else {
+                    this.updateMarkers(); // Update markers based on new nests data
+                }
             } catch (error) {
                 console.error('There has been a problem with your fetch operation:', error);
             }
         },
         initializeMapAndMarkers() {
             // Initialize map and place markers for each nest
-            const mymap = L.map('mapid').setView([51.0, 4.5], 9);
+            this.map = L.map('mapid').setView([51.0, 4.5], 9);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: 'Map data © OpenStreetMap contributors',
                 maxZoom: 18,
-            }).addTo(mymap);
+            }).addTo(this.map);
+            this.updateMarkers();
+        },
+        updateMarkers() {
+            // Clear existing markers
+            this.markers.forEach(marker => this.map.removeLayer(marker));
+            this.markers = []; // Reset markers array
 
+            // Add new markers based on nests data
             this.nests.forEach((nest) => {
                 const locationRegex = /POINT \(([^ ]+) ([^ ]+)\)/;
                 const match = nest.location.match(locationRegex);
                 if (match) {
                     const [_, longitude, latitude] = match; // Destructure to get longitude and latitude
-                    L.marker([parseFloat(latitude), parseFloat(longitude)], {
+                    const marker = L.marker([parseFloat(latitude), parseFloat(longitude)], {
                         icon: L.divIcon({
                             className: 'custom-div-icon',
                             html: "<i class='fa fa-bug' style='color: black; font-size: 24px;'></i>",
                             iconSize: [30, 42],
                             iconAnchor: [15, 42]
                         })
-                    }).addTo(mymap)
-                        .bindPopup(`<b>Nest Status:</b> ${nest.status}`)
+                    }).addTo(this.map)
                         .on('click', () => this.selectNest(nest));
+                    this.markers.push(marker); // Store marker reference
                 }
             });
         },
@@ -99,7 +112,7 @@ const app = Vue.createApp({
                 this.closeLoginModal(); // Close modal on successful login
                 this.isLoggedIn = true;
             } catch (error) {
-                alert('Login failed. Please try again.');
+                throw new Error('Login failed. Please try again.');
             }
         },
         logout() {
@@ -123,7 +136,7 @@ const app = Vue.createApp({
     },
     mounted() {
         this.getNests(); // Initial fetch
-        //setInterval(this.getNests, 30000); // Poll every 30 seconds
+        setInterval(this.getNests, 60000); // Poll every 60 seconds
     }
 });
 app.mount('#app');

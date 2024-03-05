@@ -10,7 +10,12 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
+import os
 from pathlib import Path
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -65,8 +70,21 @@ DATABASES = {
         "NAME": "vespadb",
         "USER": "vespauser",
         "PASSWORD": "vespauserpassword",
-        "HOST": "db",  # Matches the service name in docker-compose.yml
+        "HOST": "db",
         "PORT": "5432",
+    }
+}
+
+REDIS_REFRESH_RATE_MIN = int(os.getenv("REDIS_REFRESH_RATE_MIN", "15"))  # default to 15 minutes
+
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://127.0.0.1:6379/1",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        },
+        "KEY_PREFIX": "vespadb",
     }
 }
 
@@ -126,7 +144,9 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
 STATIC_URL = "static/"
-STATICFILES_DIRS = [BASE_DIR / "static",]
+STATICFILES_DIRS = [
+    BASE_DIR / "static",
+]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field

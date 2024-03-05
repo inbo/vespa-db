@@ -24,6 +24,8 @@ ipython = "^8.22.1"
 drf-yasg = "^1.21.7"
 djangorestframework-gis = "^1.0"
 pre-commit = "^3.6.2"
+django-redis = "^5.4.0"
+python-dotenv = "^1.0.1"
 
 [tool.poetry.group.dev.dependencies]  # https://python-poetry.org/docs/master/managing-dependencies/
 coverage = { extras = ["toml"], version = ">=7.4.1" }

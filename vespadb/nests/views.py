@@ -1,9 +1,13 @@
 """Views for the nests app."""
 
 import csv
-from django.core.serializers import serialize
+from urllib.parse import urlencode
 
+from django.conf import settings
+from django.core.cache import cache
+from django.core.serializers import serialize
 from django.http import HttpResponse
+from django.shortcuts import render
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
@@ -12,7 +16,6 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
 from rest_framework_gis.filters import DistanceToPointFilter
-from django.shortcuts import render
 
 from vespadb.nests.filters import NestFilter
 from vespadb.nests.models import Nest
@@ -75,13 +78,22 @@ class NestsViewSet(viewsets.ModelViewSet):
         else:
             permission_classes = [AllowAny()]
         return permission_classes
-    
-    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
+
+    @action(detail=False, methods=["get"], permission_classes=[AllowAny])
     def geojson(self, request: Request) -> Response:
         """Serve Nest data in GeoJSON format."""
-        nests = self.get_queryset()
-        data = serialize('geojson', nests, geometry_field='location', fields=('id', 'location'))
-        return HttpResponse(data, content_type='application/json')
+        query_params = request.query_params.dict()
+        sorted_query_params_string = urlencode(sorted(query_params.items()))
+        cache_key = f"nests_geojson_data_{sorted_query_params_string}"
+        data = cache.get(cache_key)
+
+        if not data:
+            nests = self.get_queryset()
+            data = serialize("geojson", nests, geometry_field="location", fields=("id", "location"))
+            refresh_rate = settings.REDIS_REFRESH_RATE_MIN
+            cache.set(cache_key, data, refresh_rate * 60)
+
+        return HttpResponse(data, content_type="application/json")
 
     @action(detail=False, methods=["post"], permission_classes=[IsAdmin])
     def bulk_import(self, request: Request) -> Response:
@@ -113,6 +125,7 @@ class NestsViewSet(viewsets.ModelViewSet):
 
         return response
 
+
 def map_view(request: Request) -> HttpResponse:
     """Render the map view."""
-    return render(request, 'nests/map.html')
+    return render(request, "nests/map.html")

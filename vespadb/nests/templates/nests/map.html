@@ -20,7 +20,7 @@
                 {{ username }}
                 <button @click="logout">Logout</button>
             </span>
-            <a v-if="!isLoggedIn" href="#" @click="showLoginModal"
+            <a href="#" onclick="showLoginModal()"
                 style="float: right; color: white; text-decoration: none; padding: 10px;">Login</a>
         </div>
         <div id="loginModal" class="modal">

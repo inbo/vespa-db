@@ -2,7 +2,7 @@
 ARG PYTHON_VERSION=3.11.6
 FROM python:$PYTHON_VERSION-slim AS base
 
-LABEL org.opencontainers.image.description "monitoring vespa nests"
+LABEL org.opencontainers.image.description "monitoring vespa observations"
 
 ENV PYTHONFAULTHANDLER=1 \
     PYTHONUNBUFFERED=1 \
@@ -12,11 +12,11 @@ ENV PYTHONFAULTHANDLER=1 \
 RUN --mount=type=cache,target=/root/.cache/pip/ \
     pip install poetry==$POETRY_VERSION poethepoet pre-commit
 
-# Install curl, compilers, and GDAL dependencies.
+# Install curl, compilers, GDAL dependencies, and PostgreSQL client.
 RUN rm /etc/apt/apt.conf.d/docker-clean
 RUN --mount=type=cache,target=/var/cache/apt/ \
     --mount=type=cache,target=/var/lib/apt/ \
-    apt-get update && apt-get install --no-install-recommends --yes curl build-essential gdal-bin libgdal-dev
+    apt-get update && apt-get install --no-install-recommends --yes curl build-essential gdal-bin libgdal-dev postgresql-client
 
 # Configure GDAL environment variables, adjust according to the installed GDAL version
 ENV GDAL_LIBRARY_PATH /usr/lib/libgdal.so

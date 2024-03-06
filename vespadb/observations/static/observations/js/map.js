@@ -1,42 +1,42 @@
 const app = Vue.createApp({
     data() {
         return {
-            selectedNest: null,
+            selectedObservation: null,
             isLoggedIn: !!localStorage.getItem('token'), // Convert string to boolean to determine logged-in state
             isEditing: false,
             username: '',
             password: '',
-            nests: [], // Will hold nests data fetched from server
+            observations: [], // Will hold observations data fetched from server
             map: null, // Reference to the map
             markers: [], // Array to keep track of markers
             isModalVisible: false,
         };
     },
     methods: {
-        selectNest(nestData) {
-            // Select a nest for viewing or editing
-            this.selectedNest = nestData;
+        selectObservation(observationData) {
+            // Select a observation for viewing or editing
+            this.selectedObservation = observationData;
         },
-        async getNests() {
-            // Fetch nests data from the server
+        async getObservations() {
+            // Fetch observations data from the server
             try {
-                const response = await fetch('/nests/');
+                const response = await fetch('/observations/');
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
                 }
                 const data = await response.json();
-                this.nests = data;
+                this.observations = data;
                 if (!this.map) {
-                    this.initializeMapAndMarkers(); // Initialize map after fetching nests for the first time
+                    this.initializeMapAndMarkers(); // Initialize map after fetching observations for the first time
                 } else {
-                    this.updateMarkers(); // Update markers based on new nests data
+                    this.updateMarkers(); // Update markers based on new observations data
                 }
             } catch (error) {
                 console.error('There has been a problem with your fetch operation:', error);
             }
         },
         initializeMapAndMarkers() {
-            // Initialize map and place markers for each nest
+            // Initialize map and place markers for each observation
             this.map = L.map('mapid').setView([51.0, 4.5], 9);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: 'Map data © OpenStreetMap contributors',
@@ -49,10 +49,10 @@ const app = Vue.createApp({
             this.markers.forEach(marker => this.map.removeLayer(marker));
             this.markers = []; // Reset markers array
 
-            // Add new markers based on nests data
-            this.nests.forEach((nest) => {
+            // Add new markers based on observations data
+            this.observations.forEach((observation) => {
                 const locationRegex = /POINT \(([^ ]+) ([^ ]+)\)/;
-                const match = nest.location.match(locationRegex);
+                const match = observation.location.match(locationRegex);
                 if (match) {
                     const [_, longitude, latitude] = match; // Destructure to get longitude and latitude
                     const marker = L.marker([parseFloat(latitude), parseFloat(longitude)], {
@@ -63,21 +63,21 @@ const app = Vue.createApp({
                             iconAnchor: [15, 42]
                         })
                     }).addTo(this.map)
-                        .on('click', () => this.selectNest(nest));
+                        .on('click', () => this.selectObservation(observation));
                     this.markers.push(marker); // Store marker reference
                 }
             });
         },
-        async updateNest() {
-            // Update nest information on the server
+        async updateObservation() {
+            // Update observation information on the server
             try {
-                const response = await fetch(`/nests/${this.selectedNest.id}/`, {
+                const response = await fetch(`/observations/${this.selectedObservation.id}/`, {
                     method: 'PATCH',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Token ${localStorage.getItem('token')}`,
                     },
-                    body: JSON.stringify(this.selectedNest)
+                    body: JSON.stringify(this.selectedObservation)
                 });
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
@@ -86,7 +86,7 @@ const app = Vue.createApp({
                 console.log('Success:', data);
                 this.isEditing = false; // End editing after successful update
             } catch (error) {
-                console.error('Error when updating the nest:', error);
+                console.error('Error when updating the observation:', error);
             }
         },
         async login() {
@@ -135,8 +135,8 @@ const app = Vue.createApp({
         },
     },
     mounted() {
-        this.getNests(); // Initial fetch
-        setInterval(this.getNests, 60000); // Poll every 60 seconds
+        this.getObservations(); // Initial fetch
+        setInterval(this.getObservations, 60000); // Poll every 60 seconds
     }
 });
 app.mount('#app');

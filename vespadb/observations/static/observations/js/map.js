@@ -66,6 +66,29 @@ const app = Vue.createApp({
                 }
             });
         },
+        async deleteObservation() {
+            if (!confirm("Are you sure you want to delete this observation?")) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/observations/${this.selectedObservation.id}/`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Token ${localStorage.getItem('token')}`,
+                    },
+                });
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                console.log('Observation deleted successfully');
+                this.selectedObservation = null; // Reset selected observation
+                this.getObservations(); // Refresh observations list
+            } catch (error) {
+                console.error('Error when deleting the observation:', error);
+            }
+        },
+
         async updateObservation() {
             // Update observation information on the server
             try {
@@ -122,10 +145,16 @@ const app = Vue.createApp({
             // Enable edit mode
             this.isEditing = true;
         },
+        confirmUpdate() {
+            this.updateObservation();
+        },
+        cancelEdit() {
+            this.isEditing = false;
+        },
     },
     mounted() {
         this.getObservations(); // Initial fetch
-        setInterval(this.getObservations, 60000); // Poll every 60 seconds
+        setInterval(this.getObservations, 20000); // Poll every 60 seconds
     }
 });
 app.mount('#app');

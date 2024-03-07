@@ -22,22 +22,31 @@
                 {% verbatim %}
                 <div v-if="selectedObservation">
                     <p><strong>ID:</strong> {{ selectedObservation.id }}</p>
-                    <p><strong>Location:</strong> {{ selectedObservation.location }}</p>
-                    <p><strong>Status:</strong> <span v-if="!isEditing">{{ selectedObservation.status }}</span>
-                        <select v-if="isEditing" v-model="selectedObservation.status">
-                            <option value="UT">Untreated</option>
-                            <option value="TR">Treated</option>
-                        </select>
-                    </p>
-                    <button v-if="isLoggedIn && !isEditing" @click="startEdit">Updaten</button>
+                    <p><strong>Source:</strong> <input v-if="isEditing" v-model="selectedObservation.source"
+                            type="text" /> <span v-else>{{ selectedObservation.source }}</span></p>
+                    <p><strong>Validated:</strong> <input v-if="isEditing" v-model="selectedObservation.validated"
+                            type="checkbox" /> <span v-else>{{ selectedObservation.validated }}</span></p>
+                    <p><strong>Notes:</strong> <textarea v-if="isEditing"
+                            v-model="selectedObservation.notes"></textarea> <span v-else>{{ selectedObservation.notes
+                            }}</span></p>
+                    <p><strong>Admin Notes:</strong> <textarea v-if="isEditing"
+                            v-model="selectedObservation.admin_notes"></textarea> <span v-else>{{
+                            selectedObservation.admin_notes }}</span></p>
+                    <p><strong>Species:</strong> <input v-if="isEditing" v-model="selectedObservation.species"
+                            type="number" /> <span v-else>{{ selectedObservation.species }}</span></p>
+                    <p><strong>Activity:</strong> <input v-if="isEditing" v-model="selectedObservation.activity"
+                            type="text" /> <span v-else>{{ selectedObservation.activity }}</span></p>
+                    <p><strong>Attributes:</strong> <input v-if="isEditing" v-model="selectedObservation.attributes"
+                            type="text" /> <span v-else>{{ selectedObservation.attributes | JSON }}</span></p>
+                    <button v-if="isLoggedIn && !isEditing" @click="startEdit">Aanpassen</button>
                     <button v-if="isLoggedIn && isEditing" @click="confirmUpdate">Bevestigen</button>
+                    <button v-if="isLoggedIn && isEditing" @click="deleteObservation">Verwijderen</button>
+                    <button v-if="isLoggedIn && isEditing" @click="cancelEdit">Annuleren</button>
                 </div>
-
                 {% endverbatim %}
                 <div v-else>
                     <p>No observation selected</p>
                 </div>
-
             </div>
         </div>
         <div id="filters">

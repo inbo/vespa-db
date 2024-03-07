@@ -2,14 +2,12 @@ const app = Vue.createApp({
     data() {
         return {
             selectedObservation: null,
-            isLoggedIn: !!localStorage.getItem('token'), // Convert string to boolean to determine logged-in state
+            isLoggedIn: !!localStorage.getItem('token'),
             isEditing: false,
             username: '',
-            password: '',
-            observations: [], // Will hold observations data fetched from server
-            map: null, // Reference to the map
-            markers: [], // Array to keep track of markers
-            isModalVisible: false,
+            observations: [],
+            map: null,
+            markers: [],
         };
     },
     methods: {
@@ -123,15 +121,6 @@ const app = Vue.createApp({
         startEdit() {
             // Enable edit mode
             this.isEditing = true;
-        },
-        showModal() {
-            console.log("Showing login modal");
-            this.isModalVisible = true;
-        },
-
-        hideModal() {
-            console.log("Closing login modal");
-            this.isModalVisible = false;
         },
     },
     mounted() {

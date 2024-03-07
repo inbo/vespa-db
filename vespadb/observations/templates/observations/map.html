@@ -14,24 +14,7 @@
 
 <body>
     <div id="app">
-        <div id="navbar">
-            VespaWatch Dashboard
-            <span v-if="isLoggedIn">
-                {{ username }}
-                <button @click="logout">Logout</button>
-            </span>
-            <a href="#" @click="showModal"
-                style="float: right; color: white; text-decoration: none; padding: 10px;">Login</a>
-        </div>
-        <div v-if="isModalVisible" class="modal" style="display: flex;">
-            <div class="modal-content">
-                <span @click="hideModal" class="close">&times;</span>
-                <h2>Login</h2>
-                <input v-model="username" type="text" placeholder="Gebruikersnaam" />
-                <input v-model="password" type="password" placeholder="Wachtwoord" />
-                <button @click="login">Login</button>
-            </div>
-        </div>
+        {% include 'observations/navbar.html' %}
         <div id="main-content">
             <div id="mapid"></div>
             <div id="details">
@@ -62,6 +45,7 @@
             <input type="text" placeholder="Status" />
         </div>
     </div>
+    {% include 'observations/footer.html' %}
     <script src="{% static 'observations/js/map.js' %}"></script>
 </body>
 

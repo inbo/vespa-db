@@ -4,12 +4,22 @@ html {
     padding: 0;
     height: 100%;
     font-family: 'Arial', sans-serif;
+    display: flex;
+    flex-direction: column;
+}
+
+#loginApp {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    justify-content: space-between;
 }
 
 #app {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    flex-grow: 1;
+    justify-content: space-between;
 }
 
 #navbar {
@@ -28,6 +38,7 @@ html {
     padding: 10px;
     background-color: #36532d;
     border-radius: 5px;
+    text-decoration: none;
 }
 
 #navbar a:hover {
@@ -83,30 +94,28 @@ input[type="checkbox"] {
 }
 
 .modal {
-    display: none;
+    display: flex;
     position: fixed;
-    z-index: 1000;
     left: 0;
     top: 0;
     width: 100%;
     height: 100%;
     overflow: auto;
-    background-color: rgb(0, 0, 0);
     background-color: rgba(0, 0, 0, 0.4);
+    justify-content: center;
+    align-items: center;
 }
 
-
 .modal-content {
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
     background-color: #fefefe;
-    margin: 5% auto;
+    margin: auto;
     padding: 20px;
     border: 1px solid #888;
     width: 400px;
     box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
-    position: fixed;
-    top: 10%;
-    left: 50%;
-    transform: translateX(-50%);
+    position: relative;
 }
 
 .modal-content input[type="text"],
@@ -161,6 +170,18 @@ button:hover {
     opacity: 0.8;
 }
 
+.button-style {
+    color: white;
+    text-decoration: none;
+    padding: 10px;
+    background-color: #36532d;
+    border-radius: 5px;
+}
+
+.button-style:hover {
+    background-color: #2e4424;
+}
+
 input[type="text"],
 input[type="password"] {
     box-sizing: border-box;
@@ -168,8 +189,14 @@ input[type="password"] {
     margin: 8px 0;
     border: 1px solid #ccc;
     height: 40px;
-    /* Optioneel, afhankelijk van je ontwerp */
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
+}
+
+footer {
+    background-color: #4C7742;
+    color: white;
+    text-align: left;
+    padding: 10px;
 }

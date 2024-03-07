@@ -38,6 +38,7 @@ class ObservationsViewSet(viewsets.ModelViewSet):
         "location",
         "reported_datetime",
         "validation_status",
+        "validated"
     ]
     filterset_class = ObservationFilter
     ordering_fields = ["reported_datetime", "status"]

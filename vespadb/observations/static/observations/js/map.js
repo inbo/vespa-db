@@ -8,6 +8,13 @@ const app = Vue.createApp({
             observations: [],
             map: null,
             markers: [],
+            filters: {
+                validated: false,
+                minCreationDatetime: '',
+                maxCreationDatetime: '',
+                minLastModificationDatetime: '',
+                maxLastModificationDatetime: ''
+            },
         };
     },
     methods: {
@@ -15,10 +22,29 @@ const app = Vue.createApp({
             // Select a observation for viewing or editing
             this.selectedObservation = observationData;
         },
-        async getObservations() {
+        async applyFilters() {
+            let filterQuery = `/observations/?`;
+            if (this.filters.validated) {
+                filterQuery += `validated=${this.filters.validated}&`;
+            }
+            if (this.filters.minCreationDatetime) {
+                filterQuery += `min_creation_datetime=${new Date(this.filters.minCreationDatetime).toISOString()}&`;
+            }
+            if (this.filters.maxCreationDatetime) {
+                filterQuery += `max_creation_datetime=${new Date(this.filters.maxCreationDatetime).toISOString()}&`;
+            }
+            if (this.filters.minLastModificationDatetime) {
+                filterQuery += `min_last_modification_datetime=${new Date(this.filters.minLastModificationDatetime).toISOString()}&`;
+            }
+            if (this.filters.maxLastModificationDatetime) {
+                filterQuery += `max_last_modification_datetime=${new Date(this.filters.maxLastModificationDatetime).toISOString()}&`;
+            }
+            await this.getObservations(filterQuery);
+        },
+        async getObservations(filterQuery = '/observations/') {
             // Fetch observations data from the server
             try {
-                const response = await fetch('/observations/');
+                const response = await fetch(filterQuery);
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
                 }

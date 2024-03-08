@@ -41,7 +41,7 @@ class ObservationsViewSet(viewsets.ModelViewSet):
         "validated"
     ]
     filterset_class = ObservationFilter
-    ordering_fields = ["reported_datetime", "status"]
+    ordering_fields = ["reported_datetime", "validated"]
     distance_filter_field = "location"
     distance_filter_convert_meters = True
 

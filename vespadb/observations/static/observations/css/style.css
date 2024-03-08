@@ -70,22 +70,18 @@ html {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    /* Allows for wrapping on smaller screens */
     gap: 10px;
-    /* Adds space between elements */
 }
 
 #filters label {
     margin-right: 5px;
     white-space: nowrap;
-    /* Prevents labels from wrapping */
 }
 
 #filters .input-group {
     display: flex;
     align-items: center;
     flex-wrap: nowrap;
-    /* Prevents input groups from wrapping */
 }
 
 #filters input[type="datetime-local"],
@@ -101,13 +97,11 @@ html {
     background-color: #4C7742;
     color: white;
     padding: 5px 10px;
-    /* Smaller padding */
     border: none;
     cursor: pointer;
     border-radius: 5px;
     transition: background-color 0.3s ease;
     white-space: nowrap;
-    /* Prevents text in button from wrapping */
 }
 
 #filters button:hover {
@@ -117,12 +111,10 @@ html {
 @media (max-width: 768px) {
     #filters {
         justify-content: center;
-        /* Center items on smaller screens */
     }
 
     #filters .input-group {
         justify-content: flex-start;
-        /* Align input groups to the start */
     }
 }
 

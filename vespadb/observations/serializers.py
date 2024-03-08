@@ -3,11 +3,11 @@
 from typing import Any, ClassVar, cast
 
 from django.contrib.gis.geos import Point
-from rest_framework import serializers
-from vespadb.observations.models import Cluster
 from django.utils import timezone
+from rest_framework import serializers
 
-from vespadb.observations.models import Observation
+from vespadb.observations.models import Cluster, Observation
+
 
 # Observation serializers
 class ObservationSerializer(serializers.ModelSerializer):
@@ -79,7 +79,7 @@ class ObservationSerializer(serializers.ModelSerializer):
         else:
             # Handle missing location data, e.g., by raising a validation error
             raise serializers.ValidationError("Missing or invalid location data")
-        
+
         # Set last_modification_datetime to now
         instance.last_modification_datetime = timezone.now()
 
@@ -117,6 +117,7 @@ class ClusterSerializer(serializers.ModelSerializer):
 
         model = Cluster
         fields = "__all__"
+
 
 class ClusterPatchSerializer(serializers.ModelSerializer):
     """Serializer for updating clusters with limited fields."""

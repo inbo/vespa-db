@@ -3,12 +3,12 @@
 import django.contrib.gis.db.models.fields
 import django.db.models.deletion
 from django.db import migrations, models
-
+from typing import Any
 
 class Migration(migrations.Migration):
     initial = True
 
-    dependencies = []
+    dependencies: list[Any]= []
 
     operations = [
         migrations.CreateModel(

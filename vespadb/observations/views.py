@@ -19,7 +19,11 @@ from rest_framework_gis.filters import DistanceToPointFilter
 
 from vespadb.observations.filters import ObservationFilter
 from vespadb.observations.models import Observation
-from vespadb.observations.serializers import AdminObservationPatchSerializer, ObservationPatchSerializer, ObservationSerializer
+from vespadb.observations.serializers import (
+    AdminObservationPatchSerializer,
+    ObservationPatchSerializer,
+    ObservationSerializer,
+)
 from vespadb.permissions import IsAdmin, IsUser
 
 
@@ -34,12 +38,7 @@ class ObservationsViewSet(viewsets.ModelViewSet):
         filters.OrderingFilter,
         DistanceToPointFilter,
     ]
-    filterset_fields = [
-        "location",
-        "reported_datetime",
-        "validation_status",
-        "validated"
-    ]
+    filterset_fields = ["location", "reported_datetime", "validation_status", "validated"]
     filterset_class = ObservationFilter
     ordering_fields = ["reported_datetime", "validated"]
     distance_filter_field = "location"
@@ -129,5 +128,7 @@ def map_view(request: Request) -> HttpResponse:
     """Render the map view."""
     return render(request, "observations/map.html")
 
+
 def login_view(request: Request) -> HttpResponse:
-    return render(request, 'observations/login.html')
+    """Render the login view."""
+    return render(request, "observations/login.html")

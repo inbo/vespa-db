@@ -4,13 +4,16 @@ from django.contrib.gis.db import models as gis_models
 from django.db import models
 from django.db.models import JSONField
 
+
 class Observation(models.Model):
+    """Observation model for the observations app."""
+
     id = models.AutoField(primary_key=True)
-    cluster = models.ForeignKey('Cluster', on_delete=models.CASCADE, related_name='observations', null=True, blank=True)
+    cluster = models.ForeignKey("Cluster", on_delete=models.CASCADE, related_name="observations", null=True, blank=True)
     external_id = models.CharField(max_length=255)
     creation_datetime = models.DateTimeField(auto_now_add=True)
     last_modification_datetime = models.DateTimeField(auto_now=True)
-    
+
     # Observation details
     location = gis_models.PointField()
     source = models.CharField(max_length=255)
@@ -22,15 +25,16 @@ class Observation(models.Model):
     activity = models.CharField(max_length=255)
     attributes = JSONField(default=list)
     images = JSONField(default=list)
-    
+
     # Reporter details
     reporter_phone_number = models.CharField(max_length=20, blank=True, null=True)
     reporter_email = models.EmailField()
     reported_datetime = models.DateTimeField()
-    
-    
+
 
 class Cluster(models.Model):
+    """Cluster model for the observations app."""
+
     id = models.AutoField(primary_key=True)
     location = gis_models.PointField()
     species = models.IntegerField()

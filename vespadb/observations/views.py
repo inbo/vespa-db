@@ -1,4 +1,4 @@
-"""Views for the nests app."""
+"""Views for the observations app."""
 
 import csv
 from urllib.parse import urlencode
@@ -17,32 +17,30 @@ from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
 from rest_framework_gis.filters import DistanceToPointFilter
 
-from vespadb.nests.filters import NestFilter
-from vespadb.nests.models import Nest
-from vespadb.nests.serializers import AdminNestPatchSerializer, NestPatchSerializer, NestSerializer
+from vespadb.observations.filters import ObservationFilter
+from vespadb.observations.models import Observation
+from vespadb.observations.serializers import (
+    AdminObservationPatchSerializer,
+    ObservationPatchSerializer,
+    ObservationSerializer,
+)
 from vespadb.permissions import IsAdmin, IsUser
 
 
-class NestsViewSet(viewsets.ModelViewSet):
-    """ViewSet for the Nest model."""
+class ObservationsViewSet(viewsets.ModelViewSet):
+    """ViewSet for the Observation model."""
 
-    queryset = Nest.objects.all()
-    serializer_class = NestSerializer
+    queryset = Observation.objects.all()
+    serializer_class = ObservationSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [
         DjangoFilterBackend,
         filters.OrderingFilter,
         DistanceToPointFilter,
     ]
-    filterset_fields = [
-        "location",
-        "reported_datetime",
-        "status",
-        "nature_reserve",
-        "public_domain",
-    ]
-    filterset_class = NestFilter
-    ordering_fields = ["reported_datetime", "status"]
+    filterset_fields = ["location", "reported_datetime", "validation_status", "validated"]
+    filterset_class = ObservationFilter
+    ordering_fields = ["reported_datetime", "validated"]
     distance_filter_field = "location"
     distance_filter_convert_meters = True
 
@@ -56,8 +54,8 @@ class NestsViewSet(viewsets.ModelViewSet):
         """
         if self.request.method == "PATCH":
             if self.request.user.is_staff:
-                return AdminNestPatchSerializer
-            return NestPatchSerializer
+                return AdminObservationPatchSerializer
+            return ObservationPatchSerializer
         return super().get_serializer_class()
 
     def get_permissions(self) -> list[BasePermission]:
@@ -81,15 +79,15 @@ class NestsViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"], permission_classes=[AllowAny])
     def geojson(self, request: Request) -> Response:
-        """Serve Nest data in GeoJSON format."""
+        """Serve Observation data in GeoJSON format."""
         query_params = request.query_params.dict()
         sorted_query_params_string = urlencode(sorted(query_params.items()))
-        cache_key = f"nests_geojson_data_{sorted_query_params_string}"
+        cache_key = f"observations_geojson_data_{sorted_query_params_string}"
         data = cache.get(cache_key)
 
         if not data:
-            nests = self.get_queryset()
-            data = serialize("geojson", nests, geometry_field="location", fields=("id", "location"))
+            observations = self.get_queryset()
+            data = serialize("geojson", observations, geometry_field="location", fields=("id", "location"))
             refresh_rate = settings.REDIS_REFRESH_RATE_MIN
             cache.set(cache_key, data, refresh_rate * 60)
 
@@ -97,7 +95,7 @@ class NestsViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["post"], permission_classes=[IsAdmin])
     def bulk_import(self, request: Request) -> Response:
-        """Allow bulk import of nests for admin users only.
+        """Allow bulk import of observations for admin users only.
 
         :param request: The request object.
         :return: HTTP Response indicating the status of the operation.
@@ -108,24 +106,29 @@ class NestsViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"], permission_classes=[IsAdmin])
     def export(self, request: Request) -> HttpResponse:
         """
-        Export nests data in CSV format for admin users only.
+        Export observations data in CSV format for admin users only.
 
         :param request: The request object.
         :return: HTTP response with the CSV data.
         """
         response = HttpResponse(content_type="text/csv")
-        response["Content-Disposition"] = 'attachment; filename="nests_export.csv"'
+        response["Content-Disposition"] = 'attachment; filename="observations_export.csv"'
 
         writer = csv.writer(response)
         writer.writerow(["ID", "Creation Datetime", "Status", "Location", "Address"])  # Specify fields as needed.
 
-        nests = Nest.objects.all().values_list("id", "creation_datetime", "status", "location", "address")
-        for nest in nests:
-            writer.writerow(nest)
+        observations = Observation.objects.all().values_list("id", "creation_datetime", "status", "location", "address")
+        for observation in observations:
+            writer.writerow(observation)
 
         return response
 
 
 def map_view(request: Request) -> HttpResponse:
     """Render the map view."""
-    return render(request, "nests/map.html")
+    return render(request, "observations/map.html")
+
+
+def login_view(request: Request) -> HttpResponse:
+    """Render the login view."""
+    return render(request, "observations/login.html")

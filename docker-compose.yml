@@ -25,6 +25,8 @@ services:
     working_dir: /workspaces/vespadb/
     environment:
       - PYTHONPATH=/workspaces/vespadb
+    depends_on:
+      - db
 
   db:
     image: postgis/postgis:latest

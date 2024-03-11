@@ -1,4 +1,4 @@
-"""Permissies voor de nesten API."""
+"""Permissies voor de observationen API."""
 
 from rest_framework import permissions
 from rest_framework.request import Request

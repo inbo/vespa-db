@@ -1,7 +1,7 @@
 [tool.poetry]  # https://python-poetry.org/docs/pyproject/
 name = "vespadb"
 version = "0.0.0"
-description = "monitoring vespa nests"
+description = "monitoring vespa observations"
 authors = []
 license = "Proprietary"
 readme = "README.md"
@@ -74,6 +74,7 @@ show_error_codes = true
 show_error_context = true
 warn_unreachable = true
 mypy_path = "src"
+exclude = "^.*\b(migrations)\b.*$"
 
 [tool.pydantic-mypy]  # https://pydantic-docs.helpmanual.io/mypy_plugin/#configuring-the-plugin
 init_forbid_extra = true
@@ -101,7 +102,9 @@ src = ["src", "tests"]
 target-version = "py311"
 force-exclude = true  # https://docs.astral.sh/ruff/settings/#force-exclude
 preview = true  # https://docs.astral.sh/ruff/preview/
-
+exclude = [
+    "*/migrations/*",
+]
 
 [tool.ruff.extend-per-file-ignores] # https://docs.astral.sh/ruff/settings/#extend-per-file-ignores
 # Ignore missing __init__.py files in tests.

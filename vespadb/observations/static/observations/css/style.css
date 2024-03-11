@@ -4,12 +4,22 @@ html {
     padding: 0;
     height: 100%;
     font-family: 'Arial', sans-serif;
+    display: flex;
+    flex-direction: column;
+}
+
+#loginApp {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    justify-content: space-between;
 }
 
 #app {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    flex-grow: 1;
+    justify-content: space-between;
 }
 
 #navbar {
@@ -28,6 +38,7 @@ html {
     padding: 10px;
     background-color: #36532d;
     border-radius: 5px;
+    text-decoration: none;
 }
 
 #navbar a:hover {
@@ -57,7 +68,54 @@ html {
     background-color: #DDD;
     padding: 10px;
     display: flex;
-    justify-content: space-around;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+#filters label {
+    margin-right: 5px;
+    white-space: nowrap;
+}
+
+#filters .input-group {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+}
+
+#filters input[type="datetime-local"],
+#filters input[type="checkbox"] {
+    border: 1px solid #999;
+    border-radius: 5px;
+    padding: 5px;
+    font-size: 0.9rem;
+    background-color: #FFF;
+}
+
+#filters button {
+    background-color: #4C7742;
+    color: white;
+    padding: 5px 10px;
+    border: none;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: background-color 0.3s ease;
+    white-space: nowrap;
+}
+
+#filters button:hover {
+    background-color: #36532d;
+}
+
+@media (max-width: 768px) {
+    #filters {
+        justify-content: center;
+    }
+
+    #filters .input-group {
+        justify-content: flex-start;
+    }
 }
 
 input[type="text"] {
@@ -96,6 +154,8 @@ input[type="checkbox"] {
 }
 
 .modal-content {
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
     background-color: #fefefe;
     margin: auto;
     padding: 20px;
@@ -157,6 +217,18 @@ button:hover {
     opacity: 0.8;
 }
 
+.button-style {
+    color: white;
+    text-decoration: none;
+    padding: 10px;
+    background-color: #36532d;
+    border-radius: 5px;
+}
+
+.button-style:hover {
+    background-color: #2e4424;
+}
+
 input[type="text"],
 input[type="password"] {
     box-sizing: border-box;
@@ -164,8 +236,14 @@ input[type="password"] {
     margin: 8px 0;
     border: 1px solid #ccc;
     height: 40px;
-    /* Optioneel, afhankelijk van je ontwerp */
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
+}
+
+footer {
+    background-color: #4C7742;
+    color: white;
+    text-align: left;
+    padding: 10px;
 }

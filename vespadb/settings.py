@@ -44,7 +44,7 @@ INSTALLED_APPS = [
     "django_filters",
     "rest_framework",
     "rest_framework.authtoken",
-    "vespadb.nests",
+    "vespadb.observations",
     "vespadb.users",
     "drf_yasg",
 ]
@@ -86,6 +86,22 @@ CACHES = {
         },
         "KEY_PREFIX": "vespadb",
     }
+}
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+        },
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": "DEBUG",
+        },
+    },
 }
 
 ROOT_URLCONF = "vespadb.urls"

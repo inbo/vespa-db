@@ -9,7 +9,7 @@ from drf_yasg.views import get_schema_view
 from rest_framework import permissions
 from rest_framework.authtoken.views import obtain_auth_token
 
-from vespadb.nests.views import map_view
+from vespadb.observations.views import login_view, map_view
 
 schema_view = get_schema_view(
     openapi.Info(
@@ -30,8 +30,9 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("api-token-auth/", obtain_auth_token, name="api_token_auth"),
     path("map/", map_view, name="map"),
-    # Include the nests app URLs
-    path("", include("vespadb.nests.urls", namespace="nests")),
+    path("login/", login_view, name="login"),
+    # Include the observations app URLs
+    path("", include("vespadb.observations.urls", namespace="observations")),
     path("", include("vespadb.users.urls", namespace="users")),
     *static(settings.STATIC_URL, document_root=settings.STATIC_ROOT),  # Use iterable unpacking here
 ]

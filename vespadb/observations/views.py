@@ -127,8 +127,3 @@ class ObservationsViewSet(viewsets.ModelViewSet):
 def map_view(request: Request) -> HttpResponse:
     """Render the map view."""
     return render(request, "observations/map.html")
-
-
-def login_view(request: Request) -> HttpResponse:
-    """Render the login view."""
-    return render(request, "observations/login.html")

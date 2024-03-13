@@ -1,21 +1,63 @@
-"""Serializers for the users app."""
-
+"""Serializer for the users app."""
 from typing import Any
-
 from django.contrib.auth.models import User
 from rest_framework import serializers
-
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
+from rest_framework.response import Response
 
 class UserSerializer(serializers.ModelSerializer):
     """Serializer for the User model."""
 
     class Meta:
         """Meta class for the UserSerializer."""
-
         model = User
         fields = ["id", "username", "email", "password", "date_joined"]
-        extra_kwargs = {"password": {"write_only": True}, "date_joined": {"read_only": True}}
+        extra_kwargs = {
+            "password": {"write_only": True, "required": False},
+            "date_joined": {"read_only": True}
+        }
 
     def create(self, validated_data: dict[str, Any]) -> User:
-        """Create a new user."""
-        return User.objects.create_user(**validated_data)
+        """Create a new user, ensuring the password is validated and hashed."""
+        # Pop the password from validated_data to handle it separately
+        password = validated_data.pop('password', None)
+        user = User.objects.create_user(**validated_data)
+        
+        if password is not None:
+            try:
+                validate_password(password, user)
+            except DjangoValidationError as e:
+                raise serializers.ValidationError({'password': list(e.messages)})
+            user.set_password(password)
+        
+        user.save()
+        return user
+
+    def update(self, instance: User, validated_data: dict[str, Any]) -> User:
+        """Update a user, ensuring the password is validated and hashed if provided."""
+        password = validated_data.pop('password', None)
+        
+        # Update fields except for password
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        
+        if password is not None:
+            try:
+                validate_password(password, instance)
+            except DjangoValidationError as e:
+                raise serializers.ValidationError({'password': list(e.messages)})
+            instance.set_password(password)
+        
+        instance.save()
+        return instance
+
+    def validate_password(self, value: str) -> str:
+        """Perform custom password validation."""
+        if value is not None:
+            try:
+                # Use Django's built-in validators
+                validate_password(value)
+            except DjangoValidationError as exc:
+                raise serializers.ValidationError(str(exc))
+        return value

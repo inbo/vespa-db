@@ -1,3 +1,4 @@
+import { store } from '../../js/store.js';
 const app = Vue.createApp({
     data() {
         return {
@@ -164,8 +165,7 @@ const app = Vue.createApp({
         },
         logout() {
             // Handle user logout
-            localStorage.removeItem('token');
-            this.isLoggedIn = false;
+            store.logout();
         },
         startEdit() {
             // Enable edit mode

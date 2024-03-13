@@ -5,7 +5,6 @@ const profileApp = Vue.createApp({
             userEmail: '',
             userPassword: '',
             userId: null,
-            token: localStorage.getItem('token'),
         };
     },
     methods: {
@@ -13,9 +12,7 @@ const profileApp = Vue.createApp({
             try {
                 const response = await fetch('/api/user/profile/', {
                     method: 'GET',
-                    headers: {
-                        'Authorization': `Token ${this.token}`,
-                    },
+                    credentials: 'include',
                 });
                 if (!response.ok) {
                     throw new Error('Failed to fetch profile data');
@@ -32,10 +29,7 @@ const profileApp = Vue.createApp({
             try {
                 const response = await fetch(`/api/users/${this.userId}/`, {
                     method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Token ${this.token}`,
-                    },
+                    credentials: 'include',
                     body: JSON.stringify({
                         email: this.userEmail,
                     }),
@@ -52,10 +46,7 @@ const profileApp = Vue.createApp({
             try {
                 const response = await fetch(`/api/users/${this.userId}/change_password/`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Token ${this.token}`,
-                    },
+                    credentials: 'include',
                     body: JSON.stringify({
                         new_password: this.userPassword,
                     }),

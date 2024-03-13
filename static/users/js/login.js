@@ -8,11 +8,18 @@ createApp({
         };
     },
     methods: {
+        getCsrfToken() {
+            return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        },
         async login() {
             try {
-                const response = await fetch('/api-token-auth/', {
+                const csrfToken = this.getCsrfToken();
+                const response = await fetch('/login/', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken,
+                    },
                     body: JSON.stringify({ username: this.username, password: this.password }),
                 });
 
@@ -20,13 +27,9 @@ createApp({
                     throw new Error('Login failed.');
                 }
 
-                const data = await response.json();
-                localStorage.setItem('token', data.token);
-
-                // Redirect to the dashboard page or wherever appropriate
                 window.location.href = '/map/';
             } catch (error) {
-                alert('Login failed. Please try again.'); // Consider a more user-friendly way to display errors
+                alert('Login failed. Please try again.');
             }
         }
     }

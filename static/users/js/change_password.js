@@ -4,14 +4,12 @@ const changePasswordApp = Vue.createApp({
             oldPassword: '',
             newPassword: '',
             confirmNewPassword: '',
-            token: localStorage.getItem('token'),
         };
     },
     methods: {
         async changePassword() {
             if (this.newPassword !== this.confirmNewPassword) {
-                alert("Nieuw wachtwoord komt niet overeen met de bevestiging.");
-                return;
+                throw new Error("Nieuw wachtwoord komt niet overeen met de bevestiging.");
             }
 
             try {
@@ -19,7 +17,7 @@ const changePasswordApp = Vue.createApp({
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Token ${this.token}`,
+                        credentials: 'include',
                     },
                     body: JSON.stringify({
                         old_password: this.oldPassword,

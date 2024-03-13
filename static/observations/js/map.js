@@ -1,9 +1,9 @@
-import { store } from '../../js/store.js';
+import { store } from '../../shared/store.js';
 const app = Vue.createApp({
     data() {
         return {
             selectedObservation: null,
-            isLoggedIn: !!localStorage.getItem('token'),
+            isLoggedIn: false,
             isEditing: false,
             username: '',
             observations: [],
@@ -17,6 +17,13 @@ const app = Vue.createApp({
                 maxLastModificationDatetime: ''
             },
         };
+    },
+    async created() {
+        await store.checkLoginStatus();
+        this.isLoggedIn = store.state.isLoggedIn;
+        this.username = store.state.username;
+        this.user_id = store.state.userId;
+        this.getObservations();
     },
     methods: {
         selectObservation(observationData) {
@@ -101,9 +108,7 @@ const app = Vue.createApp({
             try {
                 const response = await fetch(`/observations/${this.selectedObservation.id}/`, {
                     method: 'DELETE',
-                    headers: {
-                        'Authorization': `Token ${localStorage.getItem('token')}`,
-                    },
+                    credentials: 'include'
                 });
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
@@ -121,10 +126,7 @@ const app = Vue.createApp({
             try {
                 const response = await fetch(`/observations/${this.selectedObservation.id}/`, {
                     method: 'PATCH',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Token ${localStorage.getItem('token')}`,
-                    },
+                    credentials: 'include',
                     body: JSON.stringify(this.selectedObservation)
                 });
                 if (!response.ok) {
@@ -137,30 +139,23 @@ const app = Vue.createApp({
                 console.error('Error when updating the observation:', error);
             }
         },
-        async login() {
-            // Handle user login
+        async checkLoginStatus() {
             try {
-                const response = await fetch('/api-token-auth/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        username: this.username,
-                        password: this.password,
-                    }),
+                const response = await fetch('/check_login/', {
+                    method: 'GET',
+                    credentials: 'include'
                 });
-                if (!response.ok) {
-                    throw new Error('Login failed.');
+                if (response.ok) {
+                    const data = await response.json();
+                    this.isLoggedIn = data.isLoggedIn;
+                    this.username = data.username;
+                    this.user_id = data.user_id;
+                    console.log("Login status: ", this.isLoggedIn);
+                } else {
+                    this.isLoggedIn = false;
                 }
-                const data = await response.json();
-                localStorage.setItem('token', data.token);
-                this.username = '';
-                this.password = '';
-                this.closeLoginModal(); // Close modal on successful login
-                this.isLoggedIn = true;
             } catch (error) {
-                throw new Error('Login failed. Please try again.');
+                this.isLoggedIn = false;
             }
         },
         logout() {
@@ -179,7 +174,6 @@ const app = Vue.createApp({
         },
     },
     mounted() {
-        this.getObservations(); // Initial fetch
         setInterval(this.getObservations, 20000); // Poll every 60 seconds
     }
 });

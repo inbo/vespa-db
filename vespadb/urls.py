@@ -10,7 +10,7 @@ from rest_framework import permissions
 from rest_framework.authtoken.views import obtain_auth_token
 
 from vespadb.observations.views import map_view
-from vespadb.users.views import login_view, profile_view, change_password_view
+from vespadb.users.views import login_view, profile_view, change_password_view, check_login
 
 schema_view = get_schema_view(
     openapi.Info(
@@ -34,6 +34,7 @@ urlpatterns = [
     path("map/", map_view, name="map"),
     # User views
     path("login/", login_view, name="login"),
+    path("check_login/", check_login, name="check_login"),
     path('profile/', profile_view, name='user_profile'),
     path('change_password/', change_password_view, name='change_password'),
     # Include the observations app URLs

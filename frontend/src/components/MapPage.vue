@@ -1,5 +1,83 @@
-import { store } from '../../shared/store.js';
-const app = Vue.createApp({
+<template>
+    <NavbarComponent />
+    <div id="main-content">
+        <div id="mapid"></div>
+        <div id="details">
+            <h3>Observation Details</h3>
+            <div v-if="selectedObservation">
+                <p><strong>ID:</strong> {{ selectedObservation.id }}</p>
+                <p><strong>Source:</strong> <input v-if="isEditing" v-model="selectedObservation.source" type="text" />
+                    <span v-else>{{ selectedObservation.source }}</span>
+                </p>
+                <p><strong>Validated:</strong> <input v-if="isEditing" v-model="selectedObservation.validated"
+                        type="checkbox" /> <span v-else>{{ selectedObservation.validated }}</span></p>
+                <p><strong>Notes:</strong> <textarea v-if="isEditing" v-model="selectedObservation.notes"></textarea>
+                    <span v-else>{{ selectedObservation.notes
+                        }}</span>
+                </p>
+                <p><strong>Admin Notes:</strong> <textarea v-if="isEditing"
+                        v-model="selectedObservation.admin_notes"></textarea> <span v-else>{{
+                selectedObservation.admin_notes }}</span></p>
+                <p><strong>Species:</strong> <input v-if="isEditing" v-model="selectedObservation.species"
+                        type="number" /> <span v-else>{{ selectedObservation.species }}</span></p>
+                <p><strong>Activity:</strong> <input v-if="isEditing" v-model="selectedObservation.activity"
+                        type="text" /> <span v-else>{{ selectedObservation.activity }}</span></p>
+                <p><strong>Attributes:</strong> <input v-if="isEditing" v-model="selectedObservation.attributes"
+                        type="text" /> <span v-else>{{ selectedObservation.attributes | JSON }}</span></p>
+                <p><strong>Creation Datetime:</strong> <input v-if="isEditing"
+                        v-model="selectedObservation.creation_datetime" type="datetime-local" /> <span v-else>{{
+                selectedObservation.creation_datetime }}</span></p>
+                <p><strong>Last Modification Datetime:</strong> <input v-if="isEditing"
+                        v-model="selectedObservation.last_modification_datetime" type="datetime-local" /> <span
+                        v-else>{{ selectedObservation.last_modification_datetime }}</span></p>
+
+
+                <button v-if="isLoggedIn && !isEditing" @click="startEdit">Aanpassen</button>
+                <button v-if="isLoggedIn && isEditing" @click="confirmUpdate">Bevestigen</button>
+                <button v-if="isLoggedIn && isEditing" @click="deleteObservation">Verwijderen</button>
+                <button v-if="isLoggedIn && isEditing" @click="cancelEdit">Annuleren</button>
+            </div>
+            <div v-if="!selectedObservation">
+                <p>No observation selected</p>
+            </div>
+        </div>
+    </div>
+    <div id="filters">
+        <div class="input-group">
+            <label for="validated">Validated</label>
+            <input type="checkbox" v-model="filters.validated" id="validated">
+        </div>
+
+        <div class="input-group">
+            <span>Creation Date:</span>
+            <label for="minCreationDatetime">From</label>
+            <input type="datetime-local" v-model="filters.minCreationDatetime" id="minCreationDatetime">
+            <label for="maxCreationDatetime">To</label>
+            <input type="datetime-local" v-model="filters.maxCreationDatetime" id="maxCreationDatetime">
+        </div>
+
+        <div class="input-group">
+            <span>Last Modification:</span>
+            <label for="minLastModificationDatetime">From</label>
+            <input type="datetime-local" v-model="filters.minLastModificationDatetime" id="minLastModificationDatetime">
+            <label for="maxLastModificationDatetime">To</label>
+            <input type="datetime-local" v-model="filters.maxLastModificationDatetime" id="maxLastModificationDatetime">
+        </div>
+        <div class="input-group">
+            <button @click="applyFilters">Filter</button>
+        </div>
+    </div>
+    <FooterComponent></FooterComponent>
+</template>
+
+<script>
+import NavbarComponent from './NavbarComponent.vue';
+import FooterComponent from './FooterComponent.vue';
+export default {
+    components: {
+        NavbarComponent,
+        FooterComponent,
+    },
     data() {
         return {
             selectedObservation: null,
@@ -19,16 +97,33 @@ const app = Vue.createApp({
         };
     },
     created() {
-        await store.checkLoginStatus();
-        this.isLoggedIn = store.state.isLoggedIn;
-        this.username = store.state.username;
-        this.user_id = store.state.userId;
-        this.getObservations();
+        this.initialize();
     },
     methods: {
+        async initialize() {
+            await this.checkLoginStatus();
+        },
         selectObservation(observationData) {
             // Select a observation for viewing or editing
             this.selectedObservation = observationData;
+        },
+        async checkLoginStatus() {
+            try {
+                const response = await fetch('/check_login/', {
+                    method: 'GET',
+                    credentials: 'include'
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    this.isLoggedIn = data.isLoggedIn;
+                    this.username = data.username;
+                    this.user_id = data.user_id;
+                } else {
+                    this.isLoggedIn = false;
+                }
+            } catch (error) {
+                this.isLoggedIn = false;
+            }
         },
         async applyFilters() {
             let filterQuery = `/observations/?`;
@@ -96,7 +191,7 @@ const app = Vue.createApp({
                         })
                     }).addTo(this.map)
                         .on('click', () => this.selectObservation(observation));
-                    this.markers.push(marker); // Store marker reference
+                    this.markers.push(marker);
                 }
             });
         },
@@ -122,7 +217,6 @@ const app = Vue.createApp({
         },
 
         updateObservation() {
-            // Update observation information on the server
             try {
                 const response = await fetch(`/observations/${this.selectedObservation.id}/`, {
                     method: 'PATCH',
@@ -134,12 +228,12 @@ const app = Vue.createApp({
                 }
                 const data = await response.json();
                 console.log('Success:', data);
-                this.isEditing = false; // End editing after successful update
+                this.isEditing = false;
             } catch (error) {
                 console.error('Error when updating the observation:', error);
             }
         },
-        checkLoginStatus() {
+        async checkLoginStatus() {
             try {
                 const response = await fetch('/check_login/', {
                     method: 'GET',
@@ -150,17 +244,12 @@ const app = Vue.createApp({
                     this.isLoggedIn = data.isLoggedIn;
                     this.username = data.username;
                     this.user_id = data.user_id;
-                    console.log("Login status: ", this.isLoggedIn);
                 } else {
                     this.isLoggedIn = false;
                 }
             } catch (error) {
                 this.isLoggedIn = false;
             }
-        },
-        logout() {
-            // Handle user logout
-            store.logout();
         },
         startEdit() {
             // Enable edit mode
@@ -174,7 +263,15 @@ const app = Vue.createApp({
         },
     },
     mounted() {
+        this.initializeMapAndMarkers();
+        this.checkLoginStatus();
+        this.getObservations();
         setInterval(this.getObservations, 20000); // Poll every 60 seconds
     }
-});
-app.mount('#app');
+};
+</script>
+
+
+<style scoped>
+/* Voeg hier je CSS-stijlen toe */
+</style>

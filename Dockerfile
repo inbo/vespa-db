@@ -1,8 +1,23 @@
-# syntax=docker/dockerfile:1
+# First stage: Install Node.js and build the Vue.js project
+FROM node:lts AS frontend-builder
+
+# Set the working directory
+WORKDIR /app
+# Copy frontend package files to the working directory
+COPY ./frontend/package*.json ./
+
+# Install dependencies
+RUN npm install
+
+COPY ./frontend/ .
+# Execute build
+RUN npm run build
+
+# Base stage for the Python environment
 ARG PYTHON_VERSION=3.11.6
 FROM python:$PYTHON_VERSION-slim AS base
 
-LABEL org.opencontainers.image.description "monitoring vespa observations"
+LABEL org.opencontainers.image.description "Monitoring Vespa observations"
 
 ENV PYTHONFAULTHANDLER=1 \
     PYTHONUNBUFFERED=1 \
@@ -12,7 +27,7 @@ ENV PYTHONFAULTHANDLER=1 \
 RUN --mount=type=cache,target=/root/.cache/pip/ \
     pip install poetry==$POETRY_VERSION poethepoet pre-commit
 
-# Install curl, compilers, GDAL dependencies, and PostgreSQL client.
+# Install curl, compilers, GDAL dependencies, and PostgreSQL client
 RUN rm /etc/apt/apt.conf.d/docker-clean
 RUN --mount=type=cache,target=/var/cache/apt/ \
     --mount=type=cache,target=/var/lib/apt/ \
@@ -22,7 +37,7 @@ RUN --mount=type=cache,target=/var/cache/apt/ \
 ENV GDAL_LIBRARY_PATH /usr/lib/libgdal.so
 ENV GEOS_LIBRARY_PATH /usr/lib/libgeos_c.so
 
-# Create and activate a virtual environment.
+# Create and activate a virtual environment
 RUN python -m venv /opt/vespadb-env
 ENV PATH /opt/vespadb-env/bin:$PATH
 ENV VIRTUAL_ENV /opt/vespadb-env
@@ -32,9 +47,10 @@ WORKDIR /workspaces/vespadb/
 RUN mkdir -p /root/.cache/pypoetry/ && mkdir -p /root/.config/pypoetry/ && \
     mkdir -p src/vespadb/ && touch src/vespadb/__init__.py && touch README.md
 
+# Development stage setup
 FROM base AS dev
 
-# Install DevContainer utilities: zsh, git, and starship prompt. Note: Docker CLI setup has been updated.
+# Install DevContainer utilities: zsh, git, and starship prompt. Note: Docker CLI setup has been updated
 RUN --mount=type=cache,target=/var/cache/apt/ \
     --mount=type=cache,target=/var/lib/apt/ \
     apt-get update && apt-get install --yes --no-install-recommends openssh-client git zsh gnupg lsb-release
@@ -48,8 +64,6 @@ RUN curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /
 RUN sh -c "$(curl -fsSL https://starship.rs/install.sh)" -- "--yes" && \
     git config --system --add safe.directory '*' && \
     echo 'eval "$(starship init zsh)"' >> ~/.zshrc \
-    # Commented out to avoid build failure. Uncomment if poe-the-poet is installed and configured correctly.
-    # && echo 'poe --help' >> ~/.zshrc \
     && zsh -c 'source ~/.zshrc'
 
 # Copy poetry and project configuration files to the container
@@ -60,11 +74,15 @@ RUN poetry install --no-root --no-interaction --no-ansi
 
 CMD ["zsh"]
 
+# Application stage setup
 FROM base AS app
 
 COPY poetry.lock* pyproject.toml /workspaces/vespadb/
 RUN --mount=type=cache,target=/root/.cache/pypoetry/ \
     poetry install --only main --no-interaction --no-ansi
+
+# Copy built Vue.js assets to Django's static files directory
+COPY --from=frontend-builder /app/dist static
 
 COPY . .
 

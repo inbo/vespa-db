@@ -10,6 +10,7 @@ import NavbarComponent from './components/NavbarComponent.vue'
 
 export default {
   name: 'App',
+  created() { },
   components: {
     NavbarComponent
   }

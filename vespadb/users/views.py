@@ -93,8 +93,6 @@ def login_view(request: Request) -> HttpResponse:
                 return JsonResponse({'detail': 'Invalid credentials'}, status=400)
             else:
                 return render(request, "users/login.html", {"error": "Invalid credentials"})
-    elif request.method == "GET":
-        return render(request, "users/login.html")
     else:
         return HttpResponse(status=405)
 

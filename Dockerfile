@@ -14,8 +14,7 @@ COPY ./frontend/ .
 RUN npm run build
 
 # Base stage for the Python environment
-ARG PYTHON_VERSION=3.11.6
-FROM python:$PYTHON_VERSION-slim AS base
+FROM python:3.11.6-slim AS base
 
 LABEL org.opencontainers.image.description "Monitoring Vespa observations"
 
@@ -82,7 +81,7 @@ RUN --mount=type=cache,target=/root/.cache/pypoetry/ \
     poetry install --only main --no-interaction --no-ansi
 
 # Copy built Vue.js assets to Django's static files directory
-COPY --from=frontend-builder /app/dist static
+COPY --from=frontend-builder ../static/vue static
 
 COPY . .
 

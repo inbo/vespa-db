@@ -24,3 +24,5 @@ reports/
 
 # PyCharm
 .idea/
+
+static/vue

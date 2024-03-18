@@ -7,11 +7,12 @@ from django.urls import include, path, re_path
 from drf_yasg import openapi
 from drf_yasg.views import get_schema_view
 from rest_framework import permissions
-from rest_framework.authtoken.views import obtain_auth_token
-from vespadb.spa.views import SPAView
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView,
+)
 
-from vespadb.observations.views import map_view
-from vespadb.users.views import login_view, profile_view, change_password_view, check_login
+from vespadb.users.views import UserStatusView
 
 schema_view = get_schema_view(
     openapi.Info(
@@ -30,18 +31,13 @@ urlpatterns = [
     path("swagger/", schema_view.with_ui("swagger", cache_timeout=0), name="schema-swagger-ui"),
     path("redoc/", schema_view.with_ui("redoc", cache_timeout=0), name="schema-redoc"),
     path("admin/", admin.site.urls),
-    path("api-token-auth/", obtain_auth_token, name="api_token_auth"),
-    # observation views
-    path("map/", map_view, name="map"),
     # User views
-    path("login/", login_view, name="login"),
-    path("check_login/", check_login, name="check_login"),
-    #path('profile/', profile_view, name='user_profile'),
-    #path('change_password/', change_password_view, name='change_password'),
+    path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path("user_status/", UserStatusView.as_view(), name="user_status"),
     # Include the observations app URLs
     path("", include("vespadb.observations.urls", namespace="observations")),
     path("", include("vespadb.users.urls", namespace="users")),
-    re_path(r'^.*$', SPAView.as_view(), name='spa'),
     # static urls
     *static(settings.STATIC_URL, document_root=settings.STATIC_ROOT),
 ]

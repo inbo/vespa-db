@@ -1,34 +1,42 @@
 <template>
     <nav id="navbar">
-        <a href="/">VespaWatch Dashboard</a>
-        <div class="nav-right">
-            <span v-if="isLoggedIn">
-                Hallo, {{ username }}!
-                <button @click="logoutAction">Uitloggen</button>
-            </span>
-            <a v-else href="/login" class="button-style">Inloggen</a>
-        </div>
+      <a href="/">VespaWatch Dashboard</a>
+      <div class="nav-right">
+        <span v-if="isLoggedIn">
+          Hallo, {{ username }}!
+          <a href="javascript:void(0);" @click="logout" class="button-style">Uitloggen</a>
+        </span>
+        <a v-else href="/login" class="button-style">Inloggen</a>
+      </div>
     </nav>
-</template>
-
-<script>
-import { mapState, mapActions } from 'vuex';
-
-export default {
+  </template>
+  
+  <script>
+  import { mapActions, mapState } from 'vuex';
+  
+  export default {
     computed: {
-        ...mapState(['isLoggedIn', 'username']),
+      ...mapState(['isLoggedIn', 'username']),
     },
     methods: {
-        ...mapActions(['checkLoginStatus', 'logoutAction']),
-
-        logout() {
-            this.logoutAction().then(() => {
-                this.$router.push('/login');
-            });
-        },
+      ...mapActions(['fetchUserStatus', 'logoutAction']),
+  
+      logout() {
+      this.logoutAction().then(() => {
+        localStorage.removeItem('access_token');
+        this.$router.push('/map');
+      });
+    },
     },
     created() {
-        this.checkLoginStatus();
+      console.log('API URL:', process.env.VUE_APP_API_URL);
+      this.fetchUserStatus();
     },
-};
-</script>
+    mounted() {
+      if (this.isLoggedIn) {
+        this.$router.push('/map'); 
+      }
+    }, 
+  };
+  </script>
+  

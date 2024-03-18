@@ -61,11 +61,11 @@
 </template>
 
 <script>
-import { mapState, mapActions } from 'vuex';
 import L from 'leaflet';
-import 'leaflet/dist/leaflet.css'; 
-import NavbarComponent from './NavbarComponent.vue';
+import 'leaflet/dist/leaflet.css';
+import { mapActions, mapState } from 'vuex';
 import FooterComponent from './FooterComponent.vue';
+import NavbarComponent from './NavbarComponent.vue';
 export default {
     components: {
         NavbarComponent,
@@ -89,13 +89,13 @@ export default {
         ...mapState(['isLoggedIn', 'username', 'userId']),
     },
     methods: {
-        ...mapActions(['checkLoginStatus']),
+        ...mapActions(['fetchUserStatus']),
         selectObservation(observationData) {
             // Select a observation for viewing or editing
             this.selectedObservation = observationData;
         },
         async applyFilters() {
-            let filterQuery = `/observations/?`;
+            let filterQuery = `${process.env.VUE_APP_API_URL}/observations/?`;
             if (this.filters.validated) {
                 filterQuery += `validated=${this.filters.validated}&`;
             }
@@ -107,7 +107,7 @@ export default {
             }
             await this.getObservations(filterQuery);
         },
-        async getObservations(filterQuery = '/observations/') {
+        async getObservations(filterQuery = `${process.env.VUE_APP_API_URL}/observations/`) {
             try {
                 const response = await fetch(filterQuery, { credentials: 'include' });
                 if (!response.ok) {
@@ -157,9 +157,8 @@ export default {
             if (!confirm("Are you sure you want to delete this observation?")) {
                 return;
             }
-
             try {
-                const response = fetch(`/observations/${this.selectedObservation.id}/`, {
+                const response = fetch(`${process.env.VUE_APP_API_URL}/observations/${this.selectedObservation.id}/`, {
                     method: 'DELETE',
                     credentials: 'include'
                 });
@@ -176,7 +175,7 @@ export default {
 
         updateObservation() {
             try {
-                const response = fetch(`/observations/${this.selectedObservation.id}/`, {
+                const response = fetch(`${process.env.VUE_APP_API_URL}/observations/${this.selectedObservation.id}/`, {
                     method: 'PATCH',
                     credentials: 'include',
                     body: JSON.stringify(this.selectedObservation)
@@ -192,7 +191,6 @@ export default {
             }
         },
         startEdit() {
-            // Enable edit mode
             this.isEditing = true;
         },
         confirmUpdate() {
@@ -203,14 +201,14 @@ export default {
         },
     },
     mounted() {
-        this.checkLoginStatus().then(() => {
+        this.fetchUserStatus().then(() => {
             this.initializeMapAndMarkers();
             this.getObservations();
         });
 
         setInterval(() => {
             this.getObservations();
-        }, 20000); // Poll every 20 seconds
+        }, 120000); // Poll every 120 seconds
     }
 };
 </script>

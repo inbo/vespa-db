@@ -80,9 +80,6 @@ COPY poetry.lock* pyproject.toml /workspaces/vespadb/
 RUN --mount=type=cache,target=/root/.cache/pypoetry/ \
     poetry install --only main --no-interaction --no-ansi
 
-# Copy built Vue.js assets to Django's static files directory
-COPY --from=frontend-builder ../static/vue static
-
 COPY . .
 
 ENTRYPOINT ["/opt/vespadb-env/bin/poe"]

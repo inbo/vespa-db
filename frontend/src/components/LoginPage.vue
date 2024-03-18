@@ -12,8 +12,9 @@
 </template>
 
 <script>
-import NavbarComponent from './NavbarComponent.vue';
+import { mapActions } from 'vuex';
 import FooterComponent from './FooterComponent.vue';
+import NavbarComponent from './NavbarComponent.vue';
 
 export default {
     components: {
@@ -27,13 +28,18 @@ export default {
         };
     },
     methods: {
-        login() {
-            // Login logica
+        ...mapActions(['loginAction']),
+        async login() {
+            try {
+                await this.loginAction({
+                username: this.username,
+                password: this.password
+                });
+                this.$router.push('/map');
+            } catch (error) {
+                console.log('Login failed. Please try again.', error.message);
+            }
         }
     }
 }
 </script>
-
-<style scoped>
-/* Je CSS hier */
-</style>M

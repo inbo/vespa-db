@@ -1,16 +1,18 @@
 """Serializer for the users app."""
 from typing import Any
+
+from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
-from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
+from rest_framework import serializers
 from rest_framework.response import Response
 
-class UserSerializer(serializers.ModelSerializer):
-    """Serializer for the User model."""
 
+class UserSerializer(serializers.ModelSerializer):
     class Meta:
         """Meta class for the UserSerializer."""
+
         model = User
         fields = ["id", "username", "email", "password", "date_joined"]
         extra_kwargs = {
@@ -23,32 +25,32 @@ class UserSerializer(serializers.ModelSerializer):
         # Pop the password from validated_data to handle it separately
         password = validated_data.pop('password', None)
         user = User.objects.create_user(**validated_data)
-        
+
         if password is not None:
             try:
                 validate_password(password, user)
             except DjangoValidationError as e:
                 raise serializers.ValidationError({'password': list(e.messages)})
             user.set_password(password)
-        
+
         user.save()
         return user
 
     def update(self, instance: User, validated_data: dict[str, Any]) -> User:
         """Update a user, ensuring the password is validated and hashed if provided."""
         password = validated_data.pop('password', None)
-        
+
         # Update fields except for password
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
-        
+
         if password is not None:
             try:
                 validate_password(password, instance)
             except DjangoValidationError as e:
                 raise serializers.ValidationError({'password': list(e.messages)})
             instance.set_password(password)
-        
+
         instance.save()
         return instance
 
@@ -61,3 +63,23 @@ class UserSerializer(serializers.ModelSerializer):
             except DjangoValidationError as exc:
                 raise serializers.ValidationError(str(exc))
         return value
+
+
+class LoginSerializer(serializers.Serializer):
+    username = serializers.CharField(required=True)
+    password = serializers.CharField(required=True, write_only=True)
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        username = attrs.get('username')
+        password = attrs.get('password')
+        user = authenticate(request=self.context.get('request'), username=username, password=password)
+        if not user:
+            raise serializers.ValidationError('Invalid credentials')
+        attrs['user'] = user
+        return attrs
+
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ('username', 'email')

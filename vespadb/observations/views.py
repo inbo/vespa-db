@@ -122,8 +122,3 @@ class ObservationsViewSet(viewsets.ModelViewSet):
             writer.writerow(observation)
 
         return response
-
-
-def map_view(request: Request) -> HttpResponse:
-    """Render the map view."""
-    return render(request, "observations/map.html")

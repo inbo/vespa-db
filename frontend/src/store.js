@@ -1,13 +1,15 @@
+import axios from 'axios';
 import { createStore } from 'vuex';
 
 export default createStore({
   state() {
     return {
-        isLoggedIn: false,
-        username: '',
-        userId: null,
-        loading: false,
-        error: null,
+      isLoggedIn: false,
+      username: '',
+      userId: null,
+      loading: false,
+      error: null,
+      accessToken: null,
     };
   },
   mutations: {
@@ -17,34 +19,57 @@ export default createStore({
       state.userId = userId;
     },
     setLoading(state, loading) {
-        state.loading = loading;
+      state.loading = loading;
     },
     setError(state, error) {
-        state.error = error;
+      state.error = error;
+    },
+    setAccessToken(state, accessToken) {
+      state.accessToken = accessToken;
     },
   },
   actions: {
-    async checkLoginStatus({ commit }) {
+    async fetchUserStatus({ commit }) {
       commit('setLoading', true);
-      commit('setError', null); // Reset error state
+      commit('setError', null);
       try {
-        const response = await fetch('/check_login/', {
-          method: 'GET',
-          credentials: 'include',
-        });
-        if (response.ok) {
-          const data = await response.json();
-          commit('setLoginStatus', { isLoggedIn: data.isLoggedIn, username: data.username, userId: data.user_id });
-        } else {
-          throw new Error('Failed to fetch login status');
+        const accessToken = localStorage.getItem('access_token');
+        if (!accessToken) {
+          throw new Error('No access token found');
         }
+        const response = await axios.get(`${process.env.VUE_APP_API_URL}/user_status/`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+        commit('setLoginStatus', { isLoggedIn: true, username: response.data.username, userId: response.data.user_id });
       } catch (error) {
-        console.error('Error checking login status:', error);
-        commit('setError', error.message || 'Failed to check login status');
+        console.error('Error fetching user status:', error);
+        commit('setError', error.message || 'Failed to fetch user status');
         commit('setLoginStatus', { isLoggedIn: false, username: '', userId: null });
       } finally {
         commit('setLoading', false);
       }
+    },
+    async loginAction({ commit }, { username, password }) {
+      try {
+        const response = await axios.post(`${process.env.VUE_APP_API_URL}/token/`, {
+          username,
+          password,
+        });
+        const accessToken = response.data.access;
+        commit('setLoginStatus', { isLoggedIn: true, username: username, userId: response.data.user_id });
+        commit('setAccessToken', accessToken);
+        localStorage.setItem('access_token', accessToken);
+      } catch (error) {
+        console.error('Error during login:', error);
+        throw error;
+      }
+    },
+    logoutAction({ commit }) {
+      localStorage.removeItem('access_token');
+      commit('setLoginStatus', { isLoggedIn: false, username: '', userId: null });
+      commit('setAccessToken', null);
     },
   },
 });

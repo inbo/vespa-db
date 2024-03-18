@@ -28,7 +28,8 @@
         "tamasfe.even-better-toml",
         "visualstudioexptteam.vscodeintellicode",
         "GitHub.copilot-chat",
-        "GitHub.copilot"
+        "GitHub.copilot",
+        "Vue.volar"
       ],
       "settings": {
         "coverage-gutters.coverageFileNames": [

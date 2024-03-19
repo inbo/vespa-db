@@ -6,6 +6,8 @@ html {
     font-family: 'Arial', sans-serif;
     display: flex;
     flex-direction: column;
+    background-color: #E5E5E5;
+    color: black;
 }
 
 #loginApp {
@@ -51,6 +53,13 @@ html {
     background-color: #E5E5E5;
 }
 
+#main-content,
+#mapid,
+#details {
+    background-color: #F0F0F0;
+    color: black;
+}
+
 #mapid {
     flex-grow: 2;
     background-color: #FAFAFA;
@@ -65,12 +74,12 @@ html {
 }
 
 #filters {
-    background-color: #DDD;
-    padding: 10px;
     display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 10px;
+    flex-wrap: nowrap;
+    justify-content: space-around;
+    overflow-x: auto;
+    background-color: #DDD;
+    color: black;
 }
 
 #filters label {
@@ -108,14 +117,13 @@ html {
     background-color: #36532d;
 }
 
-@media (max-width: 768px) {
-    #filters {
-        justify-content: center;
-    }
-
-    #filters .input-group {
-        justify-content: flex-start;
-    }
+#filters,
+.v-container {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 10px;
+    padding: 10px;
 }
 
 input[type="text"] {
@@ -246,4 +254,81 @@ footer {
     color: white;
     text-align: left;
     padding: 10px;
+}
+
+
+@media (max-width: 768px) {
+    #filters {
+        justify-content: center;
+    }
+
+    #filters .input-group {
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 600px) {
+    #main-content {
+        flex-direction: column;
+    }
+
+    #mapid,
+    #details {
+        flex-basis: auto;
+        width: 100%;
+    }
+
+    #filters,
+    .v-container {
+        flex-direction: column;
+        padding: 5px;
+    }
+}
+
+@media (max-width: 768px) {
+    #main-content {
+        flex-direction: column-reverse;
+    }
+
+    #mapid {
+        flex-grow: 1;
+        order: 2;
+    }
+
+    #details {
+        flex-basis: 25%;
+        order: 1;
+        padding: 10px;
+    }
+}
+
+@media (max-width: 600px) {
+
+    #filters,
+    .v-container {
+        padding: 5px;
+        flex-direction: column;
+    }
+
+    .v-container .v-select,
+    .v-container .v-switch {
+        width: 100%;
+        margin-bottom: 10px;
+    }
+}
+
+@media (max-width: 600px) {
+    #details {
+        flex-basis: auto;
+        width: 100%;
+        padding: 10px;
+    }
+
+    #details h3 {
+        font-size: 1rem;
+    }
+
+    #details p {
+        font-size: 0.8rem;
+    }
 }

@@ -64,9 +64,9 @@ MIDDLEWARE = [
 ]
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:8080",
+    "http://localhost:4173/",
 ]
-CSRF_TRUSTED_ORIGINS = ["http://localhost:8080"]
+CSRF_TRUSTED_ORIGINS = ["http://localhost:4173/"]
 
 CORS_ALLOW_CREDENTIALS = True
 REST_FRAMEWORK = {

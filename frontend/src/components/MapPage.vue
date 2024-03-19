@@ -1,5 +1,6 @@
 <template>
     <NavbarComponent />
+    <div id="filters"><FilterComponent :initialFilters="filtersConfig" @updateFilters="updateFilters" /></div>
     <div id="main-content">
         <div id="mapid"></div>
         <div id="details">
@@ -40,23 +41,6 @@
             </div>
         </div>
     </div>
-    <div id="filters">
-        <div class="input-group">
-            <label for="validated">Validated</label>
-            <input type="checkbox" v-model="filters.validated" id="validated">
-        </div>
-
-        <div class="input-group">
-            <span>Creation Date:</span>
-            <label for="minCreationDatetime">From</label>
-            <input type="datetime-local" v-model="filters.minCreationDatetime" id="minCreationDatetime">
-            <label for="maxCreationDatetime">To</label>
-            <input type="datetime-local" v-model="filters.maxCreationDatetime" id="maxCreationDatetime">
-        </div>
-        <div class="input-group">
-            <button @click="applyFilters">Filter</button>
-        </div>
-    </div>
     <FooterComponent></FooterComponent>
 </template>
 
@@ -64,12 +48,14 @@
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { mapActions, mapState } from 'vuex';
+import FilterComponent from './FilterComponent.vue';
 import FooterComponent from './FooterComponent.vue';
 import NavbarComponent from './NavbarComponent.vue';
 export default {
     components: {
         NavbarComponent,
         FooterComponent,
+        FilterComponent 
     },
     data() {
         return {
@@ -83,6 +69,10 @@ export default {
                 minCreationDatetime: '',
                 maxCreationDatetime: ''
             },
+            filtersConfig: {
+                minCreationDatetime: { label: 'Min Creation Datetime', type: 'date', value: '' },
+                maxCreationDatetime: { label: 'Max Creation Datetime', type: 'date', value: '' },
+            }
         };
     },
     computed: {
@@ -93,6 +83,10 @@ export default {
         selectObservation(observationData) {
             // Select a observation for viewing or editing
             this.selectedObservation = observationData;
+        },
+        updateFilters(updatedFilters) {
+            this.filtersConfig = updatedFilters;
+            this.applyFilters();
         },
         async applyFilters() {
             let filterQuery = `${process.env.VUE_APP_API_URL}/observations/?`;

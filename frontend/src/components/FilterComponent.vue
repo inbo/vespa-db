@@ -1,69 +1,63 @@
 <template>
-    <div id="filters">
-      <div class="filter-item" v-for="(filter, key) in filters" :key="key">
-        <label :for="key">{{ filter.label }}</label>
-        <input
-          v-if="filter.type === 'date'"
-          type="date"
-          :id="key"
-          v-model="filter.value"
-          @change="applyFilter"
-        />
-      </div>
-    </div>
-  </template>
-  
-  <script>
-  export default {
-    name: 'FilterComponent',
-    props: ['initialFilters'],
-    data() {
-      return {
-        filters: this.initialFilters,
-      };
+  <v-container fluid>
+    <v-row no-gutters>
+      <v-col cols="12" md="2" class="py-1">
+        <v-combobox
+          v-model="filters.municipalities"
+          :items="availableMunicipalities"
+          label="Gemeente"
+          multiple
+          chips
+          small-chips
+          class="styled-combobox"
+        ></v-combobox>
+      </v-col>
+      <v-col cols="12" md="2" class="py-1">
+        <v-combobox
+          v-model="filters.years"
+          :items="availableYears"
+          label="Year"
+          multiple
+          chips
+          small-chips
+          class="styled-combobox"
+        ></v-combobox>
+      </v-col>
+      <v-col cols="12" md="1" class="py-1">
+        <v-btn
+          :color="filters.anb ? '#4C7742' : 'grey lighten-1'"
+          @click="filters.anb = !filters.anb"
+          class="styled-button"
+        >
+          ANB
+        </v-btn>
+      </v-col>
+    </v-row>
+  </v-container>
+</template>
+
+<script>
+export default {
+  name: 'FilterComponent',
+  data: () => ({
+    filters: {
+      municipalities: [],
+      anb: false,
+      thisSeason: false,
+      years: [],
     },
-    methods: {
-      applyFilter() {
-        this.$emit('updateFilters', this.filters);
+    availableMunicipalities: ['Leuven', 'Tienen', 'Brussel'],
+    availableYears: Array.from({ length: 5 }, (v, k) => new Date().getFullYear() - k),
+  }),
+  methods: {
+  },
+  watch: {
+    filters: {
+      handler(newFilters) {
+        this.$emit('update:filters', newFilters);
       },
+      deep: true,
     },
-  };
-  </script>
-  
-  <style scoped>
-  #filters {
-      background-color: #f4f4f4;
-      padding: 20px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      border-bottom: 2px solid #ddd;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  }
-  
-  .filter-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-  }
-  
-  .filter-item label {
-      font-weight: bold;
-      margin: 0;
-      white-space: nowrap;
-  }
-  
-  .filter-item input[type="date"] {
-      padding: 8px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 16px;
-      color: #333;
-  }
-  
-  .filter-item input[type="date"]:focus {
-      outline: none;
-      border-color: #007bff;
-      box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
-  }
-  </style>
+  },
+};
+</script>

@@ -6,6 +6,8 @@ html {
     font-family: 'Arial', sans-serif;
     display: flex;
     flex-direction: column;
+    background-color: #E5E5E5;
+    color: black;
 }
 
 #loginApp {
@@ -51,6 +53,13 @@ html {
     background-color: #E5E5E5;
 }
 
+#main-content,
+#mapid,
+#details {
+    background-color: #F0F0F0;
+    color: black;
+}
+
 #mapid {
     flex-grow: 2;
     background-color: #FAFAFA;
@@ -65,12 +74,12 @@ html {
 }
 
 #filters {
-    background-color: #DDD;
-    padding: 10px;
     display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 10px;
+    flex-wrap: nowrap;
+    justify-content: space-around;
+    overflow-x: auto;
+    background-color: #DDD;
+    color: black;
 }
 
 #filters label {
@@ -116,6 +125,15 @@ html {
     #filters .input-group {
         justify-content: flex-start;
     }
+}
+
+#filters,
+.v-container {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 10px;
+    padding: 10px;
 }
 
 input[type="text"] {
@@ -246,4 +264,120 @@ footer {
     color: white;
     text-align: left;
     padding: 10px;
+}
+
+.v-row {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    margin: 0 !important;
+}
+
+.v-col {
+    flex-grow: 0 !important;
+    max-width: 100% !important;
+    flex-basis: auto !important;
+}
+
+.v-select,
+.v-combobox,
+.v-switch {
+    width: 100%;
+    min-height: 28px !important;
+    margin-bottom: 0 !important;
+}
+
+.v-input__control,
+.v-input__slot {
+    min-height: 28px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+.v-select .v-select__slot,
+.v-combobox .v-input__slot,
+.v-switch .v-input__slot,
+.v-text-field__slot,
+.v-select__slot,
+.v-input__slot {
+    padding-top: 0px !important;
+    padding-bottom: 0px !important;
+    background-color: #f5f5f5;
+    border-radius: 4px;
+}
+
+.v-label {
+    font-size: 0.75rem !important;
+    line-height: 1 !important;
+}
+
+.v-chip {
+    height: auto !important;
+    font-size: 0.75rem !important;
+}
+
+.v-container {
+    padding: 0 !important;
+}
+
+input,
+select,
+.v-btn {
+    height: 28px !important;
+    font-size: 0.875rem !important;
+}
+
+.v-input__border,
+.v-input__icon {
+    border-color: #ccc !important;
+}
+
+.v-col {
+    flex-grow: 1;
+    flex-basis: 50%;
+    /* Elke kolom neemt maximaal 50% van de breedte in */
+}
+
+.v-switch {
+    --v-theme-switch-track-background: #ddd;
+    /* Achtergrondkleur van de track */
+    --v-theme-switch-knob-color: #4C7742;
+    /* Kleur van de knop */
+    --v-theme-switch-knob-size: 22px;
+    /* Grootte van de knop */
+    --v-theme-switch-track-height: 14px;
+    /* Hoogte van de track */
+    --v-theme-switch-track-width: 40px;
+    /* Breedte van de track */
+}
+
+@media (max-width: 768px) {
+    .v-col {
+        flex-basis: 100%;
+        /* Op mobiele apparaten neemt elke kolom de volledige breedte in */
+    }
+}
+
+.styled-button {
+    height: 40px;
+    /* Maak de knop hoger */
+    color: #4C7742;
+    /* Kleur van de lettertypes */
+    border: 1px solid #4C7742;
+    /* Randkleur */
+}
+
+.styled-combobox .v-input__control {
+    border: 1px solid #4C7742;
+    /* Randkleur voor combobox */
+}
+
+.styled-combobox .v-select__selections {
+    color: #4C7742;
+    /* Lettertypekleur voor geselecteerde items in combobox */
+}
+
+.styled-combobox .v-input__slot {
+    height: 40px;
+    /* Zorg ervoor dat de combobox dezelfde hoogte heeft als de knop */
 }

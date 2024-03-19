@@ -2,6 +2,9 @@
 node_modules
 /dist
 
+# Env files
+.env.development
+.env.production
 
 # local env files
 .env.local

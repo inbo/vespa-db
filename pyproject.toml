@@ -26,6 +26,9 @@ djangorestframework-gis = "^1.0"
 pre-commit = "^3.6.2"
 django-redis = "^5.4.0"
 python-dotenv = "^1.0.1"
+django-cors-headers = "^4.3.1"
+djangorestframework-jwt = "^1.11.0"
+djangorestframework-simplejwt = "^5.3.1"
 
 [tool.poetry.group.dev.dependencies]  # https://python-poetry.org/docs/master/managing-dependencies/
 coverage = { extras = ["toml"], version = ">=7.4.1" }

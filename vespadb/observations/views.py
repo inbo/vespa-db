@@ -7,7 +7,6 @@ from django.conf import settings
 from django.core.cache import cache
 from django.core.serializers import serialize
 from django.http import HttpResponse
-from django.shortcuts import render
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
@@ -122,13 +121,3 @@ class ObservationsViewSet(viewsets.ModelViewSet):
             writer.writerow(observation)
 
         return response
-
-
-def map_view(request: Request) -> HttpResponse:
-    """Render the map view."""
-    return render(request, "observations/map.html")
-
-
-def login_view(request: Request) -> HttpResponse:
-    """Render the login view."""
-    return render(request, "observations/login.html")

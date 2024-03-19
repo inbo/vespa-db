@@ -8,13 +8,13 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-    <link rel="stylesheet" href="{% static 'observations/css/style.css' %}">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
 </head>
 
 <body>
     <div id="app">
-        {% include 'observations/navbar.html' %}
+        {% include 'shared/navbar.html' %}
         <div id="main-content">
             <div id="mapid"></div>
             <div id="details">
@@ -85,8 +85,9 @@
             </div>
         </div>
     </div>
-    {% include 'observations/footer.html' %}
-    <script src="{% static 'observations/js/map.js' %}"></script>
+    {% include 'shared/footer.html' %}
+    <script type="module" src="{% static 'shared/store.js' %}"></script>
+    <script type="module" src="{% static 'observations/js/map.js' %}"></script>
 </body>
 
 </html>

@@ -8,7 +8,3 @@ class ObservationsConfig(AppConfig):
 
     default_auto_field = "django.db.models.BigAutoField"
     name = "vespadb.observations"
-
-    def ready(self) -> None:
-        """Import signals."""
-        import vespadb.observations.signals  # noqa: PLC0415, F401

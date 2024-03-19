@@ -11,24 +11,18 @@ class ObservationFilter(GeoFilterSet):
 
     min_creation_datetime = django_filters.DateTimeFilter(field_name="creation_datetime", lookup_expr="gte")
     max_creation_datetime = django_filters.DateTimeFilter(field_name="creation_datetime", lookup_expr="lte")
-    min_last_modification_datetime = django_filters.DateTimeFilter(
-        field_name="last_modification_datetime", lookup_expr="gte"
-    )
-    max_last_modification_datetime = django_filters.DateTimeFilter(
-        field_name="last_modification_datetime", lookup_expr="lte"
-    )
+    min_modified_datetime = django_filters.DateTimeFilter(field_name="modified_datetime", lookup_expr="gte")
+    max_modified_datetime = django_filters.DateTimeFilter(field_name="modified_datetime", lookup_expr="lte")
 
     class Meta:
         """Meta class for the ObservationFilter."""
 
         model = Observation
         fields = [
-            "validation_status",
-            "validated",
             "min_creation_datetime",
             "max_creation_datetime",
-            "min_last_modification_datetime",
-            "max_last_modification_datetime",
+            "min_modified_datetime",
+            "max_modified_datetime",
         ]
         geo_filters = {
             "location": ["exact", "distance_lte", "dwithin"],

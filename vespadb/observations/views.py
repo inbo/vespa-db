@@ -1,6 +1,7 @@
 """Views for the observations app."""
 
 import csv
+from typing import Any
 from urllib.parse import urlencode
 
 from django.conf import settings
@@ -37,11 +38,21 @@ class ObservationsViewSet(viewsets.ModelViewSet):
         filters.OrderingFilter,
         DistanceToPointFilter,
     ]
-    filterset_fields = ["location", "reported_datetime", "validation_status", "validated"]
+    filterset_fields = ["location", "creation_datetime", "modified_datetime"]
     filterset_class = ObservationFilter
-    ordering_fields = ["reported_datetime", "validated"]
+    ordering_fields = ["creation_datetime", "modified_datetime"]
     distance_filter_field = "location"
     distance_filter_convert_meters = True
+
+    def get_serializer_context(self) -> dict[str, Any]:
+        """
+        Add the request to the serializer context.
+
+        :return: Context dictionary with the request included.
+        """
+        context: dict[str, Any] = super().get_serializer_context()
+        context["request"] = self.request
+        return context
 
     def get_serializer_class(self) -> BaseSerializer:
         """
@@ -114,9 +125,8 @@ class ObservationsViewSet(viewsets.ModelViewSet):
         response["Content-Disposition"] = 'attachment; filename="observations_export.csv"'
 
         writer = csv.writer(response)
-        writer.writerow(["ID", "Creation Datetime", "Status", "Location", "Address"])  # Specify fields as needed.
-
-        observations = Observation.objects.all().values_list("id", "creation_datetime", "status", "location", "address")
+        writer.writerow(["ID", "CreationDatetime", "source", "Location"])
+        observations = Observation.objects.all().values_list("id", "creation_datetime", "source", "location")
         for observation in observations:
             writer.writerow(observation)
 

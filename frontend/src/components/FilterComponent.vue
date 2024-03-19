@@ -1,63 +1,51 @@
 <template>
-  <v-container fluid>
-    <v-row no-gutters>
-      <v-col cols="12" md="2" class="py-1">
-        <v-combobox
-          v-model="filters.municipalities"
-          :items="availableMunicipalities"
-          label="Gemeente"
+    <v-row>
+      <v-col cols="5" sm="3" md="3" lg="3"class="d-flex align-start">
+        <v-autocomplete
+          v-model="selectedGemeentes"
+          :menu-props="{ maxHeight: 500 }"
+          :items="gemeentes"
+          label="Selecteer gemeente(s)"
           multiple
           chips
-          small-chips
-          class="styled-combobox"
-        ></v-combobox>
+          dense
+          solo
+        ></v-autocomplete>
       </v-col>
-      <v-col cols="12" md="2" class="py-1">
-        <v-combobox
-          v-model="filters.years"
-          :items="availableYears"
-          label="Year"
+
+      <v-col cols="5" sm="3" md="3" lg="3"class="d-flex align-start">
+        <v-autocomplete
+          v-model="selectedJaartallen"
+          :items="jaartallen"
+          label="Selecteer jaartal(len)"
           multiple
           chips
-          small-chips
-          class="styled-combobox"
-        ></v-combobox>
+          dense
+          solo
+        ></v-autocomplete>
       </v-col>
-      <v-col cols="12" md="1" class="py-1">
-        <v-btn
-          :color="filters.anb ? '#4C7742' : 'grey lighten-1'"
-          @click="filters.anb = !filters.anb"
-          class="styled-button"
-        >
-          ANB
-        </v-btn>
+
+      <v-col cols="2" sm="3" md="3" lg="3" class="d-flex align-start">
+        <v-switch
+          v-model="anbAreasActief"
+          :label="`ANB Areas ${anbAreasActief ? 'Aan' : 'Uit'}`"
+          :color="anbAreasActief ? '#4C7742' : ''"
+        ></v-switch>
       </v-col>
     </v-row>
-  </v-container>
 </template>
 
 <script>
 export default {
-  name: 'FilterComponent',
   data: () => ({
-    filters: {
-      municipalities: [],
-      anb: false,
-      thisSeason: false,
-      years: [],
-    },
-    availableMunicipalities: ['Leuven', 'Tienen', 'Brussel'],
-    availableYears: Array.from({ length: 5 }, (v, k) => new Date().getFullYear() - k),
+    selectedGemeentes: [],
+    gemeentes: ['Aalst', 'Dendermonde', 'Diest'], // TODO: fetch from API
+    selectedJaartallen: [],
+    jaartallen: [2020, 2021, 2022, 2023],
+    anbAreasActief: false,
+    smallScreen: false,
   }),
   methods: {
   },
-  watch: {
-    filters: {
-      handler(newFilters) {
-        this.$emit('update:filters', newFilters);
-      },
-      deep: true,
-    },
-  },
-};
+}
 </script>

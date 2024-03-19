@@ -23,9 +23,7 @@ class IsAdmin(permissions.BasePermission):
 
 
 class IsAdminOrSelf(permissions.BasePermission):
-    """
-    Custom permission to only allow users to edit their own profile unless they are an admin.
-    """
+    """Custom permission to only allow users to edit their own profile unless they are an admin."""
 
     def has_object_permission(self, request: Request, view: View, obj: User) -> bool:
         """Write permissions are only allowed to the user themselves or an admin."""

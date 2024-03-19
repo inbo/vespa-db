@@ -38,9 +38,9 @@ class ObservationsViewSet(viewsets.ModelViewSet):
         filters.OrderingFilter,
         DistanceToPointFilter,
     ]
-    filterset_fields = ["location", "creation_datetime", "modified_datetime"]
+    filterset_fields = ["location", "created_datetime", "modified_datetime"]
     filterset_class = ObservationFilter
-    ordering_fields = ["creation_datetime", "modified_datetime"]
+    ordering_fields = ["created_datetime", "modified_datetime"]
     distance_filter_field = "location"
     distance_filter_convert_meters = True
 

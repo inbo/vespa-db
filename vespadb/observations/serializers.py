@@ -148,5 +148,4 @@ class MunicipalitySerializer(serializers.ModelSerializer):
         """Meta class for the MunicipalitySerializer."""
 
         model = Municipality
-        geo_field = "polygon"
-        fields = ["name", "nis_code", "polygon"]
+        fields = ["name"]

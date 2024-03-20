@@ -38,6 +38,10 @@ urlpatterns = [
     # Include the observations app URLs
     path("", include("vespadb.observations.urls", namespace="observations")),
     path("", include("vespadb.users.urls", namespace="users")),
-    # static urls
-    *static(settings.STATIC_URL, document_root=settings.STATIC_ROOT),
 ]
+
+if settings.DEBUG:
+    urlpatterns = urlpatterns + static(
+        settings.STATIC_URL,
+        document_root=settings.STATIC_ROOT,
+    )

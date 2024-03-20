@@ -34,18 +34,33 @@
       </v-col>
     </v-row>
 </template>
-
 <script>
+import ApiService from '@/services/apiService';
 export default {
   data: () => ({
     selectedGemeentes: [],
-    gemeentes: ['Aalst', 'Dendermonde', 'Diest'], // TODO: fetch from API
+    gemeentes: [],
     selectedJaartallen: [],
     jaartallen: [2020, 2021, 2022, 2023],
     anbAreasActief: false,
     smallScreen: false,
   }),
   methods: {
+    async fetchMunicipalities() {
+      try {
+        const response = await ApiService.get('/municipalities/');
+        if (response.status === 200) {
+          this.gemeentes = response.data.map(municipality => municipality.name);
+        } else {
+          console.error('Failed to fetch municipalities: Status Code', response.status);
+        }
+      } catch (error) {
+        console.error('Error fetching municipalities:', error);
+      }
+    },
+  },
+  created() {
+    this.fetchMunicipalities();
   },
 }
 </script>

@@ -33,7 +33,6 @@
 
                 <button v-if="isLoggedIn && !isEditing" @click="startEdit">Aanpassen</button>
                 <button v-if="isLoggedIn && isEditing" @click="confirmUpdate">Bevestigen</button>
-                <button v-if="isLoggedIn && isEditing" @click="deleteObservation">Verwijderen</button>
                 <button v-if="isLoggedIn && isEditing" @click="cancelEdit">Annuleren</button>
             </div>
             <div v-if="!selectedObservation">
@@ -45,6 +44,7 @@
 </template>
 
 <script>
+import ApiService from '@/services/apiService';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { mapActions, mapState } from 'vuex';
@@ -89,7 +89,7 @@ export default {
             this.applyFilters();
         },
         async applyFilters() {
-            let filterQuery = `${process.env.VUE_APP_API_URL}/observations/?`;
+            let filterQuery = `/observations/?`;
             if (this.filters.validated) {
                 filterQuery += `validated=${this.filters.validated}&`;
             }
@@ -101,14 +101,13 @@ export default {
             }
             await this.getObservations(filterQuery);
         },
-        async getObservations(filterQuery = `${process.env.VUE_APP_API_URL}/observations/`) {
+        async getObservations(filterQuery = `/observations/`) {
             try {
-                const response = await fetch(filterQuery, { credentials: 'include' });
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
+                const response = await ApiService.get(filterQuery);
+                if (response.status !== 200) {
+                    throw new Error(`Network response was not ok, status code: ${response.status}`);
                 }
-                const data = await response.json();
-                this.observations = data;
+                this.observations = response.data;
                 this.updateMarkers();
             } catch (error) {
                 console.error('There has been a problem with your fetch operation:', error);
@@ -147,38 +146,13 @@ export default {
                 }
             });
         },
-        deleteObservation() {
-            if (!confirm("Are you sure you want to delete this observation?")) {
-                return;
-            }
+        async updateObservation() {
             try {
-                const response = fetch(`${process.env.VUE_APP_API_URL}/observations/${this.selectedObservation.id}/`, {
-                    method: 'DELETE',
-                    credentials: 'include'
-                });
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                console.log('Observation deleted successfully');
-                this.selectedObservation = null; // Reset selected observation
-                this.getObservations(); // Refresh observations list
-            } catch (error) {
-                console.error('Error when deleting the observation:', error);
-            }
-        },
-
-        updateObservation() {
-            try {
-                const response = fetch(`${process.env.VUE_APP_API_URL}/observations/${this.selectedObservation.id}/`, {
-                    method: 'PATCH',
-                    credentials: 'include',
-                    body: JSON.stringify(this.selectedObservation)
-                });
-                if (!response.ok) {
+                const response = await ApiService.patch(`/observations/${this.selectedObservation.id}/`, this.selectedObservation);
+                if (response.status !== 200) {
                     throw new Error('Network response was not ok');
                 }
                 const data = response.json();
-                console.log('Success:', data);
                 this.isEditing = false;
             } catch (error) {
                 console.error('Error when updating the observation:', error);
@@ -203,6 +177,6 @@ export default {
         setInterval(() => {
             this.getObservations();
         }, 120000); // Poll every 120 seconds
-    }
+    },
 };
 </script>

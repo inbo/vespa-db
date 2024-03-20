@@ -1,3 +1,4 @@
+import ApiService from '@/services/apiService';
 import axios from 'axios';
 import { createStore } from 'vuex';
 
@@ -34,15 +35,17 @@ export default createStore({
             commit('setError', null);
             try {
                 const accessToken = localStorage.getItem('access_token');
-                if (!accessToken) {
-                    throw new Error('No access token found');
+                let headers = {};
+
+                if (accessToken) {
+                    headers.Authorization = `Bearer ${accessToken}`;
                 }
-                const response = await axios.get(`${process.env.VUE_APP_API_URL}/user_status/`, {
-                    headers: {
-                        Authorization: `Bearer ${accessToken}`,
-                    },
-                });
-                commit('setLoginStatus', { isLoggedIn: true, username: response.data.username, userId: response.data.user_id });
+
+                const response = await axios.get(`/user_status/`, { headers });
+
+                if (response.data.is_logged_in) {
+                    commit('setLoginStatus', { isLoggedIn: true, username: response.data.username, userId: response.data.user_id });
+                }
             } catch (error) {
                 console.error('Error fetching user status:', error);
                 commit('setError', error.message || 'Failed to fetch user status');
@@ -53,23 +56,26 @@ export default createStore({
         },
         async loginAction({ commit }, { username, password }) {
             try {
-                const response = await axios.post(`${process.env.VUE_APP_API_URL}/token/`, {
+                const response = await ApiService.post('/token/', {
                     username,
                     password,
                 });
                 const accessToken = response.data.access;
+                localStorage.setItem('access_token', accessToken);
                 commit('setLoginStatus', { isLoggedIn: true, username: username, userId: response.data.user_id });
                 commit('setAccessToken', accessToken);
-                localStorage.setItem('access_token', accessToken);
             } catch (error) {
                 console.error('Error during login:', error);
                 throw error;
             }
         },
+
         logoutAction({ commit }) {
             localStorage.removeItem('access_token');
+            ApiService.removeHeader();
             commit('setLoginStatus', { isLoggedIn: false, username: '', userId: null });
             commit('setAccessToken', null);
         },
+
     },
 });

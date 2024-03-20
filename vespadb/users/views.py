@@ -5,12 +5,12 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import AllowAny, BasePermission
+from rest_framework.permissions import AllowAny, BasePermission, IsAdminUser
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from vespadb.permissions import IsAdmin, IsAdminOrSelf
+from vespadb.permissions import IsAdminOrSelf
 from vespadb.users.serializers import UserSerializer
 
 
@@ -19,7 +19,7 @@ class UserViewSet(viewsets.ModelViewSet):
 
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAdminUser]
 
     def perform_create(self, serializer: serializers.ModelSerializer) -> None:
         """Create a new user."""
@@ -28,7 +28,7 @@ class UserViewSet(viewsets.ModelViewSet):
     def get_permissions(self) -> list[BasePermission]:
         """Instantiate and return the list of permissions that this view requires."""
         if self.action in {"list", "create", "destroy"}:
-            permission_classes = [IsAdmin]
+            permission_classes = [IsAdminUser]
         elif self.action in {"retrieve", "update", "partial_update", "change_password"}:
             permission_classes = [IsAdminOrSelf]
         else:

@@ -22,14 +22,11 @@
       ...mapActions(['fetchUserStatus', 'logoutAction']),
   
       logout() {
-      this.logoutAction().then(() => {
-        localStorage.removeItem('access_token');
-        this.$router.push('/map');
-      });
-    },
+        this.logoutAction();
+        this.$router.push('/login');
+      },
     },
     created() {
-      console.log('API URL:', process.env.VUE_APP_API_URL);
       this.fetchUserStatus();
     },
     mounted() {

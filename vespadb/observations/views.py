@@ -11,7 +11,7 @@ from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import AllowAny, BasePermission, IsAuthenticated, IsAdminUser
+from rest_framework.permissions import AllowAny, BasePermission, IsAdminUser, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
@@ -26,6 +26,7 @@ from vespadb.observations.serializers import (
     ObservationPatchSerializer,
     ObservationSerializer,
 )
+
 
 class ObservationsViewSet(viewsets.ModelViewSet):
     """ViewSet for the Observation model."""
@@ -137,11 +138,7 @@ class MunicipalityViewSet(ReadOnlyModelViewSet):
 
     queryset = Municipality.objects.all()
     serializer_class = MunicipalitySerializer
-    
+
     def get_permissions(self) -> list[BasePermission]:
         """Determine the set of permissions that apply to the current action."""
-        if self.request.method in ['GET']:
-            permission_classes = [AllowAny]
-        else:
-            permission_classes = [IsAdminUser]
-        return [permission() for permission in permission_classes]
+        return [AllowAny] if self.request.method == "GET" else [IsAdminUser]

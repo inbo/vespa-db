@@ -6,6 +6,7 @@
             <input type="text" v-model="username" placeholder="Gebruikersnaam" />
             <input type="password" v-model="password" placeholder="Wachtwoord" />
             <button @click="login">Login</button>
+            <p v-if="loginError" class="error">{{ loginError }}</p>
         </div>
         <footer-component></footer-component>
     </div>
@@ -24,20 +25,23 @@ export default {
     data() {
         return {
             username: '',
-            password: ''
+            password: '',
+            loginError: null
         };
     },
     methods: {
         ...mapActions(['loginAction']),
         async login() {
+            this.loginError = null;
             try {
                 await this.loginAction({
-                username: this.username,
-                password: this.password
+                    username: this.username,
+                    password: this.password
                 });
                 this.$router.push('/map');
             } catch (error) {
-                console.log('Login failed. Please try again.', error.message);
+                this.loginError = "Login mislukt. Controleer uw gebruikersnaam en wachtwoord.";
+                console.error('Login failed:', error.message);
             }
         }
     }

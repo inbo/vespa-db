@@ -11,7 +11,7 @@ from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import AllowAny, BasePermission, IsAuthenticated
+from rest_framework.permissions import AllowAny, BasePermission, IsAuthenticated, IsAdminUser
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
@@ -26,8 +26,6 @@ from vespadb.observations.serializers import (
     ObservationPatchSerializer,
     ObservationSerializer,
 )
-from vespadb.permissions import IsAdmin, IsUser
-
 
 class ObservationsViewSet(viewsets.ModelViewSet):
     """ViewSet for the Observation model."""
@@ -82,9 +80,9 @@ class ObservationsViewSet(viewsets.ModelViewSet):
             List[BasePermission]: A list of permission instances that should be applied to the action.
         """
         if self.action in {"create", "update", "partial_update"}:
-            permission_classes = [IsUser()]
+            permission_classes = [IsAuthenticated()]
         elif self.action == "destroy":
-            permission_classes = [IsAdmin()]
+            permission_classes = [IsAdminUser()]
         else:
             permission_classes = [AllowAny()]
         return permission_classes
@@ -105,7 +103,7 @@ class ObservationsViewSet(viewsets.ModelViewSet):
 
         return HttpResponse(data, content_type="application/json")
 
-    @action(detail=False, methods=["post"], permission_classes=[IsAdmin])
+    @action(detail=False, methods=["post"], permission_classes=[IsAdminUser])
     def bulk_import(self, request: Request) -> Response:
         """Allow bulk import of observations for admin users only.
 
@@ -115,7 +113,7 @@ class ObservationsViewSet(viewsets.ModelViewSet):
         # Placeholder for bulk import logic.
         return Response(status=status.HTTP_501_NOT_IMPLEMENTED)
 
-    @action(detail=False, methods=["get"], permission_classes=[IsAdmin])
+    @action(detail=False, methods=["get"], permission_classes=[IsAdminUser])
     def export(self, request: Request) -> HttpResponse:
         """
         Export observations data in CSV format for admin users only.
@@ -131,7 +129,6 @@ class ObservationsViewSet(viewsets.ModelViewSet):
         observations = Observation.objects.all().values_list("id", "creation_datetime", "source", "location")
         for observation in observations:
             writer.writerow(observation)
-
         return response
 
 
@@ -140,3 +137,11 @@ class MunicipalityViewSet(ReadOnlyModelViewSet):
 
     queryset = Municipality.objects.all()
     serializer_class = MunicipalitySerializer
+    
+    def get_permissions(self) -> list[BasePermission]:
+        """Determine the set of permissions that apply to the current action."""
+        if self.request.method in ['GET']:
+            permission_classes = [AllowAny]
+        else:
+            permission_classes = [IsAdminUser]
+        return [permission() for permission in permission_classes]

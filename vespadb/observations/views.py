@@ -26,7 +26,18 @@ from vespadb.observations.serializers import (
     ObservationPatchSerializer,
     ObservationSerializer,
 )
+from django.contrib.gis.geos import Point
+from rest_framework import status, viewsets
+from rest_framework.exceptions import ValidationError
+from rest_framework.request import Request
+from rest_framework.response import Response
 
+from vespadb.observations.models import Municipality, Observation
+from vespadb.observations.serializers import ObservationSerializer
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ObservationsViewSet(viewsets.ModelViewSet):
     """ViewSet for the Observation model."""
@@ -87,6 +98,44 @@ class ObservationsViewSet(viewsets.ModelViewSet):
         else:
             permission_classes = [AllowAny()]
         return permission_classes
+    
+    def create(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        """
+        Override the create method to determine the municipality for a new Observation instance based on the provided point location.
+        
+        Expects 'longitude' and 'latitude' in the request data.
+        """
+        data = request.data.copy()
+
+        longitude = data.get("longitude")
+        latitude = data.get("latitude")
+
+        if longitude is None or latitude is None:
+            raise ValidationError("Longitude and latitude are required.")
+
+        try:
+            # Create a Point instance from the provided location
+            point_location = Point(float(longitude), float(latitude), srid=4326)  # Ensure SRID matches your database configuration
+            
+            # Find the municipality that contains the provided location
+            municipality = Municipality.objects.filter(polygon__contains=point_location).first()
+            
+            if municipality:
+                data['municipality'] = municipality.pk
+            else:
+                raise ValidationError("No municipality found for the provided location.")
+        except ValueError as e:
+            logger.error(f"Error converting longitude and latitude to float: {e}")
+            raise ValidationError("Invalid longitude or latitude format.")
+        except Exception as e:
+            logger.error(f"Unexpected error when assigning municipality: {e}")
+            raise ValidationError("An unexpected error occurred while determining the municipality.")
+
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
     @action(detail=False, methods=["get"], permission_classes=[AllowAny])
     def geojson(self, request: Request) -> Response:
@@ -141,4 +190,8 @@ class MunicipalityViewSet(ReadOnlyModelViewSet):
 
     def get_permissions(self) -> list[BasePermission]:
         """Determine the set of permissions that apply to the current action."""
-        return [AllowAny] if self.request.method == "GET" else [IsAdminUser]
+        if self.request.method == "GET":
+            permission_classes = [AllowAny()]
+        else:
+            permission_classes = [IsAdminUser()]
+        return permission_classes

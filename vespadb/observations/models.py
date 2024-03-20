@@ -67,6 +67,18 @@ class EradicationProductEnum(models.TextChoices):
     OTHER = "andere", _("Andere")
     NONE = "geen", _("Geen")
     UNKNOWN = "onbekend", _("Onbekend")
+    
+class Municipality(models.Model):
+    """Model for the municipalities."""
+
+    id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=255)
+    nis_code = models.CharField(max_length=255)
+    polygon = gis_models.MultiPolygonField()
+
+    def __str__(self) -> str:
+        """Return the string representation of the model."""
+        return str(self.name)
 
 
 class Observation(models.Model):
@@ -77,6 +89,13 @@ class Observation(models.Model):
     created_datetime = models.DateTimeField(auto_now_add=True)
     modified_datetime = models.DateTimeField(auto_now=True)
     location = gis_models.PointField()
+    municipality = models.ForeignKey(
+        Municipality,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='observations',
+    )
     source = models.CharField(max_length=255)
     wn_notes = models.TextField(blank=True, null=True)
     wn_admin_notes = models.TextField(blank=True, null=True)
@@ -111,15 +130,3 @@ class Observation(models.Model):
     def __str__(self) -> str:
         """Return the string representation of the model."""
         return f"Observation {self.id} - location: {self.location} - eradicated: {self.eradication_datetime}"
-
-
-class Municipality(models.Model):
-    """Model for the municipalities."""
-
-    name = models.CharField(max_length=255)
-    nis_code = models.CharField(max_length=255)
-    polygon = gis_models.MultiPolygonField()
-
-    def __str__(self) -> str:
-        """Return the string representation of the model."""
-        return str(self.name)

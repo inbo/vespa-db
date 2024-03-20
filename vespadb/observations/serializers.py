@@ -148,4 +148,4 @@ class MunicipalitySerializer(serializers.ModelSerializer):
         """Meta class for the MunicipalitySerializer."""
 
         model = Municipality
-        fields = ["name"]
+        fields = ["id", "name"]

@@ -15,12 +15,14 @@ from rest_framework.permissions import AllowAny, BasePermission, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
+from rest_framework.viewsets import ReadOnlyModelViewSet
 from rest_framework_gis.filters import DistanceToPointFilter
 
 from vespadb.observations.filters import ObservationFilter
-from vespadb.observations.models import Observation
+from vespadb.observations.models import Municipality, Observation
 from vespadb.observations.serializers import (
     AdminObservationPatchSerializer,
+    MunicipalitySerializer,
     ObservationPatchSerializer,
     ObservationSerializer,
 )
@@ -131,3 +133,10 @@ class ObservationsViewSet(viewsets.ModelViewSet):
             writer.writerow(observation)
 
         return response
+
+
+class MunicipalityViewSet(ReadOnlyModelViewSet):
+    """ViewSet for the Municipality model."""
+
+    queryset = Municipality.objects.all()
+    serializer_class = MunicipalitySerializer

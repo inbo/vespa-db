@@ -29,7 +29,8 @@
         "visualstudioexptteam.vscodeintellicode",
         "GitHub.copilot-chat",
         "GitHub.copilot",
-        "Vue.volar"
+        "Vue.volar",
+        "ms-toolsai.jupyter"
       ],
       "settings": {
         "coverage-gutters.coverageFileNames": [

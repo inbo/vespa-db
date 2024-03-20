@@ -6,7 +6,7 @@ from django.contrib.gis.geos import Point
 from django.utils import timezone
 from rest_framework import serializers
 
-from vespadb.observations.models import Observation
+from vespadb.observations.models import Municipality, Observation
 
 
 # Observation serializers
@@ -138,3 +138,15 @@ class AdminObservationPatchSerializer(serializers.ModelSerializer):
         model = Observation
         fields = "__all__"  # Admins can update all fields except id.
         read_only_fields = ("id",)
+
+
+# Municipality serializers
+class MunicipalitySerializer(serializers.ModelSerializer):
+    """Serializer for the Municipality model."""
+
+    class Meta:
+        """Meta class for the MunicipalitySerializer."""
+
+        model = Municipality
+        geo_field = "polygon"
+        fields = ["name", "nis_code", "polygon"]

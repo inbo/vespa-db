@@ -111,3 +111,15 @@ class Observation(models.Model):
     def __str__(self) -> str:
         """Return the string representation of the model."""
         return f"Observation {self.id} - location: {self.location} - eradicated: {self.eradication_datetime}"
+
+
+class Municipality(models.Model):
+    """Model for the municipalities."""
+
+    name = models.CharField(max_length=255)
+    nis_code = models.CharField(max_length=255)
+    polygon = gis_models.MultiPolygonField()
+
+    def __str__(self) -> str:
+        """Return the string representation of the model."""
+        return str(self.name)

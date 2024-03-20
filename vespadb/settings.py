@@ -46,10 +46,11 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework.authtoken",
     "rest_framework_simplejwt",
-    "vespadb.observations",
-    "vespadb.users",
     "drf_yasg",
     "corsheaders",
+    "vespadb",
+    "vespadb.observations",
+    "vespadb.users",
 ]
 
 MIDDLEWARE = [
@@ -64,9 +65,9 @@ MIDDLEWARE = [
 ]
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:4173/",
+    "http://localhost:4173",
 ]
-CSRF_TRUSTED_ORIGINS = ["http://localhost:4173/"]
+CSRF_TRUSTED_ORIGINS = ["http://localhost:4173"]
 
 CORS_ALLOW_CREDENTIALS = True
 REST_FRAMEWORK = {

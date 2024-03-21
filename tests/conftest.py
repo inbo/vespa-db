@@ -1,1 +1,1 @@
-"""Pytest configuration."""
+"""."""

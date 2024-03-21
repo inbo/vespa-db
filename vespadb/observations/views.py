@@ -1,6 +1,7 @@
 """Views for the observations app."""
 
 import csv
+import logging
 from typing import Any
 from urllib.parse import urlencode
 
@@ -26,6 +27,8 @@ from vespadb.observations.serializers import (
     ObservationPatchSerializer,
     ObservationSerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class ObservationsViewSet(viewsets.ModelViewSet):
@@ -88,6 +91,19 @@ class ObservationsViewSet(viewsets.ModelViewSet):
             permission_classes = [AllowAny()]
         return permission_classes
 
+    def create(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        """
+        Override the create method to determine the municipality for a new Observation instance based on the provided point location.
+
+        Expects 'longitude' and 'latitude' in the request data.
+        """
+        data = request.data.copy()
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
     @action(detail=False, methods=["get"], permission_classes=[AllowAny])
     def geojson(self, request: Request) -> Response:
         """Serve Observation data in GeoJSON format."""
@@ -141,4 +157,6 @@ class MunicipalityViewSet(ReadOnlyModelViewSet):
 
     def get_permissions(self) -> list[BasePermission]:
         """Determine the set of permissions that apply to the current action."""
-        return [AllowAny] if self.request.method == "GET" else [IsAdminUser]
+        if self.request.method == "GET":
+            return [AllowAny()]
+        return [IsAdminUser()]

@@ -64,8 +64,8 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-CORS_ALLOWED_ORIGINS = ["http://localhost:4173", "http://localhost:3000"]
-CSRF_TRUSTED_ORIGINS = ["http://localhost:4173", "http://localhost:3000"]
+CORS_ALLOWED_ORIGINS = ["http://localhost:4173", "http://localhost:3001"]
+CSRF_TRUSTED_ORIGINS = ["http://localhost:4173", "http://localhost:3001"]
 
 CORS_ALLOW_CREDENTIALS = True
 REST_FRAMEWORK = {
@@ -113,11 +113,9 @@ LOGGING = {
             "class": "logging.StreamHandler",
         },
     },
-    "loggers": {
-        "django": {
-            "handlers": ["console"],
-            "level": "DEBUG",
-        },
+    "root": {
+        "handlers": ["console"],
+        "level": "DEBUG",
     },
 }
 

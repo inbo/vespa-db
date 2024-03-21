@@ -1,9 +1,15 @@
 """Observation models for the observations app."""
 
+import logging
+from typing import Any
+
 from django.conf import settings
 from django.contrib.gis.db import models as gis_models
+from django.contrib.gis.geos import Point
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+
+logger = logging.getLogger(__name__)
 
 
 class NestHeightEnum(models.TextChoices):
@@ -67,18 +73,39 @@ class EradicationProductEnum(models.TextChoices):
     OTHER = "andere", _("Andere")
     NONE = "geen", _("Geen")
     UNKNOWN = "onbekend", _("Onbekend")
-    
-class Municipality(models.Model):
-    """Model for the municipalities."""
 
+
+class Municipality(models.Model):
+    """Model voor de Belgische gemeenten met uitgebreide gegevens."""
+
+    # Behoud de bestaande velden
     id = models.AutoField(primary_key=True)
-    name = models.CharField(max_length=255)
-    nis_code = models.CharField(max_length=255)
-    polygon = gis_models.MultiPolygonField()
+    name = models.CharField(max_length=255)  # Overeenkomend met 'NAAM'
+    nis_code = models.CharField(max_length=255)  # Overeenkomend met 'NISCODE'
+    polygon = gis_models.MultiPolygonField(srid=31370)  # Zorg voor het juiste SRID, bv. Belgian Lambert 72
+
+    # Nieuwe velden gebaseerd op de extra informatie
+    oidn = models.BigIntegerField(blank=True, null=True)  # Optioneel, afhankelijk van de behoefte
+    uidn = models.BigIntegerField(blank=True, null=True)
+    terrid = models.BigIntegerField(blank=True, null=True)
+    datpublbs = models.DateField(blank=True, null=True)
+    numac = models.CharField(max_length=10, blank=True, null=True)
+    length = models.FloatField(blank=True, null=True)
+    surface = models.FloatField(blank=True, null=True)
 
     def __str__(self) -> str:
         """Return the string representation of the model."""
         return str(self.name)
+
+
+def get_municipality_from_coordinates(longitude: float, latitude: float) -> Municipality | None:
+    """Get the municipality for a given long and lat."""
+    point_to_check = Point(longitude, latitude, srid=4326)
+    point_to_check.transform(31370)
+
+    municipalities_containing_point = Municipality.objects.filter(polygon__contains=point_to_check)
+    municipality: Municipality | None = municipalities_containing_point.first()
+    return municipality
 
 
 class Observation(models.Model):
@@ -94,7 +121,7 @@ class Observation(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='observations',
+        related_name="observations",
     )
     source = models.CharField(max_length=255)
     wn_notes = models.TextField(blank=True, null=True)
@@ -130,3 +157,28 @@ class Observation(models.Model):
     def __str__(self) -> str:
         """Return the string representation of the model."""
         return f"Observation {self.id} - location: {self.location} - eradicated: {self.eradication_datetime}"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        """
+        Override the save method to automatically assign a municipality based on the observation's location.
+
+        :param args: Variable length argument list.
+        :param kwargs: Arbitrary keyword arguments.
+        """
+        # Only compute the municipality if the location is set and the municipality is not
+        if self.location and not self.municipality:
+            # Ensure self.location is a Point instance
+            if not isinstance(self.location, Point):
+                self.location = Point(self.location)
+
+            long = self.location.x
+            lat = self.location.y
+
+            municipality = get_municipality_from_coordinates(long, lat)
+
+            if municipality:
+                self.municipality = municipality
+            else:
+                logger.warning("No municipality found for the provided location.")
+
+        super().save(*args, **kwargs)

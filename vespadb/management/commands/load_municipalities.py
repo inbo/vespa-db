@@ -1,53 +1,44 @@
-"""Handle the load_municipalities command."""
+"""Handlers."""
 
 from pathlib import Path
 from typing import Any
 
-import geopandas as gpd
-from django.contrib.gis.geos import GEOSGeometry, MultiPolygon, Polygon
+from django.contrib.gis.utils import LayerMapping
 from django.core.management.base import BaseCommand
 
 from vespadb.observations.models import Municipality
 
+# A mapping dictionary to map field names from the Shapefile to the Municipality model fields.
+municipality_mapping = {
+    "oidn": "OIDN",
+    "uidn": "UIDN",
+    "terrid": "TERRID",
+    "nis_code": "NISCODE",
+    "name": "NAAM",
+    "datpublbs": "DATPUBLBS",
+    "numac": "NUMAC",
+    "length": "LENGTE",
+    "surface": "OPPERVL",
+    "polygon": "MULTIPOLYGON",
+}
+
 
 class Command(BaseCommand):
-    """Load municipalities from a Shapefile into the database."""
+    """A custom management command that loads a ShapeFile containing municipality boundaries into the database.
 
-    help = "Load municipalities from a Shapefile into the database"
+    This command uses the LayerMapping utility from Django's GIS framework to perform the data import.
+    """
 
-    def handle(self, *args: Any, **kwargs: Any) -> None:
+    help: str = "Laadt een ShapeFile met gemeentegrenzen in de database."
+
+    def handle(self, *args: Any, **options: Any) -> None:
         """
-        Load the municipalities from the Shapefile into the database.
+        Handle municipality data loading.
 
-        Args:
-            *args (Any): Variable length argument list.
-            **kwargs (Any): Arbitrary keyword arguments.
-
-        Returns
-        -------
-            None
+        :param args: Variable length argument list.
+        :param options: Arbitrary keyword arguments.
         """
-        # Load the GeoDataFrame from the Shapefile
-        script_dir = Path(__file__).parent
-        shp_path = script_dir / "data/Refgem.shp"
+        shapefile_path: str = str((Path(__file__).parent / "data" / "Refgem.shp").resolve())
 
-        gdf = gpd.read_file(str(shp_path))
-        for _, row in gdf.iterrows():
-            nis_code = row["NISCODE"]
-            name = row["NAAM"]
-            geometry = GEOSGeometry(row["geometry"].wkt)
-
-            if isinstance(geometry, Polygon):
-                geometry = MultiPolygon(geometry)
-
-            municipality, created = Municipality.objects.get_or_create(
-                name=name, nis_code=nis_code, defaults={"polygon": geometry}
-            )
-
-            if created:
-                self.stdout.write(self.style.SUCCESS(f'Municipality "{name}" successfully saved.'))
-            else:
-                # Update the polygon geometry if the municipality exists
-                municipality.polygon = geometry
-                municipality.save()
-                self.stdout.write(self.style.SUCCESS(f'Municipality "{name}" updated.'))
+        lm = LayerMapping(Municipality, shapefile_path, municipality_mapping, transform=False, encoding="iso-8859-1")
+        lm.save(strict=True, verbose=True)

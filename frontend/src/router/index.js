@@ -1,7 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import Login from '../components/LoginPage.vue';
 import MapPage from '../components/MapPage.vue';
-import store from '../store';
+import appAuthStore from '../store';
+
 
 const routes = [
   {
@@ -26,11 +27,8 @@ const router = createRouter({
   routes,
 });
 
-router.beforeEach(async (to, from, next) => {
-  if (!store.state.isLoggedIn) {
-    await store.dispatch('fetchUserStatus');
-  }
-  next();
+Router.beforeEach(() => {
+  appAuthStore.authCheck();
 });
 
 export default router;

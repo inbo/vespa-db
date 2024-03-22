@@ -33,16 +33,11 @@ export default {
         ...mapActions(['loginAction']),
         async login() {
             this.loginError = null;
-            try {
-                await this.loginAction({
-                    username: this.username,
-                    password: this.password
-                });
-                this.$router.push('/map');
-            } catch (error) {
-                this.loginError = "Login mislukt. Controleer uw gebruikersnaam en wachtwoord.";
-                console.error('Login failed:', error.message);
-            }
+            await this.loginAction({
+                username: this.username,
+                password: this.password
+            });
+            this.$router.push('/map');
         }
     }
 }

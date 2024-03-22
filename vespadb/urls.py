@@ -32,9 +32,10 @@ urlpatterns = [
     path("redoc/", schema_view.with_ui("redoc", cache_timeout=0), name="schema-redoc"),
     path("admin/", admin.site.urls),
     # User views
-    path("token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
-    path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("user_status/", UserStatusView.as_view(), name="user_status"),
+    path('app_auth/', include('vespadb.app_auth.urls')),
+    path('api-auth/', include('rest_framework.urls', namespace='rest_framework')),
+    path('admin/', admin.site.urls),
     # Include the observations app URLs
     path("", include("vespadb.observations.urls", namespace="observations")),
     path("", include("vespadb.users.urls", namespace="users")),

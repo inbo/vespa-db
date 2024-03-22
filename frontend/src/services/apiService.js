@@ -2,19 +2,29 @@
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_APP_API_URL;
+const instance = axios.create({
+    baseURL: API_URL,
+    withCredentials: true,
+});
+
+function getCookie(name) {
+    const value = '; ' + document.cookie;
+    const parts = value.split('; ' + name + '=');
+    if (parts.length === 2) return parts.pop().split(';').shift() || null;
+    return null;
+}
+
 
 const ApiService = {
     getAxiosInstance() {
-        const instance = axios.create({
-            baseURL: API_URL,
-            withCredentials: true,
+
+        instance.interceptors.request.use((config) => {
+            const csrfToken = getCookie('csrftoken');
+            if (csrfToken) {
+                config.headers['X-CSRFToken'] = csrfToken;
+            }
+            return config;
         });
-
-        const accessToken = localStorage.getItem('access_token');
-        if (accessToken) {
-            instance.defaults.headers.common["Authorization"] = `Bearer ${accessToken}`;
-        }
-
         return instance;
     },
 

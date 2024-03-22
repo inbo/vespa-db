@@ -36,7 +36,6 @@ class ObservationsViewSet(viewsets.ModelViewSet):
 
     queryset = Observation.objects.all()
     serializer_class = ObservationSerializer
-    permission_classes = [IsAuthenticated]
     filter_backends = [
         DjangoFilterBackend,
         filters.OrderingFilter,

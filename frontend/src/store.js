@@ -11,6 +11,8 @@ export default createStore({
             loading: false,
             error: null,
             accessToken: null,
+            selectedMunicipalities: [],
+            observations: [],
         };
     },
     mutations: {
@@ -27,6 +29,12 @@ export default createStore({
         },
         setAccessToken(state, accessToken) {
             state.accessToken = accessToken;
+        },
+        setSelectedMunicipalities(state, municipalities) {
+            state.selectedMunicipalities = municipalities;
+        },
+        setObservations(state, observations) {  // Optioneel
+            state.observations = observations;
         },
     },
     actions: {
@@ -69,7 +77,26 @@ export default createStore({
                 throw error;
             }
         },
-
+        async getObservations({ commit }, filterQuery = '') {
+            console.log(`Ophalen van observaties met filterQuery: '${filterQuery}'`);
+            try {
+                const response = await ApiService.get(`/observations${filterQuery}`); // Verwijder de slash voor filterQuery
+                if (response.status === 200) {
+                    console.log("Observaties succesvol opgehaald: ", response.data);
+                    commit('setObservations', response.data);
+                } else {
+                    throw new Error(`Network response was not ok, status code: ${response.status}`);
+                }
+            } catch (error) {
+                console.error('There has been a problem with your fetch operation:', error);
+            }
+        },
+        updateSelectedMunicipalities({ commit, dispatch }, municipalities) {
+            commit('setSelectedMunicipalities', municipalities);
+            if (municipalities.length === 0) {
+                dispatch('getObservations');
+            }
+        },
         logoutAction({ commit }) {
             localStorage.removeItem('access_token');
             ApiService.removeHeader();

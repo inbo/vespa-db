@@ -1,6 +1,8 @@
 <template>
     <NavbarComponent />
-    <div id="filters"><FilterComponent :initialFilters="filtersConfig" @updateFilters="updateFilters" /></div>
+    <div id="filters">
+        <FilterComponent :initialFilters="filtersConfig" @updateFilters="updateFilters" />
+    </div>
     <div id="main-content">
         <div id="mapid"></div>
         <div id="details">
@@ -18,14 +20,14 @@
                 </p>
                 <p><strong>Admin Notes:</strong> <textarea v-if="isEditing"
                         v-model="selectedObservation.admin_notes"></textarea> <span v-else>{{
-                selectedObservation.admin_notes }}</span></p>
+            selectedObservation.admin_notes }}</span></p>
                 <p><strong>Species:</strong> <input v-if="isEditing" v-model="selectedObservation.species"
                         type="number" /> <span v-else>{{ selectedObservation.species }}</span></p>
                 <p><strong>Activity:</strong> <input v-if="isEditing" v-model="selectedObservation.activity"
                         type="text" /> <span v-else>{{ selectedObservation.activity }}</span></p>
                 <p><strong>Creation Datetime:</strong> <input v-if="isEditing"
                         v-model="selectedObservation.creation_datetime" type="datetime-local" /> <span v-else>{{
-                selectedObservation.creation_datetime }}</span></p>
+            selectedObservation.creation_datetime }}</span></p>
                 <p><strong>Last Modification Datetime:</strong> <input v-if="isEditing"
                         v-model="selectedObservation.last_modification_datetime" type="datetime-local" /> <span
                         v-else>{{ selectedObservation.last_modification_datetime }}</span></p>
@@ -55,13 +57,12 @@ export default {
     components: {
         NavbarComponent,
         FooterComponent,
-        FilterComponent 
+        FilterComponent
     },
     data() {
         return {
             selectedObservation: null,
             isEditing: false,
-            observations: [],
             map: null,
             markers: [],
             filters: {
@@ -76,7 +77,14 @@ export default {
         };
     },
     computed: {
-        ...mapState(['isLoggedIn', 'username', 'userId']),
+        ...mapState(['isLoggedIn', 'username', 'userId', 'observations']),
+    },
+    watch: {
+        observations(newVal) {
+            if (newVal && newVal.length > 0) {
+                this.updateMarkers();
+            }
+        },
     },
     methods: {
         ...mapActions(['fetchUserStatus']),
@@ -84,37 +92,34 @@ export default {
             // Select a observation for viewing or editing
             this.selectedObservation = observationData;
         },
-        updateFilters(updatedFilters) {
-            this.filtersConfig = updatedFilters;
+        updateFilters(filters) {
+            this.filters = {
+                ...this.filters,
+                ...filters
+            };
             this.applyFilters();
         },
         async applyFilters() {
-            let filterQuery = `/observations/?`;
-            if (this.filters.validated) {
-                filterQuery += `validated=${this.filters.validated}&`;
+            let filterQuery = `?`;
+
+            // If there are municipality filters
+            if (this.filters.municipalities && this.filters.municipalities.length) {
+                filterQuery += `municipality_id=${this.filters.municipalities.join(',')}&`;
             }
-            if (this.filters.minCreationDatetime) {
-                filterQuery += `min_creation_datetime=${this.filters.minCreationDatetime.toISOString()}&`;
+
+            // If there are year filters
+            if (this.filters.years && this.filters.years.length) {
+                filterQuery += `year_range=${this.filters.years.join(',')}&`;
             }
-            if (this.filters.maxCreationDatetime) {
-                filterQuery += `max_creation_datetime=${this.filters.maxCreationDatetime.toISOString()}&`;
+
+            if (!this.filters.municipalities.length && !this.filters.years.length) {
+                filterQuery = '';
             }
-            await this.getObservations(filterQuery);
-        },
-        async getObservations(filterQuery = `/observations/`) {
-            try {
-                const response = await ApiService.get(filterQuery);
-                if (response.status !== 200) {
-                    throw new Error(`Network response was not ok, status code: ${response.status}`);
-                }
-                this.observations = response.data;
-                this.updateMarkers();
-            } catch (error) {
-                console.error('There has been a problem with your fetch operation:', error);
-            }
+
+            // Proceed to fetch observations with the constructed or default query
+            this.$store.dispatch('getObservations', filterQuery);
         },
         initializeMapAndMarkers() {
-            // Initialize map and place markers for each observation
             this.map = L.map('mapid').setView([51.0, 4.5], 9);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: 'Map data © OpenStreetMap contributors',
@@ -123,12 +128,14 @@ export default {
             this.updateMarkers();
         },
         updateMarkers() {
-            // Clear existing markers
             this.markers.forEach(marker => this.map.removeLayer(marker));
             this.markers = []; // Reset markers array
 
-            // Add new markers based on observations data
-            this.observations.forEach((observation) => {
+            if (!this.observations.length) {
+                return;
+            }
+
+            this.observations.forEach((observation, index) => {
                 const locationRegex = /POINT \(([^ ]+) ([^ ]+)\)/;
                 const match = observation.location.match(locationRegex);
                 if (match) {
@@ -141,8 +148,10 @@ export default {
                             iconAnchor: [15, 42]
                         })
                     }).addTo(this.map)
-                        .on('click', () => this.selectObservation(observation));
+                    .on('click', () => this.selectObservation(observation));
                     this.markers.push(marker);
+                } else {
+                    console.log(`Geen geldige locatie gevonden voor observatie #${index}.`);
                 }
             });
         },
@@ -170,12 +179,12 @@ export default {
     },
     mounted() {
         this.fetchUserStatus().then(() => {
+            this.$store.dispatch('getObservations');
             this.initializeMapAndMarkers();
-            this.getObservations();
         });
 
         setInterval(() => {
-            this.getObservations();
+            this.$store.dispatch('getObservations');
         }, 120000); // Poll every 120 seconds
     },
 };

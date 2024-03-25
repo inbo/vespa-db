@@ -46,10 +46,10 @@
 </template>
 
 <script>
-import ApiService from '@/services/apiService';
+import { useVespaStore } from '@/stores/vespaStore';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { mapActions, mapState } from 'vuex';
+import { computed, onMounted, ref, watch } from 'vue';
 import FilterComponent from './FilterComponent.vue';
 import FooterComponent from './FooterComponent.vue';
 import NavbarComponent from './NavbarComponent.vue';
@@ -59,133 +59,179 @@ export default {
         FooterComponent,
         FilterComponent
     },
-    data() {
-        return {
-            selectedObservation: null,
-            isEditing: false,
-            map: null,
-            markers: [],
-            filters: {
-                validated: false,
-                minCreationDatetime: '',
-                maxCreationDatetime: ''
-            },
-            filtersConfig: {
-                minCreationDatetime: { label: 'Min Creation Datetime', type: 'date', value: '' },
-                maxCreationDatetime: { label: 'Max Creation Datetime', type: 'date', value: '' },
+    setup() {
+        const vespaStore = useVespaStore();
+        const map = ref(null);
+        const markers = ref([]);
+        const selectedObservation = ref(null);
+        const isEditing = ref(false);
+
+        const isLoggedIn = computed(() => vespaStore.isLoggedIn);
+        const parseLocation = (locationStr) => {
+            // Check if the string includes 'POINT'
+            if (locationStr.includes('POINT')) {
+                // Extract the numbers after 'POINT (' and before the closing ')'
+                const matches = locationStr.match(/POINT\s*\(([^)]+)\)/);
+                if (matches) {
+                    const points = matches[1].split(' ');
+                    // Assuming the format is 'POINT (lng lat)'
+                    const lat = parseFloat(points[1]);
+                    const lng = parseFloat(points[0]);
+                    return { lat, lng };
+                }
+            }
+            console.error("Unable to parse location:", locationStr);
+            return null;
+        };
+        const observations = computed(() => vespaStore.observations.map(obs => ({
+            ...obs,
+            location: parseLocation(obs.location)
+        })));
+
+        const filtersConfig = computed(() => ({
+            minCreationDatetime: { label: 'Min Creation Date', type: 'date', value: '' },
+            maxCreationDatetime: { label: 'Max Creation Date', type: 'date', value: '' },
+            // Assuming these options are loaded from the store or another source
+            municipalities: { label: 'Municipality', type: 'select', options: vespaStore.municipalities, value: [] },
+            years: { label: 'Year', type: 'select', options: vespaStore.years, value: [] }
+        }));
+
+        const filters = ref({
+            minCreationDatetime: '',
+            maxCreationDatetime: '',
+            municipalities: [],
+            years: []
+        });
+
+
+        const updateSelectOptions = computed(() => {
+            // Example logic to update options
+            filtersConfig.value.municipalities.options = vespaStore.municipalities; // Assuming your store has this data
+            filtersConfig.value.years.options = vespaStore.years; // Assuming your store has this data
+        });
+
+        // Function to update filters based on user input
+        const updateFilters = (updatedFilters) => {
+            // Loop through the updated filters and apply changes
+            Object.keys(updatedFilters).forEach(key => {
+                if (filters.value.hasOwnProperty(key)) {
+                    filters.value[key] = updatedFilters[key];
+                }
+            });
+            // Call a method to apply these filters
+            applyFilters();
+        };
+
+        // Function to apply filters and fetch data based on the current filter state
+        const applyFilters = async () => {
+            // Construct the filter query based on the current state of `filters`
+            // This query will depend on how your API expects to receive these filters
+            let filterQuery = '?';
+            // Append each filter to the query string if it's not empty
+            Object.keys(filters.value).forEach(key => {
+                const value = filters.value[key];
+                if (value && Array.isArray(value) && value.length) {
+                    filterQuery += `${key}=${value.join(',')}&`;
+                } else if (value) {
+                    filterQuery += `${key}=${value}&`;
+                }
+            });
+
+            // Remove the last '&' for a clean query string
+            filterQuery = filterQuery.slice(0, -1);
+
+            // Assuming you have a method in your Pinia store to fetch observations with the constructed query
+            await vespaStore.getObservations(filterQuery);
+        };
+        const fetchObservations = async () => {
+            // Assuming you have a method to construct the filter query based on some criteria
+            const filterQuery = ''; // Construct your filter query here
+            await vespaStore.getObservations(filterQuery);
+        };
+
+        const initializeMapAndMarkers = () => {
+            if (!map.value && document.getElementById('mapid')) { // Ensure the element is there
+                map.value = L.map('mapid').setView([51.0, 4.5], 9);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: 'Map data © OpenStreetMap contributors',
+                    maxZoom: 18,
+                }).addTo(map.value);
+
+                // Now that the map is guaranteed to be initialized, call updateMarkers
+                updateMarkers();
             }
         };
-    },
-    computed: {
-        ...mapState(['isLoggedIn', 'username', 'userId', 'observations']),
-    },
-    watch: {
-        observations(newVal) {
-            if (newVal && newVal.length > 0) {
-                this.updateMarkers();
-            }
-        },
-    },
-    methods: {
-        ...mapActions(['fetchUserStatus']),
-        selectObservation(observationData) {
-            // Select a observation for viewing or editing
-            this.selectedObservation = observationData;
-        },
-        updateFilters(filters) {
-            this.filters = {
-                ...this.filters,
-                ...filters
-            };
-            this.applyFilters();
-        },
-        async applyFilters() {
-            let filterQuery = `?`;
 
-            // If there are municipality filters
-            if (this.filters.municipalities && this.filters.municipalities.length) {
-                filterQuery += `municipality_id=${this.filters.municipalities.join(',')}&`;
-            }
+        watch(observations, (newObservations) => {
+            // Update markers based on new observations
+            markers.value.forEach(marker => marker.remove());
+            markers.value = [];
+            newObservations.forEach(obs => {
+                if (obs.location) {
+                    const marker = L.marker([obs.location.lat, obs.location.lng])
+                        .addTo(map.value)
+                        .on('click', () => { selectedObservation.value = obs; });
+                    markers.value.push(marker);
+                }
+            });
+        }, { deep: true });
 
-            // If there are year filters
-            if (this.filters.years && this.filters.years.length) {
-                filterQuery += `year_range=${this.filters.years.join(',')}&`;
-            }
+        const updateMarkers = () => {
+            if (map.value && observations.value) {
+                markers.value.forEach(marker => marker.remove()); // Remove existing markers
+                markers.value = []; // Reset markers array
 
-            if (!this.filters.municipalities.length && !this.filters.years.length) {
-                filterQuery = '';
-            }
-
-            // Proceed to fetch observations with the constructed or default query
-            this.$store.dispatch('getObservations', filterQuery);
-        },
-        initializeMapAndMarkers() {
-            this.map = L.map('mapid').setView([51.0, 4.5], 9);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: 'Map data © OpenStreetMap contributors',
-                maxZoom: 18,
-            }).addTo(this.map);
-            this.updateMarkers();
-        },
-        updateMarkers() {
-            this.markers.forEach(marker => this.map.removeLayer(marker));
-            this.markers = []; // Reset markers array
-
-            if (!this.observations.length) {
-                return;
-            }
-
-            this.observations.forEach((observation, index) => {
-                const locationRegex = /POINT \(([^ ]+) ([^ ]+)\)/;
-                const match = observation.location.match(locationRegex);
-                if (match) {
-                    const [, longitude, latitude] = match;
-                    const marker = L.marker([parseFloat(latitude), parseFloat(longitude)], {
-                        icon: L.divIcon({
+                observations.value.forEach(observation => {
+                    if (observation.location) {
+                        const customIcon = L.divIcon({
                             className: 'custom-div-icon',
                             html: "<i class='fa fa-bug' style='color: black; font-size: 24px;'></i>",
                             iconSize: [30, 42],
                             iconAnchor: [15, 42]
-                        })
-                    }).addTo(this.map)
-                    .on('click', () => this.selectObservation(observation));
-                    this.markers.push(marker);
-                } else {
-                    console.log(`Geen geldige locatie gevonden voor observatie #${index}.`);
-                }
-            });
-        },
-        async updateObservation() {
-            try {
-                const response = await ApiService.patch(`/observations/${this.selectedObservation.id}/`, this.selectedObservation);
-                if (response.status !== 200) {
-                    throw new Error('Network response was not ok');
-                }
-                const data = response.json();
-                this.isEditing = false;
-            } catch (error) {
-                console.error('Error when updating the observation:', error);
+                        });
+                        const marker = L.marker([observation.location.lat, observation.location.lng], { icon: customIcon })
+                            .addTo(map.value)
+                            .on('click', () => {
+                                selectedObservation.value = observation;
+                                // Additional logic for selecting an observation
+                            });
+
+                        markers.value.push(marker);
+                    }
+                });
             }
-        },
-        startEdit() {
-            this.isEditing = true;
-        },
-        confirmUpdate() {
-            this.updateObservation();
-        },
-        cancelEdit() {
-            this.isEditing = false;
-        },
-    },
-    mounted() {
-        this.fetchUserStatus().then(() => {
-            this.$store.dispatch('getObservations');
-            this.initializeMapAndMarkers();
+        };
+        const startEdit = () => {
+            isEditing.value = true;
+        };
+
+        const confirmUpdate = () => {
+            isEditing.value = false;
+            // Logic to confirm and save the updated observation
+        };
+
+        const cancelEdit = () => {
+            isEditing.value = false;
+        };
+
+        onMounted(async () => {
+            await fetchObservations();
+            initializeMapAndMarkers();
         });
 
-        setInterval(() => {
-            this.$store.dispatch('getObservations');
-        }, 120000); // Poll every 120 seconds
+
+        return {
+            selectedObservation,
+            isEditing,
+            markers,
+            map,
+            isLoggedIn,
+            filtersConfig,
+            updateFilters,
+            startEdit,
+            confirmUpdate,
+            cancelEdit,
+        };
     },
 };
 </script>

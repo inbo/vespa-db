@@ -31,7 +31,7 @@ SECRET_KEY = "django-insecure-d^lhi8mkvk(r6a*!i-bgm@iw8_ve4ra9p)643puh^=!c*jchgr
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["0.0.0.0", "localhost"]  # noqa: S104
+ALLOWED_HOSTS = ["0.0.0.0", "localhost", "http://localhost:3000"]  # noqa: S104
 
 # Application definition
 INSTALLED_APPS = [
@@ -45,7 +45,6 @@ INSTALLED_APPS = [
     "django_filters",
     "rest_framework",
     "rest_framework.authtoken",
-    "rest_framework_simplejwt",
     "drf_yasg",
     "corsheaders",
     "vespadb",
@@ -56,16 +55,16 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
+    "django.middleware.common.CommonMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
-    "django.middleware.common.CommonMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-CORS_ALLOWED_ORIGINS = ["http://localhost:4173", "http://localhost:3001"]
-CSRF_TRUSTED_ORIGINS = ["http://localhost:4173", "http://localhost:3001"]
+CORS_ALLOWED_ORIGINS = ["http://localhost:4173", "http://localhost:3000"]
+CSRF_TRUSTED_ORIGINS = ["http://localhost:4173", "http://localhost:3000"]
 
 CORS_ALLOW_CREDENTIALS = True
 REST_FRAMEWORK = {
@@ -78,13 +77,9 @@ CSRF_COOKIE_NAME = "csrftoken"
 SESSION_COOKIE_AGE = 60 * 60
 SESSION_SAVE_EVERY_REQUEST = True
 
-SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=5),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
-    "ROTATE_REFRESH_TOKENS": True,
-    "AUTH_HEADER_NAME": "HTTP_AUTHORIZATION",
-    "AUTH_HEADER_KEYWORDS": ["Bearer"],
-}
+SESSION_COOKIE_SAMESITE = 'Lax' 
+SESSION_COOKIE_SECURE = False
+  
 DATABASES = {
     "default": {
         "ENGINE": "django.contrib.gis.db.backends.postgis",

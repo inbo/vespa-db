@@ -10,6 +10,7 @@ const instance = axios.create({
 function getCookie(name) {
     const value = '; ' + document.cookie;
     const parts = value.split('; ' + name + '=');
+    console.log('parts', parts)
     if (parts.length === 2) return parts.pop().split(';').shift() || null;
     return null;
 }
@@ -17,9 +18,9 @@ function getCookie(name) {
 
 const ApiService = {
     getAxiosInstance() {
-
         instance.interceptors.request.use((config) => {
             const csrfToken = getCookie('csrftoken');
+            console.log('csrfToken', csrfToken)
             if (csrfToken) {
                 config.headers['X-CSRFToken'] = csrfToken;
             }

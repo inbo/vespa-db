@@ -1,28 +1,28 @@
-/**
- * main.js
- *
- * Bootstraps Vuetify and other plugins then mounts the App`
- */
+// main.js
 
-// Plugins
+// Import necessary modules
 import { registerPlugins } from '@/plugins';
+import { createPinia } from 'pinia';
+import { createApp } from 'vue';
+import App from './App.vue';
+import router from './router';
+import { useVespaStore } from './stores/vespaStore';
+
+// Import CSS
 import '@fortawesome/fontawesome-free/css/all.css';
 import 'leaflet/dist/leaflet.css';
 import './assets/style.css';
 
-// Components
-import App from './App.vue';
-import router from './router';
-import store from './store';
+const app = createApp(App);
+const pinia = createPinia();
 
-// Composables
-import { createApp } from 'vue';
+app.use(pinia);
+app.use(router);
 
-const app = createApp(App)
+registerPlugins(app);
 
-app.use(store)
-app.use(router)
+// Initialize and use the vespaStore for authentication check
+const vespaStore = useVespaStore();
+vespaStore.authCheck();
 
-registerPlugins(app)
-
-app.mount('#app')
+app.mount('#app');

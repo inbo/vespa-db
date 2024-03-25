@@ -1,8 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import Login from '../components/LoginPage.vue';
 import MapPage from '../components/MapPage.vue';
-import appAuthStore from '../store';
-
 
 const routes = [
   {
@@ -27,8 +25,7 @@ const router = createRouter({
   routes,
 });
 
-Router.beforeEach(() => {
-  appAuthStore.authCheck();
+router.beforeEach(async (to, from, next) => {
+  next();
 });
-
 export default router;

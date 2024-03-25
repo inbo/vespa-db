@@ -13,7 +13,9 @@
 </template>
 
 <script>
-import { mapActions } from 'vuex';
+import { useVespaStore } from '@/stores/vespaStore';
+import { ref } from 'vue';
+import { useRouter } from 'vue-router';
 import FooterComponent from './FooterComponent.vue';
 import NavbarComponent from './NavbarComponent.vue';
 
@@ -22,23 +24,28 @@ export default {
         NavbarComponent,
         FooterComponent
     },
-    data() {
-        return {
-            username: '',
-            password: '',
-            loginError: null
+    setup() {
+        const router = useRouter();
+        const vespaStore = useVespaStore();
+        const username = ref('');
+        const password = ref('');
+        const loginError = ref(null);
+
+        const login = async () => {
+            try {
+                await vespaStore.loginAction({ username: username.value, password: password.value });
+                router.push('/map');
+            } catch (error) {
+                loginError.value = "Failed to login. Please check your username and password.";
+            }
         };
-    },
-    methods: {
-        ...mapActions(['loginAction']),
-        async login() {
-            this.loginError = null;
-            await this.loginAction({
-                username: this.username,
-                password: this.password
-            });
-            this.$router.push('/map');
-        }
+
+        return {
+            username,
+            password,
+            loginError,
+            login
+        };
     }
-}
+};
 </script>

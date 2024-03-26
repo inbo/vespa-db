@@ -1,31 +1,39 @@
-// Import the necessary utilities from Pinia and your ApiService
-import { default as ApiService, default as instance } from '@/services/apiService';
+import ApiService from '@/services/apiService';
+
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { defineStore } from 'pinia';
 
-// Define a single store combining both previous stores
 export const useVespaStore = defineStore('vespaStore', {
     state: () => ({
-        // States from both stores
         isLoggedIn: false,
         username: '',
         userId: null,
         loading: false,
         error: null,
+        municipalities: [],
         selectedMunicipalities: [],
         observations: [],
+        selectedObservation: null,
+        markers: [],
         user: {},
         authInterval: null,
+        isEditing: false,
+        map: null,
+        filters: {
+            municipalities: [],
+            years: [],
+            anbAreasActief: false,
+        },
     }),
 
     actions: {
-        // Actions from the Vuex store
         async getObservations(filterQuery = '') {
-            console.log(`Fetching observations with filterQuery: '${filterQuery}'`);
             try {
                 const response = await ApiService.get(`/observations${filterQuery}`);
                 if (response.status === 200) {
-                    console.log("Observations successfully fetched: ", response.data);
                     this.observations = response.data;
+                    this.updateMarkers();
                 } else {
                     throw new Error(`Network response was not ok, status code: ${response.status}`);
                 }
@@ -34,17 +42,101 @@ export const useVespaStore = defineStore('vespaStore', {
                 this.error = error.message || 'Failed to fetch observations';
             }
         },
-        updateSelectedMunicipalities(municipalities) {
-            this.selectedMunicipalities = municipalities;
-            if (municipalities.length === 0) {
-                this.getObservations();
+        async applyFilters(filters) {
+            this.filters.municipalities = filters.municipalities;
+            this.filters.years = filters.years;
+            this.filters.anbAreasActief = filters.anbAreasActief;
+
+            let filterQuery = '?';
+
+            if (this.filters.municipalities.length > 0) {
+                filterQuery += `municipality_id=${this.filters.municipalities.join(',')}&`;
+            }
+
+            if (this.filters.years.length > 0) {
+                filterQuery += `year_range=${this.filters.years.join(',')}&`;
+            }
+
+            if (this.filters.anbAreasActief) {
+                // Include ANB areas filter
+            }
+
+            if (filterQuery === '?') {
+                filterQuery = '';
+            } else {
+                // Remove the trailing '&' if present
+                filterQuery = filterQuery.endsWith('&') ? filterQuery.slice(0, -1) : filterQuery;
+            }
+
+            await this.getObservations(filterQuery);
+        },
+        initializeMapAndMarkers() {
+            if (!this.map && document.getElementById('mapid')) {
+                this.map = L.map('mapid').setView([51.0, 4.5], 9);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: 'Map data © OpenStreetMap contributors',
+                    maxZoom: 18,
+                }).addTo(this.map);
+                this.updateMarkers();
             }
         },
+        async updateMarkers() {
+            if (this.map) {
+                this.markers.forEach(marker => this.map.removeLayer(marker));
+                this.markers = [];
 
-        // Actions from the Pinia auth store
-        async loginAction({ username, password }) {
+                if (!this.observations.length) {
+                    return;
+                }
+
+                this.observations.forEach((observation, index) => {
+                    const locationRegex = /POINT \(([^ ]+) ([^ ]+)\)/;
+                    const match = observation.location.match(locationRegex);
+                    if (match) {
+                        const [, longitude, latitude] = match;
+                        const marker = L.marker([parseFloat(latitude), parseFloat(longitude)], {
+                            icon: L.divIcon({
+                                className: 'custom-div-icon',
+                                html: "<i class='fa fa-bug' style='color: black; font-size: 24px;'></i>",
+                                iconSize: [30, 42],
+                                iconAnchor: [15, 42]
+                            })
+                        }).addTo(this.map)
+                            .on('click', () => this.selectObservation(observation));
+                        this.markers.push(marker);
+                    } else {
+                        console.log(`Geen geldige locatie gevonden voor observatie #${index}.`);
+                    }
+                });
+            }
+        },
+        async updateObservation() {
+            try {
+                const response = await ApiService.patch(`/observations/${this.selectedObservation.id}/`, this.selectedObservation);
+                if (response.status !== 200) {
+                    throw new Error('Network response was not ok');
+                }
+                const data = response.json();
+                this.isEditing = false;
+            } catch (error) {
+                console.error('Error when updating the observation:', error);
+            }
+        },
+        async fetchMunicipalities() {
+            try {
+                const response = await ApiService.get('/municipalities/');
+                if (response.status === 200) {
+                    this.municipalities = response.data;
+                } else {
+                    console.error('Failed to fetch municipalities: Status Code', response.status);
+                }
+            } catch (error) {
+                console.error('Error fetching municipalities:', error);
+            }
+        },
+        async login({ username, password }) {
             this.loading = true;
-            await instance
+            await ApiService
                 .post("/app_auth/login/", {
                     username: username,
                     password: password
@@ -53,11 +145,9 @@ export const useVespaStore = defineStore('vespaStore', {
                     this.authCheck();
                 })
                 .catch((error) => {
-                    console.error(error);
                     if (error.response && error.response.data) {
                         this.error = error.response.data.error;
                     } else {
-                        // Handle cases where error.response or error.response.data is undefined
                         this.error = "An unexpected error occurred";
                     }
                     this.isLoggedIn = false;
@@ -67,7 +157,7 @@ export const useVespaStore = defineStore('vespaStore', {
         },
         async authCheck() {
             this.loading = true;
-            await instance
+            await ApiService
                 .get("/app_auth/auth-check")
                 .then((response) => {
                     const data = response.data;
@@ -99,7 +189,7 @@ export const useVespaStore = defineStore('vespaStore', {
         },
         async logout() {
             this.loading = true;
-            await instance
+            await ApiService
                 .get("/api-auth/logout/")
                 .then(() => {
                     this.authCheck();

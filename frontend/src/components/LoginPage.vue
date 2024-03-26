@@ -33,7 +33,7 @@ export default {
 
         const login = async () => {
             try {
-                await vespaStore.loginAction({ username: username.value, password: password.value });
+                await vespaStore.login({ username: username.value, password: password.value });
                 router.push('/map');
             } catch (error) {
                 loginError.value = "Failed to login. Please check your username and password.";

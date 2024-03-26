@@ -7,10 +7,6 @@ from django.urls import include, path, re_path
 from drf_yasg import openapi
 from drf_yasg.views import get_schema_view
 from rest_framework import permissions
-from rest_framework_simplejwt.views import (
-    TokenObtainPairView,
-    TokenRefreshView,
-)
 
 from vespadb.users.views import UserStatusView
 
@@ -33,9 +29,9 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     # User views
     path("user_status/", UserStatusView.as_view(), name="user_status"),
-    path('app_auth/', include('vespadb.app_auth.urls')),
-    path('api-auth/', include('rest_framework.urls', namespace='rest_framework')),
-    path('admin/', admin.site.urls),
+    path("app_auth/", include("vespadb.app_auth.urls")),
+    path("api-auth/", include("rest_framework.urls", namespace="rest_framework")),
+    path("admin/", admin.site.urls),
     # Include the observations app URLs
     path("", include("vespadb.observations.urls", namespace="observations")),
     path("", include("vespadb.users.urls", namespace="users")),

@@ -1,7 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import Login from '../components/LoginPage.vue';
 import MapPage from '../components/MapPage.vue';
-import store from '../store';
 
 const routes = [
   {
@@ -27,10 +26,6 @@ const router = createRouter({
 });
 
 router.beforeEach(async (to, from, next) => {
-  if (!store.state.isLoggedIn) {
-    await store.dispatch('fetchUserStatus');
-  }
   next();
 });
-
 export default router;

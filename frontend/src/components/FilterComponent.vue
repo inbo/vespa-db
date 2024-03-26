@@ -21,36 +21,35 @@
 
 <script>
 import ApiService from '@/services/apiService';
-import { mapActions, mapMutations } from 'vuex';
+import { useVespaStore } from '@/stores/vespaStore';
+
 export default {
-  data: () => ({
-    selectedMunicipalities: [],
-    municipalities: [],
-    selectedYears: [],
-    jaartallen: [2020, 2021, 2022, 2023],
-    anbAreasActief: false,
-  }),
-  computed: {
-    formattedMunicipalities() {
-      const formatted_municipalities = this.municipalities.map(municipality => {
-        return {
-          name: municipality.name,
-          id: municipality.id
-        };
-      });
-      return formatted_municipalities;
-    },
+  data() {
+    return {
+      selectedMunicipalities: [],
+      municipalities: [],
+      selectedYears: [],
+      jaartallen: [2020, 2021, 2022, 2023],
+      anbAreasActief: false,
+    };
   },
   watch: {
-      selectedMunicipalities(newVal) {
-          if (newVal.length === 0) {
-              this.$emit('updateFilters', { municipalities: [], years: this.selectedYears, anbAreasActief: this.anbAreasActief });
-          }
+    selectedMunicipalities: {
+      handler() {
+        this.emitFilterUpdate();
       },
+      deep: true,
+    },
+  },
+  computed: {
+    formattedMunicipalities() {
+      return this.municipalities.map(municipality => ({
+        name: municipality.name,
+        id: municipality.id
+      }));
+    },
   },
   methods: {
-    ...mapActions(['updateSelectedMunicipalities']),
-    ...mapMutations(['setSelectedMunicipalities']),
     async fetchMunicipalities() {
       try {
         const response = await ApiService.get('/municipalities/');
@@ -64,7 +63,8 @@ export default {
       }
     },
     emitFilterUpdate() {
-      this.$emit('updateFilters', {
+      const vespaStore = useVespaStore();
+      vespaStore.applyFilters({
         municipalities: this.selectedMunicipalities,
         years: this.selectedYears,
         anbAreasActief: this.anbAreasActief

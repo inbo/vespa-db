@@ -46,10 +46,9 @@
 </template>
 
 <script>
-import ApiService from '@/services/apiService';
-import L from 'leaflet';
+import { useVespaStore } from '@/stores/vespaStore';
 import 'leaflet/dist/leaflet.css';
-import { mapActions, mapState } from 'vuex';
+import { computed, onMounted } from 'vue';
 import FilterComponent from './FilterComponent.vue';
 import FooterComponent from './FooterComponent.vue';
 import NavbarComponent from './NavbarComponent.vue';
@@ -59,133 +58,44 @@ export default {
         FooterComponent,
         FilterComponent
     },
-    data() {
-        return {
-            selectedObservation: null,
-            isEditing: false,
-            map: null,
-            markers: [],
-            filters: {
-                validated: false,
-                minCreationDatetime: '',
-                maxCreationDatetime: ''
-            },
-            filtersConfig: {
-                minCreationDatetime: { label: 'Min Creation Datetime', type: 'date', value: '' },
-                maxCreationDatetime: { label: 'Max Creation Datetime', type: 'date', value: '' },
-            }
+    setup() {
+        const vespaStore = useVespaStore();
+
+        const selectedObservation = computed(() => vespaStore.selectedObservation);
+        const isEditing = computed(() => vespaStore.isEditing);
+        const markers = computed(() => vespaStore.markers);
+        const map = computed(() => vespaStore.map);
+        const isLoggedIn = computed(() => vespaStore.isLoggedIn);
+
+
+        const startEdit = () => {
+            isEditing.value = true;
         };
-    },
-    computed: {
-        ...mapState(['isLoggedIn', 'username', 'userId', 'observations']),
-    },
-    watch: {
-        observations(newVal) {
-            if (newVal && newVal.length > 0) {
-                this.updateMarkers();
-            }
-        },
-    },
-    methods: {
-        ...mapActions(['fetchUserStatus']),
-        selectObservation(observationData) {
-            // Select a observation for viewing or editing
-            this.selectedObservation = observationData;
-        },
-        updateFilters(filters) {
-            this.filters = {
-                ...this.filters,
-                ...filters
-            };
-            this.applyFilters();
-        },
-        async applyFilters() {
-            let filterQuery = `?`;
 
-            // If there are municipality filters
-            if (this.filters.municipalities && this.filters.municipalities.length) {
-                filterQuery += `municipality_id=${this.filters.municipalities.join(',')}&`;
-            }
+        const confirmUpdate = () => {
+            isEditing.value = false;
+            // Logic to confirm and save the updated observation
+        };
 
-            // If there are year filters
-            if (this.filters.years && this.filters.years.length) {
-                filterQuery += `year_range=${this.filters.years.join(',')}&`;
-            }
+        const cancelEdit = () => {
+            isEditing.value = false;
+        };
 
-            if (!this.filters.municipalities.length && !this.filters.years.length) {
-                filterQuery = '';
-            }
-
-            // Proceed to fetch observations with the constructed or default query
-            this.$store.dispatch('getObservations', filterQuery);
-        },
-        initializeMapAndMarkers() {
-            this.map = L.map('mapid').setView([51.0, 4.5], 9);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: 'Map data © OpenStreetMap contributors',
-                maxZoom: 18,
-            }).addTo(this.map);
-            this.updateMarkers();
-        },
-        updateMarkers() {
-            this.markers.forEach(marker => this.map.removeLayer(marker));
-            this.markers = []; // Reset markers array
-
-            if (!this.observations.length) {
-                return;
-            }
-
-            this.observations.forEach((observation, index) => {
-                const locationRegex = /POINT \(([^ ]+) ([^ ]+)\)/;
-                const match = observation.location.match(locationRegex);
-                if (match) {
-                    const [, longitude, latitude] = match;
-                    const marker = L.marker([parseFloat(latitude), parseFloat(longitude)], {
-                        icon: L.divIcon({
-                            className: 'custom-div-icon',
-                            html: "<i class='fa fa-bug' style='color: black; font-size: 24px;'></i>",
-                            iconSize: [30, 42],
-                            iconAnchor: [15, 42]
-                        })
-                    }).addTo(this.map)
-                    .on('click', () => this.selectObservation(observation));
-                    this.markers.push(marker);
-                } else {
-                    console.log(`Geen geldige locatie gevonden voor observatie #${index}.`);
-                }
-            });
-        },
-        async updateObservation() {
-            try {
-                const response = await ApiService.patch(`/observations/${this.selectedObservation.id}/`, this.selectedObservation);
-                if (response.status !== 200) {
-                    throw new Error('Network response was not ok');
-                }
-                const data = response.json();
-                this.isEditing = false;
-            } catch (error) {
-                console.error('Error when updating the observation:', error);
-            }
-        },
-        startEdit() {
-            this.isEditing = true;
-        },
-        confirmUpdate() {
-            this.updateObservation();
-        },
-        cancelEdit() {
-            this.isEditing = false;
-        },
-    },
-    mounted() {
-        this.fetchUserStatus().then(() => {
-            this.$store.dispatch('getObservations');
-            this.initializeMapAndMarkers();
+        onMounted(async () => {
+            await vespaStore.getObservations();
+            vespaStore.initializeMapAndMarkers();
         });
 
-        setInterval(() => {
-            this.$store.dispatch('getObservations');
-        }, 120000); // Poll every 120 seconds
+        return {
+            selectedObservation,
+            isEditing,
+            markers,
+            map,
+            isLoggedIn,
+            startEdit,
+            confirmUpdate,
+            cancelEdit,
+        };
     },
 };
 </script>

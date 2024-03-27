@@ -78,14 +78,12 @@ class EradicationProductEnum(models.TextChoices):
 class Municipality(models.Model):
     """Model voor de Belgische gemeenten met uitgebreide gegevens."""
 
-    # Behoud de bestaande velden
     id = models.AutoField(primary_key=True)
-    name = models.CharField(max_length=255)  # Overeenkomend met 'NAAM'
-    nis_code = models.CharField(max_length=255)  # Overeenkomend met 'NISCODE'
-    polygon = gis_models.MultiPolygonField(srid=31370)  # Zorg voor het juiste SRID, bv. Belgian Lambert 72
+    name = models.CharField(max_length=255)
+    nis_code = models.CharField(max_length=255)
+    polygon = gis_models.MultiPolygonField(srid=31370)
 
-    # Nieuwe velden gebaseerd op de extra informatie
-    oidn = models.BigIntegerField(blank=True, null=True)  # Optioneel, afhankelijk van de behoefte
+    oidn = models.BigIntegerField(blank=True, null=True)
     uidn = models.BigIntegerField(blank=True, null=True)
     terrid = models.BigIntegerField(blank=True, null=True)
     datpublbs = models.DateField(blank=True, null=True)
@@ -116,6 +114,48 @@ class Observation(models.Model):
     created_datetime = models.DateTimeField(auto_now_add=True)
     modified_datetime = models.DateTimeField(auto_now=True)
     location = gis_models.PointField()
+    source = models.CharField(max_length=255)
+
+    wn_notes = models.TextField(blank=True, null=True)
+    wn_admin_notes = models.TextField(blank=True, null=True)
+
+    species = models.IntegerField()
+    nest_height = models.CharField(max_length=50, choices=NestHeightEnum)
+    nest_size = models.CharField(max_length=50, choices=NestSizeEnum)
+    nest_location = models.CharField(max_length=50, choices=NestLocationEnum)
+    nest_type = models.CharField(max_length=50, choices=NestTypeEnum)
+
+    observer_phone_number = models.CharField(max_length=20, blank=True, null=True)
+    observer_email = models.EmailField(blank=True, null=True)
+    observer_name = models.CharField(max_length=255, blank=True, null=True)
+    observer_allows_contact = models.BooleanField(default=False)
+    observation_datetime = models.DateTimeField()
+
+    wn_cluster_id = models.IntegerField(blank=True, null=True)
+    notes = models.TextField(blank=True, null=True)
+
+    modified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, related_name="modified_observations", on_delete=models.SET_NULL, null=True
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, related_name="created_observations", on_delete=models.SET_NULL, null=True
+    )
+    wn_modified_datetime = models.DateTimeField(blank=True, null=True)
+    wn_created_datetime = models.DateTimeField(blank=True, null=True)
+    duplicate = models.BooleanField(default=False)
+    images = models.JSONField(default=list)
+
+    reserved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, related_name="reserved_observations", on_delete=models.SET_NULL, null=True
+    )
+    reserved_datetime = models.DateTimeField(blank=True, null=True)
+
+    eradication_datetime = models.DateTimeField(blank=True, null=True)
+    eradicator_name = models.CharField(max_length=255, blank=True, null=True)
+    eradication_result = models.CharField(max_length=50, choices=EradicationResultEnum)
+    eradication_product = models.CharField(max_length=50, choices=EradicationProductEnum, blank=True, null=True)
+    eradication_notes = models.TextField(blank=True, null=True)
+
     municipality = models.ForeignKey(
         Municipality,
         on_delete=models.SET_NULL,
@@ -123,36 +163,7 @@ class Observation(models.Model):
         blank=True,
         related_name="observations",
     )
-    source = models.CharField(max_length=255)
-    wn_notes = models.TextField(blank=True, null=True)
-    wn_admin_notes = models.TextField(blank=True, null=True)
-    species = models.IntegerField()
-    nest_height = models.CharField(max_length=50, choices=NestHeightEnum)
-    nest_size = models.CharField(max_length=50, choices=NestSizeEnum)
-    nest_location = models.CharField(max_length=50, choices=NestLocationEnum)
-    nest_type = models.CharField(max_length=50, choices=NestTypeEnum)
-    observer_phone_number = models.CharField(max_length=20, blank=True, null=True)
-    observer_email = models.EmailField(blank=True, null=True)
-    observer_name = models.CharField(max_length=255, blank=True, null=True)
-    observer_allows_contact = models.BooleanField(default=False)
-    observation_datetime = models.DateTimeField()
-    wn_cluster_id = models.IntegerField(blank=True, null=True)
-    notes = models.TextField(blank=True, null=True)
-    created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, related_name="created_observations", on_delete=models.SET_NULL, null=True
-    )
-    modified_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, related_name="modified_observations", on_delete=models.SET_NULL, null=True
-    )
-    eradication_datetime = models.DateTimeField(blank=True, null=True)
-    eradicator_name = models.CharField(max_length=255, blank=True, null=True)
-    eradication_result = models.CharField(max_length=50, choices=EradicationResultEnum)
-    eradication_product = models.CharField(max_length=50, choices=EradicationProductEnum, blank=True, null=True)
-    eradication_notes = models.TextField(blank=True, null=True)
-    wn_modified_datetime = models.DateTimeField(blank=True, null=True)
-    wn_created_datetime = models.DateTimeField(blank=True, null=True)
-    duplicate = models.BooleanField(default=False)
-    images = models.JSONField(default=list)
+    anb = models.BooleanField(default=False)
 
     def __str__(self) -> str:
         """Return the string representation of the model."""

@@ -151,7 +151,7 @@ class ObservationsViewSet(viewsets.ModelViewSet):
 class MunicipalityViewSet(ReadOnlyModelViewSet):
     """ViewSet for the Municipality model."""
 
-    queryset = Municipality.objects.all()
+    queryset = Municipality.objects.all().order_by("name")
     serializer_class = MunicipalitySerializer
 
     def get_permissions(self) -> list[BasePermission]:

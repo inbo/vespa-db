@@ -1,9 +1,8 @@
 """Serializers for the observations app."""
 
-from typing import Any, cast
+from typing import Any
 
 from django.contrib.gis.geos import Point
-from django.utils import timezone
 from rest_framework import serializers
 
 from vespadb.observations.models import Municipality, Observation
@@ -29,7 +28,18 @@ class ObservationSerializer(serializers.ModelSerializer):
         data: dict[str, Any] = super().to_representation(instance)
 
         # Fields accessible by public (unauthenticated) users
-        public_fields = ["id", "location", "nest_height", "nest_size", "nest_location", "nest_type", "created_by"]
+        public_fields = [
+            "id",
+            "location",
+            "nest_height",
+            "nest_size",
+            "nest_location",
+            "nest_type",
+            "created_by",
+            "eradiction_datetime",
+            "municipality",
+            "images",
+        ]
 
         # Check if the request exists and if the user is authenticated
         request = self.context.get("request", None)
@@ -59,36 +69,6 @@ class ObservationSerializer(serializers.ModelSerializer):
 
         return Point(longitude, latitude)
 
-    def create(self, validated_data: dict[str, Any]) -> Observation:
-        """Create a Observation instance from validated data, converting location data from a dictionary to a Point object suitable for the GeoDjango field.
-
-        Parameters
-        ----------
-        - validated_data (Dict[str, Any]): The data validated by the serializer.
-
-        Returns
-        -------
-        - Observation: The created Observation instance.
-        """
-        return cast(Observation, super().create(validated_data))
-
-    def update(self, instance: Observation, validated_data: dict[str, Any]) -> Observation:
-        """Update an existing Observation instance with validated data, converting location data from a dictionary to a Point object when necessary.
-
-        Parameters
-        ----------
-        - instance (Observation): The Observation instance to update.
-        - validated_data (Dict[str, Any]): The data validated by the serializer.
-
-        Returns
-        -------
-        - Observation: The updated Observation instance.
-        """
-        # Set last_modification_datetime to now
-        instance.last_modification_datetime = timezone.now()
-
-        return cast(Observation, super().update(instance, validated_data))
-
 
 class ObservationPatchSerializer(serializers.ModelSerializer):
     """Serializer for patching observations with limited fields accessible by exterminators or other specific roles. This serializer allows updating a subset of the Observation model's fields, ensuring that users can only modify fields they are authorized to."""
@@ -106,12 +86,14 @@ class ObservationPatchSerializer(serializers.ModelSerializer):
             "notes",
             "modified_by",
             "created_by",
+            "duplicate",
+            "reserved_by",
+            "reserved_datetime",
             "eradication_datetime",
             "eradicator_name",
             "eradication_result",
             "eradication_product",
             "eradication_notes",
-            "duplicate",
         ]
         read_only_fields = [
             "id",
@@ -122,10 +104,11 @@ class ObservationPatchSerializer(serializers.ModelSerializer):
             "wn_notes",
             "wn_admin_notes",
             "species",
-            "wn_cluster_id",
             "wn_modified_datetime",
             "wn_created_datetime",
             "images",
+            "municipality",
+            "anb",
         ]
 
 

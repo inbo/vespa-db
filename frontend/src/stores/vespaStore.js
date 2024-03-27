@@ -23,6 +23,8 @@ export const useVespaStore = defineStore('vespaStore', {
             municipalities: [],
             years: [],
             anbAreasActief: false,
+            nestType: null,
+            nestStatus: null,
         },
     }),
 
@@ -45,6 +47,8 @@ export const useVespaStore = defineStore('vespaStore', {
             this.filters.municipalities = filters.municipalities;
             this.filters.years = filters.years;
             this.filters.anbAreasActief = filters.anbAreasActief;
+            this.filters.nestType = filters.nestType;
+            this.filters.nestStatus = filters.nestStatus;
 
             let filterQuery = '?';
 
@@ -56,16 +60,21 @@ export const useVespaStore = defineStore('vespaStore', {
                 filterQuery += `year_range=${this.filters.years.join(',')}&`;
             }
 
-            if (this.filters.anbAreasActief) {
-                // Include ANB areas filter
+            filterQuery += `anb=${this.filters.anbAreasActief}&`;
+
+            if (this.filters.nestType) {
+                filterQuery += `nest_type=${this.filters.nestType}&`;
+            }
+            if (this.filters.nestStatus) {
+                filterQuery += `nest_status=${this.filters.nestStatus}&`;
             }
 
             if (filterQuery === '?') {
                 filterQuery = '';
             } else {
-                // Remove the trailing '&' if present
                 filterQuery = filterQuery.endsWith('&') ? filterQuery.slice(0, -1) : filterQuery;
             }
+
 
             await this.getObservations(filterQuery);
         },

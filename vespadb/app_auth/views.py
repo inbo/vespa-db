@@ -1,8 +1,9 @@
 """views for the app_auth app."""
 
 from collections.abc import Sequence
+from typing import Any
 
-from django.contrib.auth import login
+from django.contrib.auth import login, logout, update_session_auth_hash
 from django.contrib.sessions.models import Session
 from django.http import HttpResponseRedirect
 from rest_framework import permissions, status
@@ -12,7 +13,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from vespadb.app_auth.serializers import LoginSerializer, UserSerializer
+from vespadb.app_auth.serializers import ChangePasswordSerializer, LoginSerializer, UserSerializer
 
 
 class AuthCheck(APIView):
@@ -61,6 +62,32 @@ class LoginView(APIView):
             login(request, user)
             return Response({"detail": "Login successful."}, status=status.HTTP_200_OK)
 
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class LogoutView(APIView):
+    """API view for user logout."""
+
+    def post(self, request: Request) -> Response:
+        """Logout a user."""
+        logout(request)
+        return Response({"detail": "Successfully logged out."}, status=status.HTTP_200_OK)
+
+
+class ChangePasswordView(APIView):
+    """Change password view."""
+
+    def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        """."""
+        serializer = ChangePasswordSerializer(data=request.data)
+        if serializer.is_valid():
+            user = request.user
+            if not user.check_password(serializer.validated_data["old_password"]):
+                return Response({"old_password": ["Wrong password."]}, status=status.HTTP_400_BAD_REQUEST)
+            user.set_password(serializer.validated_data["new_password"])
+            user.save()
+            update_session_auth_hash(request, user)  # Important to keep the session active
+            return Response({"detail": "Password changed successfully."}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 

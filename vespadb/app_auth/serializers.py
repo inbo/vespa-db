@@ -62,3 +62,10 @@ class LoginSerializer(serializers.Serializer):
         if user and user.check_password(data["password"]):
             return user
         raise ValidationError({"error": "Invalid username or password."})
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    """Validate user input for changing password."""
+
+    old_password = serializers.CharField(required=True)
+    new_password = serializers.CharField(required=True)

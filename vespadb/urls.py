@@ -8,8 +8,6 @@ from drf_yasg import openapi
 from drf_yasg.views import get_schema_view
 from rest_framework import permissions
 
-from vespadb.users.views import UserStatusView
-
 schema_view = get_schema_view(
     openapi.Info(
         title="Vespawatch API Documentation",
@@ -28,9 +26,7 @@ urlpatterns = [
     path("redoc/", schema_view.with_ui("redoc", cache_timeout=0), name="schema-redoc"),
     path("admin/", admin.site.urls),
     # User views
-    path("user_status/", UserStatusView.as_view(), name="user_status"),
     path("app_auth/", include("vespadb.app_auth.urls")),
-    path("api-auth/", include("rest_framework.urls", namespace="rest_framework")),
     path("admin/", admin.site.urls),
     # Include the observations app URLs
     path("", include("vespadb.observations.urls", namespace="observations")),

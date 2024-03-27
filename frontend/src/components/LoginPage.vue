@@ -6,7 +6,7 @@
             <input type="text" v-model="username" placeholder="Gebruikersnaam" />
             <input type="password" v-model="password" placeholder="Wachtwoord" />
             <button @click="login">Login</button>
-            <p v-if="loginError" class="error">{{ loginError }}</p>
+            <p v-if="error" class="error">{{ error }}</p>
         </div>
         <footer-component></footer-component>
     </div>
@@ -14,7 +14,7 @@
 
 <script>
 import { useVespaStore } from '@/stores/vespaStore';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import FooterComponent from './FooterComponent.vue';
 import NavbarComponent from './NavbarComponent.vue';
@@ -29,22 +29,22 @@ export default {
         const vespaStore = useVespaStore();
         const username = ref('');
         const password = ref('');
-        const loginError = ref(null);
+        const error = computed(() => {
+            return Array.isArray(vespaStore.error) ? vespaStore.error.join(', ') : vespaStore.error;
+        });
 
         const login = async () => {
-            try {
-                await vespaStore.login({ username: username.value, password: password.value });
+            await vespaStore.login({ username: username.value, password: password.value });
+            if (vespaStore.isLoggedIn) {
                 router.push('/map');
-            } catch (error) {
-                loginError.value = "Failed to login. Please check your username and password.";
             }
         };
 
         return {
             username,
             password,
-            loginError,
-            login
+            login,
+            error
         };
     }
 };

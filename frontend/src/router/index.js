@@ -1,7 +1,8 @@
+import { useVespaStore } from '@/stores/vespaStore';
 import { createRouter, createWebHistory } from 'vue-router';
+import ChangePasswordPage from '../components/ChangePasswordPage.vue';
 import Login from '../components/LoginPage.vue';
 import MapPage from '../components/MapPage.vue';
-
 const routes = [
   {
     path: '/login',
@@ -17,6 +18,11 @@ const routes = [
     path: '/',
     name: 'Home',
     component: MapPage
+  },
+  {
+    path: '/change-password',
+    name: 'ChangePassword',
+    component: ChangePasswordPage
   }
 ];
 
@@ -26,6 +32,11 @@ const router = createRouter({
 });
 
 router.beforeEach(async (to, from, next) => {
-  next();
+  const vespaStore = useVespaStore();
+  if (to.meta.requiresAuth && !vespaStore.isLoggedIn) {
+    next({ name: 'Login' });
+  } else {
+    next();
+  }
 });
 export default router;

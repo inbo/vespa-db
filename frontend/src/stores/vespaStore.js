@@ -7,7 +7,6 @@ import { defineStore } from 'pinia';
 export const useVespaStore = defineStore('vespaStore', {
     state: () => ({
         isLoggedIn: false,
-        username: '',
         userId: null,
         loading: false,
         error: null,
@@ -142,6 +141,7 @@ export const useVespaStore = defineStore('vespaStore', {
                     password: password
                 })
                 .then(() => {
+                    this.isLoggedIn = true;
                     this.authCheck();
                 })
                 .catch((error) => {
@@ -190,15 +190,50 @@ export const useVespaStore = defineStore('vespaStore', {
         async logout() {
             this.loading = true;
             await ApiService
-                .get("/api-auth/logout/")
+                .post("/app_auth/logout/")
                 .then(() => {
-                    this.authCheck();
+                    this.isLoggedIn = false;
+                    this.user = {};
+                    this.loading = false;
+                    console.log('Logged out successfully');
+                    this.router.push({ name: 'map' });
                 })
                 .catch((error) => {
                     console.error(error.response.data);
                     this.error = error.response.data.error;
                     this.loading = false;
                 });
+        },
+        async changePassword(oldPassword, newPassword, confirmPassword) {
+            this.loading = true;
+            if (!oldPassword || !newPassword) {
+                this.error = "Vul aub alle velden in.";
+                this.loading = false;
+                return false;
+            }
+            if (newPassword !== confirmPassword) {
+                this.error = "De wachtwoorden komen niet overeen.";
+                this.loading = false;
+                return false;
+            }
+            try {
+                await ApiService.post("/app_auth/change-password/", {
+                    old_password: oldPassword,
+                    new_password: newPassword,
+                });
+                this.loading = false;
+                this.error = null;
+                return true;
+            } catch (error) {
+                this.loading = false;
+                if (error.response && error.response.data) {
+                    const backendMessages = error.response.data;
+                    this.error = backendMessages.detail || "Een onverwachte fout is opgetreden.";
+                } else {
+                    this.error = error.message || "Een onverwachte fout is opgetreden.";
+                }
+                return false;
+            }
         },
     },
 });

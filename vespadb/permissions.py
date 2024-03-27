@@ -1,9 +1,10 @@
 """Permissies voor de observationen API."""
 
-from django.contrib.auth.models import User
 from rest_framework import permissions
 from rest_framework.request import Request
 from rest_framework.views import View
+
+from vespadb.users.models import VespaUser as User
 
 
 class IsAdminOrSelf(permissions.BasePermission):

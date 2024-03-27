@@ -2,9 +2,10 @@
 
 from typing import Any
 
-from django.contrib.auth.models import User
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
+
+from vespadb.users.models import VespaUser as User
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -58,7 +59,7 @@ class LoginSerializer(serializers.Serializer):
         ------
             ValidationError: If the username or password is incorrect.
         """
-        user = User.objects.filter(username=data["username"]).first()
+        user: User = User.objects.filter(username=data["username"]).first()
         if user and user.check_password(data["password"]):
             return user
         raise ValidationError({"error": "Invalid username or password."})

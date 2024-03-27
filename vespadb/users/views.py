@@ -1,10 +1,10 @@
 """Views for the users app."""
 
-from django.contrib.auth.models import User
 from rest_framework import serializers, viewsets
 from rest_framework.permissions import AllowAny, BasePermission, IsAdminUser
 
 from vespadb.permissions import IsAdminOrSelf
+from vespadb.users.models import VespaUser as User
 from vespadb.users.serializers import UserSerializer
 
 

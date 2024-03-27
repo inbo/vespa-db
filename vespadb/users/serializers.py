@@ -3,10 +3,11 @@
 from typing import Any
 
 from django.contrib.auth import authenticate
-from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
+
+from vespadb.users.models import VespaUser as User
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -23,7 +24,7 @@ class UserSerializer(serializers.ModelSerializer):
         """Create a new user, ensuring the password is validated and hashed."""
         # Pop the password from validated_data to handle it separately
         password = validated_data.pop("password", None)
-        user = User.objects.create_user(**validated_data)
+        user: User = User.objects.create_user(**validated_data)
 
         if password is not None:
             try:

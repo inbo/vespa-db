@@ -3,10 +3,11 @@
 from typing import Any
 
 from django.contrib import admin
-from django.contrib.auth.models import User
 from django.contrib.sessions.models import Session
 from django.urls import reverse
 from django.utils.html import format_html
+
+from vespadb.users.models import VespaUser as User
 
 
 @admin.register(Session)

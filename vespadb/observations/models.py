@@ -95,6 +95,22 @@ class Municipality(models.Model):
         """Return the string representation of the model."""
         return str(self.name)
 
+class ANB(models.Model):
+    """Model for the Agentschap voor Natuur en Bos (ANB) domain with detailed data."""
+
+    id = models.AutoField(primary_key=True)
+    domain = models.CharField(max_length=255)
+    province = models.CharField(max_length=255)
+    regio = models.CharField(max_length=255, null=True)
+    liberties = models.CharField(max_length=255, null=True)
+    administrator = models.CharField(max_length=255, null=True)
+    contact = models.EmailField(max_length=255, null=True)
+    polygon = gis_models.MultiPolygonField(srid=31370)
+
+    def __str__(self) -> str:
+        """Return the string representation of the model."""
+        return str(self.domain)
+    
 
 def get_municipality_from_coordinates(longitude: float, latitude: float) -> Municipality | None:
     """Get the municipality for a given long and lat."""
@@ -105,6 +121,13 @@ def get_municipality_from_coordinates(longitude: float, latitude: float) -> Muni
     municipality: Municipality | None = municipalities_containing_point.first()
     return municipality
 
+def check_if_point_in_anb_area(longitude: float, latitude: float) -> bool:
+    """Check if a given point is in an ANB area."""
+    point_to_check = Point(longitude, latitude, srid=4326)
+    point_to_check.transform(31370)
+
+    anb_areas_containing_point = ANB.objects.filter(polygon__contains=point_to_check)
+    return bool(anb_areas_containing_point)
 
 class Observation(models.Model):
     """Model for the observation of a Vespa velutina nest."""
@@ -185,11 +208,7 @@ class Observation(models.Model):
             long = self.location.x
             lat = self.location.y
 
-            municipality = get_municipality_from_coordinates(long, lat)
-
-            if municipality:
-                self.municipality = municipality
-            else:
-                logger.warning("No municipality found for the provided location.")
-
+            self.anb = check_if_point_in_anb_area(long, lat)
+            self.municipality = get_municipality_from_coordinates(long, lat)
+            
         super().save(*args, **kwargs)

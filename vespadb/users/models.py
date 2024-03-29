@@ -28,3 +28,4 @@ class VespaUser(AbstractUser):
         choices=UserType.choices(),
         default=UserType.REGULAR.value,
     )
+    personal_data_access = models.BooleanField(default=False)

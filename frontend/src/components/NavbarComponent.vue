@@ -1,13 +1,15 @@
 <template>
-  <nav id="navbar">
-    <a href="/">VespaWatch Dashboard</a>
-    <div class="nav-right">
-      <span v-if="isLoggedIn">
-        Hallo, {{ username }}!
-        <a href="javascript:void(0);" @click="logout" class="button-style">Uitloggen</a>
-        <a href="javascript:void(0);" @click="navigateToChangePassword" class="button-style">Change Password</a>
-      </span>
-      <a v-else href="/login" class="button-style">Inloggen</a>
+  <nav class="navbar navbar-expand-lg navbar-dark bg-success">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="/">VespaWatch Dashboard</a>
+      <div class="d-flex">
+        <span v-if="isLoggedIn" class="navbar-text">
+          Hallo, {{ username }}!
+          <button @click="logout" class="btn btn-outline-light ms-2">Uitloggen</button>
+          <button @click="navigateToChangePassword" class="btn btn-outline-light ms-2">Change Password</button>
+        </span>
+        <a v-else href="/login" class="btn btn-outline-light ms-2">Inloggen</a>
+      </div>
     </div>
   </nav>
 </template>

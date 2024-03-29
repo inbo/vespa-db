@@ -1,44 +1,50 @@
 <template>
-  <v-row>
-    <v-col v-if="formattedMunicipalities.length > 0" cols="2" class="d-flex align-start">
-      <v-autocomplete v-model="selectedMunicipalities" :items="municipalities.length ? municipalities.map(municipality => ({
-      title: municipality.name,
-      value: municipality.id
-    })) : []" item-text="title" item-value="value" label="Selecteer gemeente(s)" multiple chips dense solo
-        @change="emitFilterUpdate">
-      </v-autocomplete>
-    </v-col>
-    <v-col cols="2" class="d-flex align-start">
-      <v-autocomplete v-model="selectedYears" :items="jaartallen" label="Selecteer jaartal(len)" multiple chips dense
-        solo @change="emitFilterUpdate"></v-autocomplete>
-    </v-col>
-    <v-col cols="2"class="d-flex align-start">
-      <v-autocomplete v-model="selectedNestType" :items="nestType.length ? nestType.map(nesttype => ({
-      title: nesttype.name,
-      value: nesttype.value
-    })) : []" item-text="title" item-value="value" label="Selecteer nesttype" multiple chips dense solo
-        @change="emitFilterUpdate">
-      </v-autocomplete>
-    </v-col>
-    <v-col cols="2" class="d-flex align-start">
-      <v-autocomplete v-model="selectedNestStatus" :items="nestStatus.length ? nestStatus.map(neststatus => ({
-      title: neststatus.name,
-      value: neststatus.value
-    })) : []" item-text="title" item-value="value" label="Selecteer neststatus" multiple chips dense solo
-        @change="emitFilterUpdate">
-      </v-autocomplete>
-    </v-col>
-    <v-col cols="2" class="d-flex align-start">
-      <v-autocomplete v-model="anbAreasActief" :items="anbAreaOptions.length ? anbAreaOptions.map(anb => ({
-      title: anb.name,
-      value: anb.value
-    })) : []" item-text="title" item-value="value" label="ANB" multiple chips dense solo
-        @change="emitFilterUpdate">
-      </v-autocomplete>
-    </v-col>
-  </v-row>
+  <button class="btn btn-primary d-md-none" type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse" aria-expanded="false" aria-controls="filterCollapse">
+    Filters
+  </button>
+  <div class="collapse d-md-block" id="filtersCollapse">
+    <div class="container-fluid mt-1">
+      <div class="row">
+        <div class="col-12 col-md-2 mb-2" v-if="formattedMunicipalities.length > 0">
+          <v-autocomplete v-model="selectedMunicipalities" :items="municipalities.length ? municipalities.map(municipality => ({
+          title: municipality.name,
+          value: municipality.id
+        })) : []" item-text="title" item-value="value" label="Selecteer gemeente(s)" multiple chips dense solo
+            @change="emitFilterUpdate">
+          </v-autocomplete>
+        </div>
+        <div class="col-12 col-md-2 mb-2">
+          <v-autocomplete v-model="selectedYears" :items="jaartallen" label="Selecteer jaartal(len)" multiple chips dense
+            solo @change="emitFilterUpdate"></v-autocomplete>
+        </div>
+        <div class="col-12 col-md-2 mb-2">
+          <v-autocomplete v-model="selectedNestType" :items="nestType.length ? nestType.map(nesttype => ({
+          title: nesttype.name,
+          value: nesttype.value
+        })) : []" item-text="title" item-value="value" label="Selecteer nesttype" multiple chips dense solo
+            @change="emitFilterUpdate">
+          </v-autocomplete>
+        </div>
+        <div class="col-12 col-md-2 mb-2">
+          <v-autocomplete v-model="selectedNestStatus" :items="nestStatus.length ? nestStatus.map(neststatus => ({
+          title: neststatus.name,
+          value: neststatus.value
+        })) : []" item-text="title" item-value="value" label="Selecteer neststatus" multiple chips dense solo
+            @change="emitFilterUpdate">
+          </v-autocomplete>
+        </div>
+        <div class="col-12 col-md-2 mb-2">
+          <v-autocomplete v-model="anbAreasActief" :items="anbAreaOptions.length ? anbAreaOptions.map(anb => ({
+          title: anb.name,
+          value: anb.value
+        })) : []" item-text="title" item-value="value" label="ANB" multiple chips dense solo
+            @change="emitFilterUpdate">
+          </v-autocomplete>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
-
 <script>
 import ApiService from '@/services/apiService';
 import { useVespaStore } from '@/stores/vespaStore';
@@ -74,36 +80,11 @@ export default {
     };
   },
   watch: {
-    selectedMunicipalities: {
-      handler() {
-        this.emitFilterUpdate();
-      },
-      deep: true,
-    },
-    selectedYears: {
-      handler() {
-        this.emitFilterUpdate();
-      },
-      deep: true,
-    },
-    anbAreasActief: {
-      handler() {
-        this.emitFilterUpdate();
-      },
-      deep: true,
-    },
-    selectedNestType: {
-      handler() {
-        this.emitFilterUpdate();
-      },
-      deep: true,
-    },
-    selectedNestStatus: {
-      handler() {
-        this.emitFilterUpdate();
-      },
-      deep: true,
-    },
+    selectedMunicipalities: 'emitFilterUpdate',
+    selectedYears: 'emitFilterUpdate',
+    anbAreasActief: 'emitFilterUpdate',
+    selectedNestType: 'emitFilterUpdate',
+    selectedNestStatus: 'emitFilterUpdate',
   },
   computed: {
     formattedMunicipalities() {

@@ -1,11 +1,8 @@
 <template>
-  <button class="btn btn-primary d-md-none" type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse" aria-expanded="false" aria-controls="filterCollapse">
-    Filters
-  </button>
   <div class="collapse d-md-block" id="filtersCollapse">
     <div class="container-fluid mt-1">
       <div class="row">
-        <div class="col-12 col-md-2 mb-2" v-if="formattedMunicipalities.length > 0">
+        <div class="col-12" v-if="formattedMunicipalities.length > 0">
           <v-autocomplete v-model="selectedMunicipalities" :items="municipalities.length ? municipalities.map(municipality => ({
           title: municipality.name,
           value: municipality.id
@@ -13,11 +10,11 @@
             @change="emitFilterUpdate">
           </v-autocomplete>
         </div>
-        <div class="col-12 col-md-2 mb-2">
+        <div class="col-12">
           <v-autocomplete v-model="selectedYears" :items="jaartallen" label="Selecteer jaartal(len)" multiple chips dense
             solo @change="emitFilterUpdate"></v-autocomplete>
         </div>
-        <div class="col-12 col-md-2 mb-2">
+        <div class="col-12">
           <v-autocomplete v-model="selectedNestType" :items="nestType.length ? nestType.map(nesttype => ({
           title: nesttype.name,
           value: nesttype.value
@@ -25,7 +22,7 @@
             @change="emitFilterUpdate">
           </v-autocomplete>
         </div>
-        <div class="col-12 col-md-2 mb-2">
+        <div class="col-12">
           <v-autocomplete v-model="selectedNestStatus" :items="nestStatus.length ? nestStatus.map(neststatus => ({
           title: neststatus.name,
           value: neststatus.value
@@ -33,7 +30,7 @@
             @change="emitFilterUpdate">
           </v-autocomplete>
         </div>
-        <div class="col-12 col-md-2 mb-2">
+        <div class="col-12">
           <v-autocomplete v-model="anbAreasActief" :items="anbAreaOptions.length ? anbAreaOptions.map(anb => ({
           title: anb.name,
           value: anb.value

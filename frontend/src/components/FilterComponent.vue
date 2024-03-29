@@ -28,9 +28,13 @@
         @change="emitFilterUpdate">
       </v-autocomplete>
     </v-col>
-    <v-col cols="1" class="d-flex align-start">
-      <v-switch v-model="anbAreasActief" :label="`ANB Areas ${anbAreasActief ? 'Aan' : 'Uit'}`"
-        :color="anbAreasActief ? '#4C7742' : ''" @change="emitFilterUpdate"></v-switch>
+    <v-col cols="2" class="d-flex align-start">
+      <v-autocomplete v-model="anbAreasActief" :items="anbAreaOptions.length ? anbAreaOptions.map(anb => ({
+      title: anb.name,
+      value: anb.value
+    })) : []" item-text="title" item-value="value" label="ANB" multiple chips dense solo
+        @change="emitFilterUpdate">
+      </v-autocomplete>
     </v-col>
   </v-row>
 </template>
@@ -48,7 +52,7 @@ export default {
       selectedNestType: [],
       selectedNestStatus: [],
       jaartallen: [2020, 2021, 2022, 2023, 2024],
-      anbAreasActief: false,
+      anbAreasActief: null,
       nestType: [
         { name: 'AH - actief embryonaal nest', value: 'AH_actief_embryonaal_nest' },
         { name: 'AH - actief primair nest', value: 'AH_actief_primair_nest' },
@@ -62,6 +66,10 @@ export default {
         { name: 'Uitgeroeid', value: 'eradicated' },
         { name: 'Gereserveerd', value: 'reserved' },
         { name: 'Open', value: 'open' }
+      ],
+      anbAreaOptions: [
+        { name: 'Niet in ANB gebied', value: false },
+        { name: 'Wel in ANB gebied', value: true },
       ],
     };
   },
@@ -78,8 +86,11 @@ export default {
       },
       deep: true,
     },
-    anbAreasActief: function() {
-      this.emitFilterUpdate();
+    anbAreasActief: {
+      handler() {
+        this.emitFilterUpdate();
+      },
+      deep: true,
     },
     selectedNestType: {
       handler() {

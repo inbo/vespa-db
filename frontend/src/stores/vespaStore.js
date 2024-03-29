@@ -60,7 +60,9 @@ export const useVespaStore = defineStore('vespaStore', {
                 filterQuery += `year_range=${this.filters.years.join(',')}&`;
             }
 
-            filterQuery += `anb=${this.filters.anbAreasActief}&`;
+            if (this.filters.anbAreasActief !== null && typeof this.filters.anbAreasActief !== 'undefined') {
+                filterQuery += `anb=${this.filters.anbAreasActief}&`;
+            }
 
             if (this.filters.nestType) {
                 filterQuery += `nest_type=${this.filters.nestType}&`;

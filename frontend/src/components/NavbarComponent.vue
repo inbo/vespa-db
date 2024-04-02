@@ -1,17 +1,24 @@
 <template>
-  <nav id="navbar">
-    <a href="/">VespaWatch Dashboard</a>
-    <div class="nav-right">
-      <span v-if="isLoggedIn">
-        Hallo, {{ username }}!
-        <a href="javascript:void(0);" @click="logout" class="button-style">Uitloggen</a>
-        <a href="javascript:void(0);" @click="navigateToChangePassword" class="button-style">Change Password</a>
-      </span>
-      <a v-else href="/login" class="button-style">Inloggen</a>
+  <nav class="navbar navbar-expand-lg navbar-dark bg-success">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="/">VespaWatch Dashboard</a>
+      <div class="d-flex">
+        <span v-if="isLoggedIn" class="navbar-text">
+          <div class="btn-group">
+            <button type="button" class="btn btn-outline-light dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+              {{username}}
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><button class="dropdown-item" @click="logout">Uitloggen</button></li>
+              <li><button class="dropdown-item" @click="navigateToChangePassword">Wijzig wachtwoord</button></li>
+            </ul>
+          </div>
+        </span>
+        <a v-else href="/login" class="btn btn-outline-light ms-2">Inloggen</a>
+      </div>
     </div>
   </nav>
 </template>
-
 <script>
 import { useVespaStore } from '@/stores/vespaStore';
 import { computed } from 'vue';

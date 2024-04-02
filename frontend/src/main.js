@@ -13,11 +13,9 @@ import '@fortawesome/fontawesome-free/css/all.css';
 import 'leaflet/dist/leaflet.css';
 import './assets/style.css';
 
+// Import Bootstrap CSS and JS
 import 'bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import 'bootstrap/dist/js/bootstrap.bundle.min';
-import 'bootstrap/dist/js/bootstrap.bundle.min.js';
-
 
 const app = createApp(App);
 const pinia = createPinia();

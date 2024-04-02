@@ -4,16 +4,21 @@
       <a class="navbar-brand" href="/">VespaWatch Dashboard</a>
       <div class="d-flex">
         <span v-if="isLoggedIn" class="navbar-text">
-          Hallo, {{ username }}!
-          <button @click="logout" class="btn btn-outline-light ms-2">Uitloggen</button>
-          <button @click="navigateToChangePassword" class="btn btn-outline-light ms-2">Change Password</button>
+          <div class="btn-group">
+            <button type="button" class="btn btn-outline-light dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+              Menu
+            </button>
+            <ul class="dropdown-menu">
+              <li><button class="dropdown-item" @click="logout">Uitloggen</button></li>
+              <li><button class="dropdown-item" @click="navigateToChangePassword">Change Password</button></li>
+            </ul>
+          </div>
         </span>
         <a v-else href="/login" class="btn btn-outline-light ms-2">Inloggen</a>
       </div>
     </div>
   </nav>
 </template>
-
 <script>
 import { useVespaStore } from '@/stores/vespaStore';
 import { computed } from 'vue';

@@ -1,24 +1,24 @@
 <template>
-  <div class="collapse d-md-block" id="filtersCollapse">
+  <div class="collapse d-block" id="filtersCollapse">
     <div class="container-fluid mt-1">
       <div class="row">
         <div class="col-12" v-if="formattedMunicipalities.length > 0">
           <v-autocomplete v-model="selectedMunicipalities" :items="municipalities.length ? municipalities.map(municipality => ({
           title: municipality.name,
           value: municipality.id
-        })) : []" item-text="title" item-value="value" label="Selecteer gemeente(s)" multiple chips dense solo
+        })) : []" item-text="title" item-value="value" label="gemeente(s)" multiple chips dense solo
             @change="emitFilterUpdate">
           </v-autocomplete>
         </div>
         <div class="col-12">
-          <v-autocomplete v-model="selectedYears" :items="jaartallen" label="Selecteer jaartal(len)" multiple chips dense
+          <v-autocomplete v-model="selectedYears" :items="jaartallen" label="jaartal(len)" multiple chips dense
             solo @change="emitFilterUpdate"></v-autocomplete>
         </div>
         <div class="col-12">
           <v-autocomplete v-model="selectedNestType" :items="nestType.length ? nestType.map(nesttype => ({
           title: nesttype.name,
           value: nesttype.value
-        })) : []" item-text="title" item-value="value" label="Selecteer nesttype" multiple chips dense solo
+        })) : []" item-text="title" item-value="value" label="nest type" multiple chips dense solo
             @change="emitFilterUpdate">
           </v-autocomplete>
         </div>
@@ -26,7 +26,7 @@
           <v-autocomplete v-model="selectedNestStatus" :items="nestStatus.length ? nestStatus.map(neststatus => ({
           title: neststatus.name,
           value: neststatus.value
-        })) : []" item-text="title" item-value="value" label="Selecteer neststatus" multiple chips dense solo
+        })) : []" item-text="title" item-value="value" label="nest status" multiple chips dense solo
             @change="emitFilterUpdate">
           </v-autocomplete>
         </div>

@@ -206,12 +206,9 @@ export const useVespaStore = defineStore('vespaStore', {
                     this.isLoggedIn = false;
                     this.user = {};
                     this.loading = false;
-                    console.log('Logged out successfully');
                     this.router.push({ name: 'map' });
                 })
                 .catch((error) => {
-                    console.error(error.response.data);
-                    this.error = error.response.data.error;
                     this.loading = false;
                 });
         },

@@ -2,6 +2,9 @@
   <div class="collapse d-block" id="filtersCollapse">
     <div class="container-fluid mt-1">
       <div class="row">
+        <div class="col-12">
+          <h3>Filters</h3>
+        </div>
         <div class="col-12" v-if="formattedMunicipalities.length > 0">
           <v-autocomplete v-model="selectedMunicipalities" :items="municipalities.length ? municipalities.map(municipality => ({
           title: municipality.name,

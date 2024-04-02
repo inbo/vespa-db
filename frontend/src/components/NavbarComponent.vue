@@ -6,11 +6,11 @@
         <span v-if="isLoggedIn" class="navbar-text">
           <div class="btn-group">
             <button type="button" class="btn btn-outline-light dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-              Menu
+              {{username}}
             </button>
-            <ul class="dropdown-menu">
+            <ul class="dropdown-menu dropdown-menu-end">
               <li><button class="dropdown-item" @click="logout">Uitloggen</button></li>
-              <li><button class="dropdown-item" @click="navigateToChangePassword">Change Password</button></li>
+              <li><button class="dropdown-item" @click="navigateToChangePassword">Wijzig wachtwoord</button></li>
             </ul>
           </div>
         </span>

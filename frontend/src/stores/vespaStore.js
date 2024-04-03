@@ -26,9 +26,15 @@ export const useVespaStore = defineStore('vespaStore', {
             nestType: null,
             nestStatus: null,
         },
+        isDetailsPaneOpen: false,
+        markerClickHandler: null,
     }),
 
     actions: {
+        selectObservation(observation) {
+            this.selectedObservation = observation;
+            this.isDetailsPaneOpen = true;
+        },
         async getObservations(filterQuery = '') {
             try {
                 const response = await ApiService.get(`/observations${filterQuery}`);
@@ -87,35 +93,39 @@ export const useVespaStore = defineStore('vespaStore', {
                     attribution: 'Map data © OpenStreetMap contributors',
                     maxZoom: 18,
                 }).addTo(this.map);
+
+                // Ensure markers are updated after the map is initialized
                 this.updateMarkers();
             }
         },
         async updateMarkers() {
-            if (this.map) {
-                this.markers.forEach(marker => this.map.removeLayer(marker));
-                this.markers = [];
+            // Clear existing markers if any
+            this.markers.forEach(marker => marker.remove());
+            this.markers = [];
 
-                if (!this.observations.length) {
-                    return;
-                }
-
-                this.observations.forEach((observation, index) => {
+            // Check if the map is initialized and there are observations to add to the map
+            if (this.map && this.observations.length) {
+                // Create a marker for each observation and add a click event listener
+                this.observations.forEach((observation) => {
                     const locationRegex = /POINT \(([^ ]+) ([^ ]+)\)/;
                     const match = observation.location.match(locationRegex);
                     if (match) {
                         const [, longitude, latitude] = match;
-                        const marker = L.marker([parseFloat(latitude), parseFloat(longitude)], {
-                            icon: L.divIcon({
-                                className: 'custom-div-icon',
-                                html: "<i class='fa fa-bug' style='color: black; font-size: 24px;'></i>",
-                                iconSize: [30, 42],
-                                iconAnchor: [15, 42]
-                            })
-                        }).addTo(this.map)
-                            .on('click', () => this.selectObservation(observation));
-                        this.markers.push(marker);
-                    } else {
-                        console.log(`Geen geldige locatie gevonden voor observatie #${index}.`);
+                        // Only attempt to add the marker if the map instance is not null
+                        if (this.map) {
+                            const marker = L.marker([parseFloat(latitude), parseFloat(longitude)], {
+                                icon: L.divIcon({
+                                    className: 'custom-div-icon',
+                                    html: "<i class='fa fa-bug' style='color: black; font-size: 24px;'></i>",
+                                    iconSize: [30, 42],
+                                    iconAnchor: [15, 42]
+                                })
+                            }).on('click', () => {
+                                this.selectObservation(observation);
+                            });
+                            this.markers.push(marker);
+                            marker.addTo(this.map);
+                        }
                     }
                 });
             }
@@ -126,7 +136,7 @@ export const useVespaStore = defineStore('vespaStore', {
                 if (response.status !== 200) {
                     throw new Error('Network response was not ok');
                 }
-                const data = response.json();
+                const data = await response.json();
                 this.isEditing = false;
             } catch (error) {
                 console.error('Error when updating the observation:', error);

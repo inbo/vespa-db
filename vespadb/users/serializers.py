@@ -1,5 +1,6 @@
 """Serializer for the users app."""
 
+import logging
 from typing import Any
 
 from django.contrib.auth import authenticate
@@ -9,6 +10,10 @@ from rest_framework import serializers
 
 from vespadb.users.models import VespaUser as User
 
+logger = logging.getLogger(__name__)
+
+POSTAL_CODE_LENGTH = 4
+
 
 class UserSerializer(serializers.ModelSerializer):
     """User serializer."""
@@ -17,23 +22,64 @@ class UserSerializer(serializers.ModelSerializer):
         """Meta class for the UserSerializer."""
 
         model = User
-        fields = ["id", "username", "email", "password", "date_joined"]
-        extra_kwargs = {"password": {"write_only": True, "required": False}, "date_joined": {"read_only": True}}
+        fields = ["id", "username", "email", "password", "date_joined", "postal_code", "province"]
+        extra_kwargs = {
+            "password": {"write_only": True, "required": False},
+            "date_joined": {"read_only": True},
+            "postal_code": {"required": True},
+            "province": {"read_only": True},
+        }
+
+    def validate_postal_code(self, value: str) -> str:
+        """Validate postal code."""
+        if len(value) != POSTAL_CODE_LENGTH:
+            raise serializers.ValidationError("Postal code must be 4 characters long.")
+
+        if not value.isdigit():
+            raise serializers.ValidationError("Postal code must contain only digits.")
+
+        return value
+
+    def to_representation(self, instance: User) -> dict[Any, Any]:
+        """
+        Override the default representation method to conditionally include 'postal_code' and 'province' for admin users.
+
+        Args:
+            instance (User): The user instance being serialized.
+
+        Returns
+        -------
+            dict: The dictionary representation of the User instance, conditionally including sensitive fields.
+        """
+        ret: dict[Any, Any] = super().to_representation(instance)
+        request = self.context.get("request", None)
+
+        if request and (request.user.is_staff or request.user.is_superuser):
+            ret["postal_code"] = instance.postal_code
+            if instance.province:
+                ret["province"] = instance.province.name
+        else:
+            ret.pop("postal_code", None)
+            ret.pop("province", None)
+
+        return ret
 
     def create(self, validated_data: dict[str, Any]) -> User:
         """Create a new user, ensuring the password is validated and hashed."""
         # Pop the password from validated_data to handle it separately
         password = validated_data.pop("password", None)
-        user: User = User.objects.create_user(**validated_data)
 
         if password is not None:
             try:
-                validate_password(password, user)
+                validate_password(password)
             except DjangoValidationError as e:
                 raise serializers.ValidationError({"password": list(e.messages)}) from e
-            user.set_password(password)
 
-        user.save()
+        user: User = User.objects.create_user(**validated_data)
+
+        if password is not None:
+            user.set_password(password)
+            user.save()
         return user
 
     def update(self, instance: User, validated_data: dict[str, Any]) -> User:

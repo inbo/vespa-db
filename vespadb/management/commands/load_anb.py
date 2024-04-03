@@ -26,7 +26,7 @@ class Command(BaseCommand):
     This command uses the LayerMapping utility from Django's GIS framework to perform the data import.
     """
 
-    help: str = "Laadt een ShapeFile met gemeentegrenzen in de database."
+    help: str = "Laadt een ShapeFile met ANB grenzen in de database."
 
     def handle(self, *args: Any, **options: Any) -> None:
         """

@@ -29,3 +29,8 @@ This command reads the Shapefile located in the `data/Refgem.shp` path relative 
 #### load_anb Command
 
 This command imports ANB aread into the database
+
+#### load_provinces Command
+
+This command imports provinces into the database
+

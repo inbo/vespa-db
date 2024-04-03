@@ -19,6 +19,7 @@ provinces_mapping = {
     "polygon": "GEOMETRY",
 }
 
+
 class Command(BaseCommand):
     """A custom management command that loads a ShapeFile containing province boundaries into the database.
 

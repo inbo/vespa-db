@@ -1,0 +1,12 @@
+!Workspace
+!Version 600
+!Charset WindowsLatin1
+Open Table "Refprv" As Refprv Interactive
+Add Map Layer Refprv
+Set Map Order 1
+Set Map
+  CoordSys Earth Projection 3, 9999, 4, -99.059, 53.322, -112.486, -0.419, 0.83, -1.885, 0.999999, 0, "m", 4.36748667, 90, 49.8333333333, 51.1666666667, 150000.01256, 5400088.4378000004
+Set Map
+  Layer 1
+    Display Global
+    Global Pen (30,2,16744192) Brush (1,0,0)

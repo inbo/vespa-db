@@ -31,6 +31,7 @@ djangorestframework-jwt = "^1.11.0"
 djangorestframework-simplejwt = "^5.3.1"
 geopandas = "^0.14.3"
 factory-boy = "^3.2.0"
+geopy = "^2.4.1"
 
 [tool.poetry.group.dev.dependencies]  # https://python-poetry.org/docs/master/managing-dependencies/
 coverage = { extras = ["toml"], version = ">=7.4.1" }

@@ -25,3 +25,12 @@ This command imports municipality data from a specified Shapefile into the Vespa
 Usage: python manage.py load_municipalities
 
 This command reads the Shapefile located in the `data/Refgem.shp` path relative to the script's directory, creating new municipality entries in the database. If a municipality already exists, its polygon geometry will be updated.
+
+#### load_anb Command
+
+This command imports ANB aread into the database
+
+#### load_provinces Command
+
+This command imports provinces into the database
+

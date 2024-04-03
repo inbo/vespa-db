@@ -75,6 +75,25 @@ class EradicationProductEnum(models.TextChoices):
     UNKNOWN = "onbekend", _("Onbekend")
 
 
+class Province(models.Model):
+    """Model voor de Belgische gemeenten met uitgebreide gegevens."""
+
+    id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=255)
+    nis_code = models.CharField(max_length=255)
+    polygon = gis_models.MultiPolygonField(srid=31370)
+
+    oidn = models.BigIntegerField(blank=True, null=True)
+    uidn = models.BigIntegerField(blank=True, null=True)
+    terrid = models.BigIntegerField(blank=True, null=True)
+    length = models.FloatField(blank=True, null=True)
+    surface = models.FloatField(blank=True, null=True)
+
+    def __str__(self) -> str:
+        """Return the string representation of the model."""
+        return str(self.name)
+
+
 class Municipality(models.Model):
     """Model voor de Belgische gemeenten met uitgebreide gegevens."""
 
@@ -197,13 +216,13 @@ class Observation(models.Model):
 
     def save(self, *args: Any, **kwargs: Any) -> None:
         """
-        Override the save method to automatically assign a municipality based on the observation's location.
+        Override the save method to automatically assign a municipality and ANB bool based on the observation's location.
 
         :param args: Variable length argument list.
         :param kwargs: Arbitrary keyword arguments.
         """
         # Only compute the municipality if the location is set and the municipality is not
-        if self.location and not self.municipality:
+        if self.location:
             # Ensure self.location is a Point instance
             if not isinstance(self.location, Point):
                 self.location = Point(self.location)

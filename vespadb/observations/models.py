@@ -8,6 +8,7 @@ from django.contrib.gis.db import models as gis_models
 from django.contrib.gis.geos import Point
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from vespadb.helpers import get_province_from_coordinates
 
 logger = logging.getLogger(__name__)
 
@@ -208,6 +209,13 @@ class Observation(models.Model):
         blank=True,
         related_name="observations",
     )
+    province = models.ForeignKey(
+        Province,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="observations",
+    )
     anb = models.BooleanField(default=False)
 
     def __str__(self) -> str:
@@ -232,5 +240,6 @@ class Observation(models.Model):
 
             self.anb = check_if_point_in_anb_area(long, lat)
             self.municipality = get_municipality_from_coordinates(long, lat)
+            self.province = get_province_from_coordinates(long, lat)
 
         super().save(*args, **kwargs)

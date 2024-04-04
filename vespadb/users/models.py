@@ -10,6 +10,7 @@ from django.db import models
 from geopy.geocoders import Nominatim
 
 from vespadb.observations.models import Province
+from vespadb.helpers import get_province_from_coordinates
 
 if TYPE_CHECKING:
     from geopy.location import Location
@@ -56,28 +57,6 @@ def get_coordinates_from_postal_code(postal_code: str, country: str = "Belgium")
     if location:
         return location.latitude, location.longitude
     raise ValueError("Postal code is invalid.")
-
-
-def get_province_from_coordinates(longitude: float, latitude: float) -> Province | None:
-    """
-    Get the province for a given long and lat.
-
-    Parameters
-    ----------
-    - longitude (float): The longitude coordinate.
-    - latitude (float): The latitude coordinate.
-
-    Returns
-    -------
-    - The province if found, otherwise None.
-    """
-    point_to_check = Point(longitude, latitude, srid=4326)
-    point_to_check.transform(31370)
-
-    province_containing_point = Province.objects.filter(polygon__contains=point_to_check)
-    province: Province | None = province_containing_point.first()
-    return province
-
 
 class VespaUser(AbstractUser):
     """Model for the Vespa user."""

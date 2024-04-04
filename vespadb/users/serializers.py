@@ -22,12 +22,13 @@ class UserSerializer(serializers.ModelSerializer):
         """Meta class for the UserSerializer."""
 
         model = User
-        fields = ["id", "username", "email", "password", "date_joined", "postal_code", "province"]
+        fields = ["id", "username", "email", "password", "date_joined", "postal_code", "province", "personal_data_access"]
         extra_kwargs = {
             "password": {"write_only": True, "required": False},
             "date_joined": {"read_only": True},
             "postal_code": {"required": True},
             "province": {"read_only": True},
+            "personal_data_access": {"required": False}
         }
 
     def validate_postal_code(self, value: str) -> str:

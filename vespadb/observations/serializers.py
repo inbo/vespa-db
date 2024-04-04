@@ -1,12 +1,16 @@
 """Serializers for the observations app."""
 
+import logging
 from typing import Any
 
 from django.contrib.gis.geos import Point
 from rest_framework import serializers
+from rest_framework.request import Request
 
 from vespadb.observations.models import Municipality, Observation
+from vespadb.users.models import VespaUser
 
+logger = logging.getLogger(__name__)
 
 # Observation serializers
 class ObservationSerializer(serializers.ModelSerializer):
@@ -36,18 +40,52 @@ class ObservationSerializer(serializers.ModelSerializer):
             "nest_location",
             "nest_type",
             "created_by",
-            "eradiction_datetime",
+            "eradication_datetime",
             "municipality",
             "images",
         ]
 
-        # Check if the request exists and if the user is authenticated
-        request = self.context.get("request", None)
-        if request and not request.user.is_authenticated:
-            # Restrict data to only public fields
-            return {field: data[field] for field in public_fields if field in data}
-        return data
+        # Additional fields to show based on specific conditions
+        conditional_fields = [
+            "observer_phone_number",
+            "observer_email",
+            "observer_name",
+            "observer_allows_contact",
+            "observation_datetime",
+        ]
 
+        # Combine the lists for easier processing later
+        all_fields = set(public_fields + conditional_fields)
+
+        # Get the request from the context
+        request: Request = self.context.get('request')
+
+        # Default to filtering out certain fields unless conditions are met
+        fields_to_include = public_fields
+
+        # If the request exists and the user is authenticated
+        if request and request.user.is_authenticated:
+            # For non-admin authenticated users, check additional conditions
+            if not request.user.is_staff:
+                user: VespaUser = request.user
+                # Check if user has personal_data_access and if the observation is in the user's province
+                logger.info(f"User {user} has personal data access: {user.personal_data_access}")
+                logger.info(f"User {user} is in province: {user.province}")
+                logger.info(f"Observation {instance} is in province: {instance.province}")
+                if user.personal_data_access and instance.province and user.province and instance.province.id == user.province.id:
+                    # All conditions met, include all fields
+                    fields_to_include = list(all_fields)
+            else:
+                # For admin users, include all fields
+                fields_to_include = list(all_fields)
+        else:
+            # For unauthenticated users, limit to public fields
+            fields_to_include = public_fields
+
+        # Return data with only the fields to be included
+        return {field: data[field] for field in fields_to_include if field in data}
+    
+    
     def validate_location(self, value: dict[str, float]) -> Point:
         """Validate the input location data. Override this method to implement custom validation logic as needed.
 

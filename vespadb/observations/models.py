@@ -8,7 +8,6 @@ from django.contrib.gis.db import models as gis_models
 from django.contrib.gis.geos import Point
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from vespadb.helpers import get_province_from_coordinates
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +109,9 @@ class Municipality(models.Model):
     numac = models.CharField(max_length=10, blank=True, null=True)
     length = models.FloatField(blank=True, null=True)
     surface = models.FloatField(blank=True, null=True)
+    province = models.ForeignKey(
+        Province, on_delete=models.SET_NULL, null=True, blank=True, related_name="municipalities"
+    )
 
     def __str__(self) -> str:
         """Return the string representation of the model."""
@@ -239,7 +241,8 @@ class Observation(models.Model):
             lat = self.location.y
 
             self.anb = check_if_point_in_anb_area(long, lat)
-            self.municipality = get_municipality_from_coordinates(long, lat)
-            self.province = get_province_from_coordinates(long, lat)
+            municipality = get_municipality_from_coordinates(long, lat)
+            self.municipality = municipality
+            self.province = municipality.province if municipality else None
 
         super().save(*args, **kwargs)

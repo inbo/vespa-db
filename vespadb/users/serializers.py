@@ -12,8 +12,6 @@ from vespadb.users.models import VespaUser as User
 
 logger = logging.getLogger(__name__)
 
-POSTAL_CODE_LENGTH = 4
-
 
 class UserSerializer(serializers.ModelSerializer):
     """User serializer."""
@@ -22,28 +20,17 @@ class UserSerializer(serializers.ModelSerializer):
         """Meta class for the UserSerializer."""
 
         model = User
-        fields = ["id", "username", "email", "password", "date_joined", "postal_code", "province", "personal_data_access"]
+        fields = ["id", "username", "email", "password", "date_joined", "municipalities", "personal_data_access"]
         extra_kwargs = {
             "password": {"write_only": True, "required": False},
             "date_joined": {"read_only": True},
-            "postal_code": {"required": True},
-            "province": {"read_only": True},
-            "personal_data_access": {"required": False}
+            "municipalities": {"read_only": True},
+            "personal_data_access": {"required": False},
         }
-
-    def validate_postal_code(self, value: str) -> str:
-        """Validate postal code."""
-        if len(value) != POSTAL_CODE_LENGTH:
-            raise serializers.ValidationError("Postal code must be 4 characters long.")
-
-        if not value.isdigit():
-            raise serializers.ValidationError("Postal code must contain only digits.")
-
-        return value
 
     def to_representation(self, instance: User) -> dict[Any, Any]:
         """
-        Override the default representation method to conditionally include 'postal_code' and 'province' for admin users.
+        Override the default representation method to conditionally include 'municipalities' for admin users.
 
         Args:
             instance (User): The user instance being serialized.
@@ -56,12 +43,10 @@ class UserSerializer(serializers.ModelSerializer):
         request = self.context.get("request", None)
 
         if request and (request.user.is_staff or request.user.is_superuser):
-            ret["postal_code"] = instance.postal_code
-            if instance.province:
-                ret["province"] = instance.province.name
+            if instance.municipalities:
+                ret["municipalities"] = instance.municipalities
         else:
-            ret.pop("postal_code", None)
-            ret.pop("province", None)
+            ret.pop("municipalities", None)
 
         return ret
 

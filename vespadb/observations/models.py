@@ -109,6 +109,9 @@ class Municipality(models.Model):
     numac = models.CharField(max_length=10, blank=True, null=True)
     length = models.FloatField(blank=True, null=True)
     surface = models.FloatField(blank=True, null=True)
+    province = models.ForeignKey(
+        Province, on_delete=models.SET_NULL, null=True, blank=True, related_name="municipalities"
+    )
 
     def __str__(self) -> str:
         """Return the string representation of the model."""
@@ -208,6 +211,13 @@ class Observation(models.Model):
         blank=True,
         related_name="observations",
     )
+    province = models.ForeignKey(
+        Province,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="observations",
+    )
     anb = models.BooleanField(default=False)
 
     def __str__(self) -> str:
@@ -231,6 +241,8 @@ class Observation(models.Model):
             lat = self.location.y
 
             self.anb = check_if_point_in_anb_area(long, lat)
-            self.municipality = get_municipality_from_coordinates(long, lat)
+            municipality = get_municipality_from_coordinates(long, lat)
+            self.municipality = municipality
+            self.province = municipality.province if municipality else None
 
         super().save(*args, **kwargs)

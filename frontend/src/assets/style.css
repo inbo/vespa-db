@@ -85,3 +85,20 @@
     box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
     z-index: 1030;
 }
+
+.navbar,
+.footer {
+    z-index: 1050;
+    /* Keeps navbar at the top */
+}
+
+.details-panel,
+.filter-panel {
+    z-index: 1030;
+    /* Default stacking for both panels */
+}
+
+.filter-panel {
+    z-index: 1040;
+    /* Ensures filter panel is above the details panel */
+}

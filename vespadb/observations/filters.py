@@ -16,6 +16,7 @@ class ObservationFilter(GeoFilterSet):
     """Filter for the Observation model."""
 
     municipality_id = ListFilter(field_name="municipality__id", lookup_expr="in")
+    province_id = ListFilter(field_name="province__id", lookup_expr="in")
     year_range = django_filters.CharFilter(method="filter_by_year_range")
 
     min_created_datetime = django_filters.DateTimeFilter(field_name="created_datetime", lookup_expr="gte")
@@ -82,6 +83,7 @@ class ObservationFilter(GeoFilterSet):
         model = Observation
         fields = [
             "municipality_id",
+            "province_id",
             "year_range",
             "min_created_datetime",
             "max_created_datetime",

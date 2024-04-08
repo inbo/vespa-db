@@ -91,8 +91,7 @@ class ObservationSerializer(serializers.ModelSerializer):
             fields_to_include = public_fields
         # Return data with only the fields to be included
         return {field: data[field] for field in fields_to_include if field in data}
-    
-    
+
     def validate_location(self, value: dict[str, float]) -> Point:
         """Validate the input location data. Override this method to implement custom validation logic as needed.
 

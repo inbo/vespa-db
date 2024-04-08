@@ -5,13 +5,15 @@
         <button class="btn-filter-toggle" @click="toggleFilterPane">
             <i class="fas fa-sliders-h"></i> Filters
         </button>
-        <div id="mapid" class="h-100"></div>
+        <div v-if="viewMode === 'map'" :key="mapKey" id="mapid" class="h-100"></div>
+        <TableViewComponent v-else></TableViewComponent>
+
         <div class="filter-panel" :class="{ 'panel-active': isFilterPaneOpen }">
             <FilterComponent/>
         </div>
         <div class="details-panel" :class="{ 'panel-active': isDetailsPaneOpen }">
             <div class="d-flex justify-content-between align-items-center">
-                <h3>Observation Details</h3>
+                <h3>Observatie details</h3>
                 <button type="button" class="btn-close" aria-label="Close" @click="toggleDetailsPane"></button>
             </div>
             <ObservationDetailsComponent/>
@@ -24,17 +26,19 @@
 <script>
 import { useVespaStore } from '@/stores/vespaStore';
 import 'leaflet/dist/leaflet.css';
-import { computed, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import FilterComponent from './FilterComponent.vue';
 import FooterComponent from './FooterComponent.vue';
 import NavbarComponent from './NavbarComponent.vue';
 import ObservationDetailsComponent from './ObservationDetailsComponent.vue';
+import TableViewComponent from './TableViewComponent.vue';
 export default {
     components: {
         NavbarComponent,
         FooterComponent,
         FilterComponent,
-        ObservationDetailsComponent
+        ObservationDetailsComponent,
+        TableViewComponent
     },
     setup() {
         const vespaStore = useVespaStore();
@@ -46,6 +50,8 @@ export default {
         const isLoggedIn = computed(() => vespaStore.isLoggedIn);
         const isDetailsPaneOpen = computed(() => vespaStore.isDetailsPaneOpen);
         const isFilterPaneOpen = ref(false);
+        const viewMode = computed(() => vespaStore.viewMode);
+        const mapKey = ref(0);
 
         const startEdit = () => {
             isEditing.value = true;
@@ -65,9 +71,25 @@ export default {
             vespaStore.isDetailsPaneOpen = !vespaStore.isDetailsPaneOpen;
         };
 
+        watch(() => vespaStore.viewMode, async (newVal) => {
+            console.log(`View mode changing to ${newVal}`);
+            if (newVal === 'map') {
+                mapKey.value++;
+                await nextTick();
+                if (vespaStore.map) {
+                    vespaStore.map.remove();
+                    vespaStore.map = null;
+                }
+                vespaStore.initializeMapAndMarkers();
+            }
+        });
         onMounted(async () => {
+            //MapPage mounted
             await vespaStore.getObservations();
-            vespaStore.initializeMapAndMarkers();
+            if (!vespaStore.map) {
+                //Initializing map
+                vespaStore.initializeMapAndMarkers();
+            }
         });
 
         return {
@@ -83,6 +105,8 @@ export default {
             startEdit,
             confirmUpdate,
             cancelEdit,
+            viewMode,
+            mapKey
         };
     },
 };

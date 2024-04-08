@@ -28,13 +28,10 @@ export const useVespaStore = defineStore('vespaStore', {
         },
         isDetailsPaneOpen: false,
         markerClickHandler: null,
+        viewMode: 'map',
     }),
 
     actions: {
-        selectObservation(observation) {
-            this.selectedObservation = observation;
-            this.isDetailsPaneOpen = true;
-        },
         async getObservations(filterQuery = '') {
             try {
                 const response = await ApiService.get(`/observations${filterQuery}`);
@@ -93,8 +90,6 @@ export const useVespaStore = defineStore('vespaStore', {
                     attribution: 'Map data © OpenStreetMap contributors',
                     maxZoom: 18,
                 }).addTo(this.map);
-
-                // Ensure markers are updated after the map is initialized
                 this.updateMarkers();
             }
         },
@@ -252,6 +247,13 @@ export const useVespaStore = defineStore('vespaStore', {
                 }
                 return false;
             }
+        },
+        selectObservation(observation) {
+            this.selectedObservation = observation;
+            this.isDetailsPaneOpen = true;
+        },
+        setViewMode(mode) {
+            this.viewMode = mode;
         },
     },
 });

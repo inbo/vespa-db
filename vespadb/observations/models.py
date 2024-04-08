@@ -8,7 +8,6 @@ from django.contrib.gis.db import models as gis_models
 from django.contrib.gis.geos import Point
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from vespadb.helpers import get_province_from_coordinates
 
 logger = logging.getLogger(__name__)
 

@@ -2,18 +2,17 @@
 <div class="d-flex flex-column vh-100">
     <NavbarComponent />
     <div class="flex-grow-1 position-relative">
-    <button class="btn-filter-toggle" @click="toggleFilterPane">
-        <i class="fas fa-sliders-h"></i> Filters
-    </button>
-
-    <div id="mapid" class="h-100"></div>
-    <div class="filter-panel" :class="{ 'panel-active': isFilterPaneOpen }">
-        <FilterComponent/>
-    </div>
-    <div id="details" class="details-panel" :class="{ 'panel-active': isDetailsPaneOpen }">
-        <h3>Observation Details</h3>
-        <ObservationDetailsComponent/>
-    </div>
+        <button class="btn-filter-toggle" @click="toggleFilterPane">
+            <i class="fas fa-sliders-h"></i> Filters
+        </button>
+        <div id="mapid" class="h-100"></div>
+        <div class="filter-panel" :class="{ 'panel-active': isFilterPaneOpen }">
+            <FilterComponent/>
+        </div>
+        <div class="details-panel" :class="{ 'panel-active': isDetailsPaneOpen }">
+            <h3>Observation Details</h3>
+            <ObservationDetailsComponent/>
+        </div>
     </div>
     <FooterComponent />
 </div>

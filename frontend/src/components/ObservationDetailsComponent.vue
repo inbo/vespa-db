@@ -17,18 +17,18 @@
 
 <script>
 import { useVespaStore } from '@/stores/vespaStore';
-import { computed, defineEmits } from 'vue';
+import { computed } from 'vue';
 
 export default {
-setup() {
-    const emits = defineEmits(['closeDetails']);
+emits: ['closeDetails'], // Define emits here
+setup(props, { emit }) {
     const vespaStore = useVespaStore();
     const selectedObservation = computed(() => vespaStore.selectedObservation);
     const isEditing = computed(() => vespaStore.isEditing);
     const isLoggedIn = computed(() => vespaStore.isLoggedIn);
 
     const closeDetails = () => {
-        emits('closeDetails');
+        emit('closeDetails'); // Use emit from the context
         vespaStore.isDetailsPaneOpen = false;
     };
 

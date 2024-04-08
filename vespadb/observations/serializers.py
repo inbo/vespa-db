@@ -8,6 +8,7 @@ from rest_framework import serializers
 from rest_framework.request import Request
 
 from vespadb.observations.models import Municipality, Observation
+from vespadb.users.models import VespaUser
 
 if TYPE_CHECKING:
     from rest_framework.request import Request

@@ -11,10 +11,11 @@ import { useVespaStore } from './stores/vespaStore';
 // Import CSS
 import '@fortawesome/fontawesome-free/css/all.css';
 import 'leaflet/dist/leaflet.css';
+
+// Import your custom styles first
 import './assets/style.css';
 
-// Import Bootstrap CSS and JS
-import 'bootstrap';
+// Import Bootstrap CSS after custom styles
 import 'bootstrap/dist/css/bootstrap.min.css';
 
 const app = createApp(App);

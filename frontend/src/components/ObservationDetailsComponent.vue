@@ -1,6 +1,5 @@
 <template>
-    <div v-if="selectedObservation" class="p-4">
-        <button type="button" class="btn-close" aria-label="Close" @click="closeDetails"></button>
+    <div v-if="selectedObservation">
         <div class="mb-3" v-for="(value, key) in selectedObservation" :key="key">
             <strong>{{ key }}:</strong>
             <span v-if="typeof value === 'boolean'">{{ value ? 'Yes' : 'No' }}</span>
@@ -17,18 +16,18 @@
 
 <script>
 import { useVespaStore } from '@/stores/vespaStore';
-import { computed, defineEmits } from 'vue';
+import { computed } from 'vue';
 
 export default {
-setup() {
-    const emits = defineEmits(['closeDetails']);
+emits: ['closeDetails'], // Define emits here
+setup(props, { emit }) {
     const vespaStore = useVespaStore();
     const selectedObservation = computed(() => vespaStore.selectedObservation);
     const isEditing = computed(() => vespaStore.isEditing);
     const isLoggedIn = computed(() => vespaStore.isLoggedIn);
 
     const closeDetails = () => {
-        emits('closeDetails');
+        emit('closeDetails'); // Use emit from the context
         vespaStore.isDetailsPaneOpen = false;
     };
 
@@ -62,5 +61,6 @@ setup() {
     position: absolute;
     top: 1rem;
     right: 1rem;
+    z-index: 1000; /* Zorg dat deze waarde hoog genoeg is */
 }
 </style>

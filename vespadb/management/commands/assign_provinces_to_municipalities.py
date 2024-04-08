@@ -15,10 +15,8 @@ class Command(BaseCommand):
     def handle(self, *args: Any, **options: Any) -> None:
         """Assign a province to each municipality based on their polygons."""
         for municipality in Municipality.objects.all():
-            # Vind de provincie(s) waarvan de polygon intersecteert met de polygon van de gemeente
             provinces = Province.objects.filter(polygon__intersects=municipality.polygon)
             if provinces.exists():
-                # Neem de eerste provincie in de lijst (of implementeer aanvullende logica als nodig)
                 province = provinces.first()
                 municipality.province = province
                 municipality.save()

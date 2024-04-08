@@ -2,18 +2,20 @@
 <div class="d-flex flex-column vh-100">
     <NavbarComponent />
     <div class="flex-grow-1 position-relative">
-    <button class="btn-filter-toggle" @click="toggleFilterPane">
-        <i class="fas fa-sliders-h"></i> Filters
-    </button>
-
-    <div id="mapid" class="h-100"></div>
-    <div class="filter-panel" :class="{ 'panel-active': isFilterPaneOpen }">
-        <FilterComponent/>
-    </div>
-    <div id="details" class="details-panel" :class="{ 'panel-active': isDetailsPaneOpen }">
-        <h3>Observation Details</h3>
-        <ObservationDetailsComponent/>
-    </div>
+        <button class="btn-filter-toggle" @click="toggleFilterPane">
+            <i class="fas fa-sliders-h"></i> Filters
+        </button>
+        <div id="mapid" class="h-100"></div>
+        <div class="filter-panel" :class="{ 'panel-active': isFilterPaneOpen }">
+            <FilterComponent/>
+        </div>
+        <div class="details-panel" :class="{ 'panel-active': isDetailsPaneOpen }">
+            <div class="d-flex justify-content-between align-items-center">
+                <h3>Observation Details</h3>
+                <button type="button" class="btn-close" aria-label="Close" @click="toggleDetailsPane"></button>
+            </div>
+            <ObservationDetailsComponent/>
+        </div>
     </div>
     <FooterComponent />
 </div>
@@ -51,7 +53,6 @@ export default {
 
         const confirmUpdate = () => {
             isEditing.value = false;
-            // Logic to confirm and save the updated observation
         };
 
         const cancelEdit = () => {
@@ -60,6 +61,9 @@ export default {
         const toggleFilterPane = () => {
             isFilterPaneOpen.value = !isFilterPaneOpen.value;
         };
+        const toggleDetailsPane = () => {
+            vespaStore.isDetailsPaneOpen = !vespaStore.isDetailsPaneOpen;
+        };
 
         onMounted(async () => {
             await vespaStore.getObservations();
@@ -67,8 +71,10 @@ export default {
         });
 
         return {
+            isDetailsPaneOpen,
             isFilterPaneOpen,
             toggleFilterPane,
+            toggleDetailsPane,
             selectedObservation,
             isEditing,
             markers,

@@ -1,6 +1,5 @@
 <template>
     <div v-if="selectedObservation" class="p-4">
-        <button type="button" class="btn-close" aria-label="Close" @click="closeDetails"></button>
         <div class="mb-3" v-for="(value, key) in selectedObservation" :key="key">
             <strong>{{ key }}:</strong>
             <span v-if="typeof value === 'boolean'">{{ value ? 'Yes' : 'No' }}</span>
@@ -62,5 +61,6 @@ setup(props, { emit }) {
     position: absolute;
     top: 1rem;
     right: 1rem;
+    z-index: 1000; /* Zorg dat deze waarde hoog genoeg is */
 }
 </style>

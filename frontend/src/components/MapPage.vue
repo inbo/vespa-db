@@ -10,7 +10,10 @@
             <FilterComponent/>
         </div>
         <div class="details-panel" :class="{ 'panel-active': isDetailsPaneOpen }">
-            <h3>Observation Details</h3>
+            <div class="d-flex justify-content-between align-items-center">
+                <h3>Observation Details</h3>
+                <button type="button" class="btn-close" aria-label="Close" @click="toggleDetailsPane"></button>
+            </div>
             <ObservationDetailsComponent/>
         </div>
     </div>
@@ -59,6 +62,9 @@ export default {
         const toggleFilterPane = () => {
             isFilterPaneOpen.value = !isFilterPaneOpen.value;
         };
+        const toggleDetailsPane = () => {
+            vespaStore.isDetailsPaneOpen = !vespaStore.isDetailsPaneOpen;
+        };
 
         onMounted(async () => {
             await vespaStore.getObservations();
@@ -66,8 +72,10 @@ export default {
         });
 
         return {
+            isDetailsPaneOpen,
             isFilterPaneOpen,
             toggleFilterPane,
+            toggleDetailsPane,
             selectedObservation,
             isEditing,
             markers,

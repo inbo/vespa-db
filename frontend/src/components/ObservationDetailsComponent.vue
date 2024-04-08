@@ -1,5 +1,5 @@
 <template>
-    <div v-if="selectedObservation" class="p-4">
+    <div v-if="selectedObservation">
         <div class="mb-3" v-for="(value, key) in selectedObservation" :key="key">
             <strong>{{ key }}:</strong>
             <span v-if="typeof value === 'boolean'">{{ value ? 'Yes' : 'No' }}</span>

@@ -53,7 +53,6 @@ export default {
 
         const confirmUpdate = () => {
             isEditing.value = false;
-            // Logic to confirm and save the updated observation
         };
 
         const cancelEdit = () => {

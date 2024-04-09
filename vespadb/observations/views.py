@@ -2,21 +2,23 @@
 
 import csv
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlencode
 
 from django.conf import settings
 from django.core.cache import cache
 from django.core.serializers import serialize
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import filters, status, viewsets
+from drf_yasg import openapi
+from drf_yasg.utils import swagger_auto_schema
+from rest_framework import filters, status
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, BasePermission, IsAdminUser, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
-from rest_framework.viewsets import ReadOnlyModelViewSet
+from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_gis.filters import DistanceToPointFilter
 
 from vespadb.observations.filters import ObservationFilter
@@ -28,10 +30,13 @@ from vespadb.observations.serializers import (
     ObservationSerializer,
 )
 
+if TYPE_CHECKING:
+    from vespadb.users.models import VespaUser
+
 logger = logging.getLogger(__name__)
 
 
-class ObservationsViewSet(viewsets.ModelViewSet):
+class ObservationsViewSet(ModelViewSet):
     """ViewSet for the Observation model."""
 
     queryset = Observation.objects.all()
@@ -129,23 +134,55 @@ class ObservationsViewSet(viewsets.ModelViewSet):
         # Placeholder for bulk import logic.
         return Response(status=status.HTTP_501_NOT_IMPLEMENTED)
 
-    @action(detail=False, methods=["get"], permission_classes=[IsAdminUser])
-    def export(self, request: Request) -> HttpResponse:
-        """
-        Export observations data in CSV format for admin users only.
+    @swagger_auto_schema(
+        method="get",
+        manual_parameters=[
+            openapi.Parameter(
+                "export_format",
+                in_=openapi.IN_QUERY,
+                description="Format of the exported data",
+                type=openapi.TYPE_STRING,
+                enum=["csv", "json"],
+                default="csv",
+            ),
+        ],
+    )
+    @action(detail=False, methods=["get"], permission_classes=[AllowAny])
+    def export(self, request: Request) -> Response:
+        """Export observations data in the specified format."""
+        user: VespaUser = request.user
+        export_format = request.query_params.get("export_format", "json").lower()
 
-        :param request: The request object.
-        :return: HTTP response with the CSV data.
-        """
-        response = HttpResponse(content_type="text/csv")
-        response["Content-Disposition"] = 'attachment; filename="observations_export.csv"'
+        # Reuse the logic from `get_queryset` and `get_serializer_class`
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer_class = self.get_serializer_class()
 
-        writer = csv.writer(response)
-        writer.writerow(["ID", "CreationDatetime", "source", "Location"])
-        observations = Observation.objects.all().values_list("id", "creation_datetime", "source", "location")
-        for observation in observations:
-            writer.writerow(observation)
-        return response
+        # Context may include request info, if necessary for serialization
+        serializer_context = self.get_serializer_context()
+        serializer = serializer_class(queryset, many=True, context=serializer_context)
+
+        # Serialize the data
+        serialized_data = serializer.data
+
+        # Export to JSON
+        if export_format == "json":
+            return JsonResponse(serialized_data, safe=False)
+
+        # Export to CSV
+        if export_format == "csv":
+            response = HttpResponse(content_type="text/csv")
+            response["Content-Disposition"] = f'attachment; filename="observations_export_{user.username}.csv"'
+
+            # Assuming `serialized_data` is a list of dictionaries
+            if serialized_data:
+                headers = serialized_data[0].keys()  # CSV column headers
+                writer = csv.DictWriter(response, fieldnames=headers)
+                writer.writeheader()
+                writer.writerows(serialized_data)
+            return response
+
+        # Handle unsupported formats
+        return Response({"error": "Unsupported format specified."}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class MunicipalityViewSet(ReadOnlyModelViewSet):

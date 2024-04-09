@@ -12,6 +12,17 @@
           <label class="btn btn-outline-light" for="tableView">Tabel</label>
         </div>
 
+        <!-- Export Toggle -->
+        <div class="btn-group me-2">
+          <button type="button" class="btn btn-outline-light dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+            Export
+          </button>
+          <ul class="dropdown-menu">
+            <li><button class="dropdown-item" @click="exportData('csv')">CSV</button></li>
+            <li><button class="dropdown-item" @click="exportData('json')">JSON</button></li>
+          </ul>
+        </div>
+
         <!-- User Login/Logout -->
         <span v-if="isLoggedIn" class="navbar-text">
           <div class="btn-group">
@@ -31,6 +42,7 @@
 </template>
 <script>
 import { useVespaStore } from '@/stores/vespaStore';
+import { Dropdown } from 'bootstrap';
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 
@@ -52,7 +64,17 @@ export default {
     const navigateToChangePassword = () => {
       router.push({ name: 'ChangePassword' });
     };
-    return { isLoggedIn, username, logout, navigateToChangePassword, setViewMode, viewMode };
+    const exportData = (format) => {
+      vespaStore.exportData(format);
+    };
+
+    return { isLoggedIn, username, logout, navigateToChangePassword, setViewMode, viewMode, exportData };
+  },
+  mounted() {
+    var dropdownElementList = [].slice.call(document.querySelectorAll('.dropdown-toggle'))
+    var dropdownList = dropdownElementList.map(function (dropdownToggleEl) {
+      return new Dropdown(dropdownToggleEl);
+    });
   },
 };
 </script>

@@ -10,13 +10,9 @@ import { useVespaStore } from './stores/vespaStore';
 
 // Import CSS
 import '@fortawesome/fontawesome-free/css/all.css';
-import 'leaflet/dist/leaflet.css';
-
-// Import your custom styles first
-import './assets/style.css';
-
-// Import Bootstrap CSS after custom styles
 import 'bootstrap/dist/css/bootstrap.min.css';
+import 'leaflet/dist/leaflet.css';
+import './assets/style.css';
 
 const app = createApp(App);
 const pinia = createPinia();
@@ -26,7 +22,6 @@ app.use(router);
 
 registerPlugins(app);
 
-// Initialize and use the vespaStore for authentication check
 const vespaStore = useVespaStore();
 vespaStore.authCheck();
 

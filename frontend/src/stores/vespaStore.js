@@ -46,14 +46,8 @@ export const useVespaStore = defineStore('vespaStore', {
                 this.error = error.message || 'Failed to fetch observations';
             }
         },
-        async applyFilters(filters) {
-            this.filters.municipalities = filters.municipalities;
-            this.filters.years = filters.years;
-            this.filters.anbAreasActief = filters.anbAreasActief;
-            this.filters.nestType = filters.nestType;
-            this.filters.nestStatus = filters.nestStatus;
-
-            let filterQuery = '?';
+        createFilterQuery() {
+            let filterQuery = '';
 
             if (this.filters.municipalities.length > 0) {
                 filterQuery += `municipality_id=${this.filters.municipalities.join(',')}&`;
@@ -70,18 +64,22 @@ export const useVespaStore = defineStore('vespaStore', {
             if (this.filters.nestType) {
                 filterQuery += `nest_type=${this.filters.nestType}&`;
             }
+
             if (this.filters.nestStatus) {
                 filterQuery += `nest_status=${this.filters.nestStatus}&`;
             }
+            return filterQuery.endsWith('&') ? filterQuery.slice(0, -1) : filterQuery;
+        },
+        async applyFilters(filters) {
+            this.filters.municipalities = filters.municipalities;
+            this.filters.years = filters.years;
+            this.filters.anbAreasActief = filters.anbAreasActief;
+            this.filters.nestType = filters.nestType;
+            this.filters.nestStatus = filters.nestStatus;
 
-            if (filterQuery === '?') {
-                filterQuery = '';
-            } else {
-                filterQuery = filterQuery.endsWith('&') ? filterQuery.slice(0, -1) : filterQuery;
-            }
+            const filterQuery = this.createFilterQuery();
 
-
-            await this.getObservations(filterQuery);
+            await this.getObservations(filterQuery.length > 0 ? `?${filterQuery}` : '');
         },
         initializeMapAndMarkers() {
             if (!this.map && document.getElementById('mapid')) {
@@ -246,6 +244,23 @@ export const useVespaStore = defineStore('vespaStore', {
                     this.error = error.message || "Een onverwachte fout is opgetreden.";
                 }
                 return false;
+            }
+        },
+        async exportData(format) {
+            const filterQuery = this.createFilterQuery();
+            const url = `observations/export?export_format=${format}&${filterQuery}`;
+
+            try {
+                const response = await ApiService.get(url, { responseType: 'blob' });
+                const downloadUrl = window.URL.createObjectURL(new Blob([response.data]));
+                const link = document.createElement('a');
+                link.href = downloadUrl;
+                link.setAttribute('download', `export.${format}`);
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+            } catch (error) {
+                console.error('Error exporting data:', error);
             }
         },
         selectObservation(observation) {

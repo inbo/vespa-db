@@ -29,8 +29,13 @@ export const useVespaStore = defineStore('vespaStore', {
         isDetailsPaneOpen: false,
         markerClickHandler: null,
         viewMode: 'map',
+        userMunicipalities: [],
     }),
-
+    getters: {
+        canEditObservation: (state) => (observation) => {
+            return state.isLoggedIn && state.userMunicipalities.includes(observation.municipality);
+        },
+    },
     actions: {
         async getObservations(filterQuery = '') {
             try {
@@ -96,7 +101,6 @@ export const useVespaStore = defineStore('vespaStore', {
             this.markers.forEach(marker => marker.remove());
             this.markers = [];
 
-            // Check if the map is initialized and there are observations to add to the map
             if (this.map && this.observations.length) {
                 // Create a marker for each observation and add a click event listener
                 this.observations.forEach((observation) => {
@@ -104,7 +108,6 @@ export const useVespaStore = defineStore('vespaStore', {
                     const match = observation.location.match(locationRegex);
                     if (match) {
                         const [, longitude, latitude] = match;
-                        // Only attempt to add the marker if the map instance is not null
                         if (this.map) {
                             const marker = L.marker([parseFloat(latitude), parseFloat(longitude)], {
                                 icon: L.divIcon({
@@ -178,6 +181,7 @@ export const useVespaStore = defineStore('vespaStore', {
                     if (data.isAuthenticated && data.user) {
                         console.log(data.user)
                         this.user = data.user;
+                        this.setUserMunicipalities(data.user.municipalities);
                         this.error = "";
                         this.isLoggedIn = true;
                         this.loading = false;
@@ -263,12 +267,27 @@ export const useVespaStore = defineStore('vespaStore', {
                 console.error('Error exporting data:', error);
             }
         },
+        async updateObservation(observation) {
+            try {
+                const response = await ApiService.patch(`/observations/${observation.id}/`, observation);
+                if (response.status !== 200) {
+                    throw new Error('Network response was not ok');
+                }
+            } catch (error) {
+                console.error('Error when updating the observation:', error);
+            }
+        },
         selectObservation(observation) {
+            console.log("Selected Observation: ", observation);
             this.selectedObservation = observation;
             this.isDetailsPaneOpen = true;
         },
         setViewMode(mode) {
             this.viewMode = mode;
+        },
+        setUserMunicipalities(municipalities) {
+            console.log("Setting user municipalities:" + municipalities)
+            this.userMunicipalities = municipalities;
         },
     },
 });

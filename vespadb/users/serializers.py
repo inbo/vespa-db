@@ -16,6 +16,8 @@ logger = logging.getLogger(__name__)
 class UserSerializer(serializers.ModelSerializer):
     """User serializer."""
 
+    municipalities = serializers.SlugRelatedField(slug_field="name", many=True, read_only=True)
+
     class Meta:
         """Meta class for the UserSerializer."""
 
@@ -24,31 +26,8 @@ class UserSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             "password": {"write_only": True, "required": False},
             "date_joined": {"read_only": True},
-            "municipalities": {"read_only": True},
             "personal_data_access": {"required": False},
         }
-
-    def to_representation(self, instance: User) -> dict[Any, Any]:
-        """
-        Override the default representation method to conditionally include 'municipalities' for admin users.
-
-        Args:
-            instance (User): The user instance being serialized.
-
-        Returns
-        -------
-            dict: The dictionary representation of the User instance, conditionally including sensitive fields.
-        """
-        ret: dict[Any, Any] = super().to_representation(instance)
-        request = self.context.get("request", None)
-
-        if request and (request.user.is_staff or request.user.is_superuser):
-            if instance.municipalities:
-                ret["municipalities"] = instance.municipalities
-        else:
-            ret.pop("municipalities", None)
-
-        return ret
 
     def create(self, validated_data: dict[str, Any]) -> User:
         """Create a new user, ensuring the password is validated and hashed."""

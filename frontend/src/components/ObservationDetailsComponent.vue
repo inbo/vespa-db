@@ -1,15 +1,24 @@
 <template>
     <div v-if="selectedObservation">
-        <div class="mb-3" v-for="(value, key) in selectedObservation" :key="key">
+        <div v-for="(value, key) in selectedObservation" :key="key" class="mb-3">
             <strong>{{ key }}:</strong>
-            <span v-if="typeof value === 'boolean'">{{ value ? 'Yes' : 'No' }}</span>
-            <span v-else-if="typeof value === 'string' || typeof value === 'number'">{{ value }}</span>
-            <span v-else>Unsupported Type</span>
+            <template v-if="isEditing && editableFields.includes(key)">
+                <input v-if="typeof value === 'number'" type="number" v-model="selectedObservation[key]"
+                    class="form-control">
+                <input v-else-if="typeof value === 'string'" type="text" v-model="selectedObservation[key]"
+                    class="form-control">
+            </template>
+            <template v-else>
+                <span v-if="typeof value === 'boolean'">{{ value ? 'Yes' : 'No' }}</span>
+                <span v-else-if="typeof value === 'string' || typeof value === 'number'">{{ value }}</span>
+                <span v-else>Unsupported Type</span>
+            </template>
         </div>
         <div>
-            <button v-if="isLoggedIn" class="btn btn-success me-2" @click="startEdit">Edit</button>
-            <button v-if="isEditing" class="btn btn-success me-2" @click="confirmUpdate">Confirm</button>
-            <button v-if="isEditing" class="btn btn-secondary" @click="cancelEdit">Cancel</button>
+            <button v-if="isLoggedIn && canEdit && !isEditing" class="btn btn-success me-2"
+                @click="startEdit">Edit</button>
+            <button v-if="isEditing && canEdit" class="btn btn-success me-2" @click="confirmUpdate">Confirm</button>
+            <button v-if="isEditing && canEdit" class="btn btn-secondary" @click="cancelEdit">Cancel</button>
         </div>
     </div>
 </template>
@@ -19,48 +28,64 @@ import { useVespaStore } from '@/stores/vespaStore';
 import { computed } from 'vue';
 
 export default {
-emits: ['closeDetails'], // Define emits here
-setup(props, { emit }) {
-    const vespaStore = useVespaStore();
-    const selectedObservation = computed(() => vespaStore.selectedObservation);
-    const isEditing = computed(() => vespaStore.isEditing);
-    const isLoggedIn = computed(() => vespaStore.isLoggedIn);
+    emits: ['closeDetails'],
+    setup(props, { emit }) {
+        const vespaStore = useVespaStore();
+        const selectedObservation = computed(() => vespaStore.selectedObservation);
+        const isEditing = computed(() => vespaStore.isEditing);
+        const isLoggedIn = computed(() => vespaStore.isLoggedIn);
+        const canEdit = computed(() => {
+            console.log(selectedObservation.value);
+            return vespaStore.canEditObservation(selectedObservation.value);
+        });
 
-    const closeDetails = () => {
-        emit('closeDetails'); // Use emit from the context
-        vespaStore.isDetailsPaneOpen = false;
-    };
+        const editableFields = [
+            "nest_height",
+            "nest_size",
+            "nest_location",
+            "nest_type",
+            "notes",
+            "modified_by",
+            "created_by",
+            "duplicate",
+            "reserved_by",
+            "reserved_datetime",
+            "eradication_datetime",
+            "eradicator_name",
+            "eradication_result",
+            "eradication_product",
+            "eradication_notes",
+        ];
 
-    const startEdit = () => {
-        // Logic to start editing
-    };
+        const closeDetails = () => {
+            emit('closeDetails'); // Use emit from the context
+            vespaStore.isDetailsPaneOpen = false;
+        };
 
-    const confirmUpdate = () => {
-        // Logic to confirm update
-    };
+        const startEdit = () => {
+            vespaStore.isEditing = true;
+        };
 
-    const cancelEdit = () => {
-        // Logic to cancel editing
-    };
+        const confirmUpdate = async () => {
+            await vespaStore.updateObservation(selectedObservation.value);
+            vespaStore.isEditing = false;
+        };
 
-    return {
-        selectedObservation,
-        isEditing,
-        isLoggedIn,
-        startEdit,
-        confirmUpdate,
-        cancelEdit,
-        closeDetails,
-    };
-},
+        const cancelEdit = () => {
+            vespaStore.isEditing = false;
+        };
+
+        return {
+            selectedObservation,
+            isEditing,
+            isLoggedIn,
+            startEdit,
+            confirmUpdate,
+            cancelEdit,
+            closeDetails,
+            editableFields,
+            canEdit
+        };
+    },
 };
 </script>
-
-<style scoped>
-.btn-close {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
-    z-index: 1000; /* Zorg dat deze waarde hoog genoeg is */
-}
-</style>

@@ -17,6 +17,64 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Define the fields that public users can read
+public_read_fields = [
+    "id",
+    "location",
+    "nest_height",
+    "nest_size",
+    "nest_location",
+    "nest_type",
+    "created_by",
+    "eradication_datetime",
+    "municipality",
+    "province",
+    "images",
+]
+
+# Define the fields that authenticated users can read
+user_read_fields = [
+    "id",
+    "wn_id",
+    "created_datetime",
+    "modified_datetime",
+    "location",
+    "source",
+    "wn_notes",
+    "wn_admin_notes",
+    "species",
+    "nest_height",
+    "nest_size",
+    "nest_location",
+    "nest_type",
+    "notes",
+    "modified_by",
+    "created_by",
+    "wn_modified_datetime",
+    "wn_created_datetime",
+    "duplicate",
+    "images",
+    "reserved_by",
+    "reserved_datetime",
+    "eradication_datetime",
+    "eradicator_name",
+    "eradication_result",
+    "eradication_product",
+    "eradication_notes",
+    "municipality",
+    "province",
+    "anb",
+]
+
+# Define the conditional fields for authenticated users with specific permissions
+conditional_fields = [
+    "observer_phone_number",
+    "observer_email",
+    "observer_name",
+    "observer_allows_contact",
+    "observation_datetime",
+]
+
 
 # Observation serializers
 class ObservationSerializer(serializers.ModelSerializer):
@@ -36,60 +94,26 @@ class ObservationSerializer(serializers.ModelSerializer):
         :return: A dictionary representation of the observation instance with filtered fields.
         """
         data: dict[str, Any] = super().to_representation(instance)
-
-        # Fields accessible by public (unauthenticated) users
-        public_fields = [
-            "id",
-            "location",
-            "nest_height",
-            "nest_size",
-            "nest_location",
-            "nest_type",
-            "created_by",
-            "eradication_datetime",
-            "municipality",
-            "images",
-        ]
-
-        # Additional fields to show based on specific conditions
-        conditional_fields = [
-            "observer_phone_number",
-            "observer_email",
-            "observer_name",
-            "observer_allows_contact",
-            "observation_datetime",
-        ]
-
-        # Combine the lists for easier processing later
-        all_fields = set(public_fields + conditional_fields)
-
-        # Get the request from the context
         request: Request = self.context.get("request")
 
-        # Default to filtering out certain fields unless conditions are met
-        fields_to_include = public_fields
-
-        # If the request exists and the user is authenticated
         if request and request.user.is_authenticated:
-            # For non-admin authenticated users, check additional conditions
             if not request.user.is_staff:
                 user: VespaUser = request.user
-                # Check if user has personal_data_access and if the observation is in the user's province
+                user_municipality_ids = user.municipalities.values_list("id", flat=True)
+
                 if (
                     user.personal_data_access
                     and instance.municipality
-                    and user.municipalities
-                    and instance.municipality.id in user.municipalities
+                    and instance.municipality.id in user_municipality_ids
                 ):
-                    # All conditions met, include all fields
-                    fields_to_include = list(all_fields)
+                    fields_to_include = user_read_fields + conditional_fields
+                else:
+                    fields_to_include = user_read_fields
             else:
-                # For admin users, include all fields
-                fields_to_include = list(all_fields)
+                fields_to_include = list(self.Meta.fields)  # Admin users can see all fields
         else:
-            # For unauthenticated users, limit to public fields
-            fields_to_include = public_fields
-        # Return data with only the fields to be included
+            fields_to_include = public_read_fields
+
         return {field: data[field] for field in fields_to_include if field in data}
 
     def validate_location(self, value: dict[str, float]) -> Point:
@@ -122,7 +146,6 @@ class ObservationPatchSerializer(serializers.ModelSerializer):
 
         model = Observation
         fields = [
-            "modified_datetime",
             "nest_height",
             "nest_size",
             "nest_location",
@@ -139,21 +162,7 @@ class ObservationPatchSerializer(serializers.ModelSerializer):
             "eradication_product",
             "eradication_notes",
         ]
-        read_only_fields = [
-            "id",
-            "wn_id",
-            "created_datetime",
-            "location",
-            "source",
-            "wn_notes",
-            "wn_admin_notes",
-            "species",
-            "wn_modified_datetime",
-            "wn_created_datetime",
-            "images",
-            "municipality",
-            "anb",
-        ]
+        read_only_fields = [field for field in "__all__" if field not in user_read_fields]
 
 
 class AdminObservationPatchSerializer(serializers.ModelSerializer):

@@ -46,6 +46,29 @@ services:
     depends_on:
       - db
 
+  redis:
+    image: "redis:alpine"
+    ports:
+      - "6379:6379"
+
+  celery_worker:
+    build: .
+    command: celery-worker
+    volumes:
+      - .:/workspaces/vespadb/
+    depends_on:
+      - db
+      - redis
+
+  celery_beat:
+    build: .
+    command: celery-beat
+    volumes:
+      - .:/workspaces/vespadb/
+    depends_on:
+      - db
+      - redis
+
 volumes:
   postgres_data:
 

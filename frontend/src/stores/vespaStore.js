@@ -29,8 +29,13 @@ export const useVespaStore = defineStore('vespaStore', {
         isDetailsPaneOpen: false,
         markerClickHandler: null,
         viewMode: 'map',
+        userMunicipalities: [],
     }),
-
+    getters: {
+        canEditObservation: (state) => (observation) => {
+            return state.isLoggedIn && state.userMunicipalities.includes(observation.municipality);
+        },
+    },
     actions: {
         async getObservations(filterQuery = '') {
             try {
@@ -178,6 +183,7 @@ export const useVespaStore = defineStore('vespaStore', {
                     if (data.isAuthenticated && data.user) {
                         console.log(data.user)
                         this.user = data.user;
+                        this.setUserMunicipalities(data.user.municipalities);
                         this.error = "";
                         this.isLoggedIn = true;
                         this.loading = false;
@@ -263,12 +269,29 @@ export const useVespaStore = defineStore('vespaStore', {
                 console.error('Error exporting data:', error);
             }
         },
+        async updateObservation(observation) {
+            try {
+                // Ensure the URL ends with a slash
+                const response = await ApiService.patch(`/observations/${observation.id}/`, observation);
+                if (response.status !== 200) {
+                    throw new Error('Network response was not ok');
+                }
+                // Update local state or UI as necessary
+            } catch (error) {
+                console.error('Error when updating the observation:', error);
+            }
+        },
         selectObservation(observation) {
+            console.log("Selected Observation: ", observation);
             this.selectedObservation = observation;
             this.isDetailsPaneOpen = true;
         },
         setViewMode(mode) {
             this.viewMode = mode;
+        },
+        setUserMunicipalities(municipalities) {
+            console.log("Setting user municipalities:" + municipalities)
+            this.userMunicipalities = municipalities;
         },
     },
 });

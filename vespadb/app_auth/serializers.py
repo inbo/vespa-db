@@ -30,7 +30,7 @@ class UserSerializer(serializers.ModelSerializer):
         """."""
 
         model = User
-        fields = ["id", "username", "first_name", "last_name", "permissions"]
+        fields = ["id", "username", "first_name", "last_name", "municipalities", "permissions", "personal_data_access"]
 
 
 class LoginSerializer(serializers.Serializer):

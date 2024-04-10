@@ -101,7 +101,6 @@ export const useVespaStore = defineStore('vespaStore', {
             this.markers.forEach(marker => marker.remove());
             this.markers = [];
 
-            // Check if the map is initialized and there are observations to add to the map
             if (this.map && this.observations.length) {
                 // Create a marker for each observation and add a click event listener
                 this.observations.forEach((observation) => {
@@ -109,7 +108,6 @@ export const useVespaStore = defineStore('vespaStore', {
                     const match = observation.location.match(locationRegex);
                     if (match) {
                         const [, longitude, latitude] = match;
-                        // Only attempt to add the marker if the map instance is not null
                         if (this.map) {
                             const marker = L.marker([parseFloat(latitude), parseFloat(longitude)], {
                                 icon: L.divIcon({
@@ -271,12 +269,10 @@ export const useVespaStore = defineStore('vespaStore', {
         },
         async updateObservation(observation) {
             try {
-                // Ensure the URL ends with a slash
                 const response = await ApiService.patch(`/observations/${observation.id}/`, observation);
                 if (response.status !== 200) {
                     throw new Error('Network response was not ok');
                 }
-                // Update local state or UI as necessary
             } catch (error) {
                 console.error('Error when updating the observation:', error);
             }

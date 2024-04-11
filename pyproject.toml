@@ -32,6 +32,12 @@ djangorestframework-simplejwt = "^5.3.1"
 geopandas = "^0.14.3"
 factory-boy = "^3.2.0"
 geopy = "^2.4.1"
+celery = "^5.3.6"
+redis = "^5.0.3"
+django-celery-beat = "^2.6.0"
+django-celery-results = "^2.5.1"
+types-requests = "^2.31.0.20240406"
+types-pytz = "^2024.1.0.20240203"
 
 [tool.poetry.group.dev.dependencies]  # https://python-poetry.org/docs/master/managing-dependencies/
 coverage = { extras = ["toml"], version = ">=7.4.1" }
@@ -198,3 +204,12 @@ convention = "numpy"
     type = "boolean"
     name = "dev"
     options = ["--dev"]
+    
+    [tool.poe.tasks.celery-worker]
+    help = "Run the Celery worker"
+    cmd = "celery -A vespadb worker --loglevel=info"
+
+    # Add Celery beat task
+    [tool.poe.tasks.celery-beat]
+    help = "Run the Celery beat scheduler"
+    cmd = "celery -A vespadb beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler"

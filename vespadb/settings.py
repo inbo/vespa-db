@@ -11,8 +11,8 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
 import os
+from datetime import timedelta
 from pathlib import Path
-from celery.schedules import crontab
 
 from dotenv import load_dotenv
 
@@ -194,16 +194,15 @@ LOGIN_URL = "/login/"
 
 # Celery specifications
 
-CELERY_BROKER_URL = 'redis://redis:6379/0'
-CELERY_RESULT_BACKEND = 'django-db'
-CELERY_ACCEPT_CONTENT = ['application/json']
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_RESULT_SERIALIZER = 'json'
+CELERY_BROKER_URL = "redis://redis:6379/0"
+CELERY_RESULT_BACKEND = "django-db"
+CELERY_ACCEPT_CONTENT = ["application/json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
 
-from datetime import timedelta
 CELERY_BEAT_SCHEDULE = {
-    'fetch_observations_daily': {
-        'task': 'vespadb.observations.tasks.fetch_observations',
-        'schedule': timedelta(minutes=1),
+    "fetch_observations_daily": {
+        "task": "vespadb.observations.tasks.fetch_observations",
+        "schedule": timedelta(weeks=1),
     },
 }

@@ -203,6 +203,6 @@ CELERY_RESULT_SERIALIZER = "json"
 CELERY_BEAT_SCHEDULE = {
     "fetch_observations_daily": {
         "task": "vespadb.observations.tasks.fetch_observations",
-        "schedule": timedelta(weeks=1),
+        "schedule": timedelta(weeks=1), #TODO: set correct schedule
     },
 }

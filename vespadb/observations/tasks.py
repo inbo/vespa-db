@@ -12,6 +12,8 @@ from dotenv import load_dotenv
 
 from vespadb.observations.models import Observation
 from vespadb.observations.observation_mapper import map_external_data_to_observation_model
+from vespadb.users.models import UserType
+from vespadb.users.utils import get_system_user
 
 load_dotenv()
 
@@ -72,6 +74,7 @@ def fetch_and_update_observations(self: Task) -> None:
     offset = 0
     created = 0
     updated = 0
+    system_user: UserType = get_system_user(UserType.SYNC)
 
     while True:
         try:
@@ -89,11 +92,13 @@ def fetch_and_update_observations(self: Task) -> None:
                 if mapped_data is None:
                     continue  # Skip this observation due to errors in the data
 
-                _, created = Observation.objects.update_or_create(
+                observation, created = Observation.objects.update_or_create(
                     wn_id=mapped_data["wn_id"],
                     defaults=mapped_data,
                 )
                 if created:
+                    observation.created_by = system_user
+                    observation.save()
                     logger.info(
                         "Created new observation with wn_id %s and internal id %s",
                         mapped_data["wn_id"],
@@ -101,6 +106,8 @@ def fetch_and_update_observations(self: Task) -> None:
                     )
                     created += 1
                 else:
+                    observation.modified_by = system_user
+                    observation.save()
                     logger.info(
                         "Updated observation with wn_id %s and internal id %s", mapped_data["wn_id"], mapped_data["id"]
                     )

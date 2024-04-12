@@ -7,17 +7,21 @@ from typing import Any
 
 import requests
 from celery import Task, shared_task
+from django.db import transaction
 from django.utils import timezone
 from dotenv import load_dotenv
 
 from vespadb.observations.models import Observation
 from vespadb.observations.observation_mapper import map_external_data_to_observation_model
+from vespadb.permissions import SYSTEM_USER_OBSERVATION_FIELDS_TO_UPDATE as FIELDS_TO_UPDATE
 from vespadb.users.models import UserType
 from vespadb.users.utils import get_system_user
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
+BATCH_SIZE = 500
 
 
 def get_oauth_token() -> str | None:
@@ -46,78 +50,112 @@ def get_oauth_token() -> str | None:
 
 def fetch_observations_page(token: str, modified_since: str, offset: int = 0) -> dict[str, Any]:
     """Fetch a page of observations."""
-    headers = {"Authorization": f"Bearer {token}"}
-    params: dict[str, str | int] = {
-        "modified_since": modified_since,
-        "limit": 100,
-        "offset": offset,
-    }
-    response = requests.get(
-        str(os.environ.get("WAARNEMINGEN_OBSERVATIONS_URL")), headers=headers, params=params, timeout=10
-    )
-    response.raise_for_status()
-    json_response = response.json()
-    if isinstance(json_response, dict):
-        return json_response
-    raise ValueError("Unexpected response format from API")
+    try:
+        headers = {"Authorization": f"Bearer {token}"}
+        params: dict[str, str | int] = {
+            "modified_since": modified_since,
+            "limit": 100,
+            "offset": offset,
+        }
+        response = requests.get(
+            str(os.environ.get("WAARNEMINGEN_OBSERVATIONS_URL")), headers=headers, params=params, timeout=10
+        )
+        response.raise_for_status()
+        json_response = response.json()
+        if isinstance(json_response, dict):
+            return json_response
+        raise ValueError("Unexpected response format from API")
+    except requests.RequestException:
+        logger.exception("Error fetching observations page")
+        return {}
+
+
+def cache_wn_ids() -> set[str]:
+    """Cache wn_ids from the database to minimize query overhead."""
+    return set(Observation.objects.values_list("wn_id", flat=True))
+
+
+def create_observations(observations_to_create: list[Observation]) -> None:
+    """Bulk create observations."""
+    if observations_to_create:
+        Observation.objects.bulk_create(observations_to_create, batch_size=BATCH_SIZE)
+
+
+def update_observations(observations_to_update: list[Observation], wn_ids_to_update: list[str]) -> None:
+    """Update existing observations."""
+    if observations_to_update:
+        # Map updated observations by wn_id for easy access during update
+        observations_update_dict = {obs.wn_id: obs for obs in observations_to_update}
+        # Fetch all observations to be updated from the database in one query
+        existing_observations_to_update = Observation.objects.filter(wn_id__in=wn_ids_to_update)
+        for observation in existing_observations_to_update:
+            updated_observation = observations_update_dict[observation.wn_id]
+            for field in FIELDS_TO_UPDATE:
+                if hasattr(observation, field) and hasattr(updated_observation, field):
+                    setattr(observation, field, getattr(updated_observation, field))
+        Observation.objects.bulk_update(existing_observations_to_update, FIELDS_TO_UPDATE, batch_size=BATCH_SIZE)
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def fetch_and_update_observations(self: Task) -> None:
-    """Fetch and update observations from waarnemingen.be."""
+    """Fetch observations from the waarnemingen API and update the database.
+
+    Observations are fetched in batches and processed in bulk to minimize query overhead.
+    All observations that have been modified by waarnmeingen in the last two weeks are fetched.
+    Only observations with a modified by field set to the system user are updated.
+    """
     token = get_oauth_token()
     if not token:
-        # If token is None, schedule a retry
         raise self.retry(exc=Exception("Failed to obtain OAuth2 token"))
 
     modified_since = (timezone.now() - timedelta(weeks=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # Pre-fetch existing observations to minimize query overhead
+    existing_observations_dict = {
+        obs["wn_id"]: obs["modified_by"] for obs in Observation.objects.all().values("wn_id", "modified_by")
+    }
+    system_user = get_system_user(UserType.SYNC)
+
+    observations_to_create, wn_ids_to_update = [], []
+    observations_to_update: list[Observation] = []
+
     offset = 0
-    created = 0
-    updated = 0
-    system_user: UserType = get_system_user(UserType.SYNC)
-
     while True:
-        try:
-            response = requests.get(
-                str(os.environ.get("WAARNEMINGEN_OBSERVATIONS_URL")),
-                headers={"Authorization": f"Bearer {token}"},
-                params={"modified_since": modified_since, "offset": offset, "limit": 100},
-                timeout=10,
-            )
-            response.raise_for_status()
-            data = response.json()
+        data = fetch_observations_page(token, modified_since, offset)
 
-            for external_data in data["results"]:
-                mapped_data = map_external_data_to_observation_model(external_data)
-                if mapped_data is None:
-                    continue  # Skip this observation due to errors in the data
+        for external_data in data["results"]:
+            mapped_data = map_external_data_to_observation_model(external_data)
+            if mapped_data is None:
+                continue
 
-                observation, created = Observation.objects.update_or_create(
-                    wn_id=mapped_data["wn_id"],
-                    defaults=mapped_data,
+            wn_id = mapped_data.pop("wn_id")
+
+            if wn_id in existing_observations_dict:
+                # Check if modified_by is system_user before update
+                if existing_observations_dict[wn_id] == system_user.id:
+                    wn_ids_to_update.append(wn_id)
+                    observations_to_update.append(Observation(wn_id=wn_id, **mapped_data, modified_by=system_user))
+                    logger.info("Observation with wn_id %s is ready to be updated.", wn_id)
+            else:
+                observations_to_create.append(
+                    Observation(wn_id=wn_id, **mapped_data, created_by=system_user, modified_by=system_user)
                 )
-                if created:
-                    observation.created_by = system_user
-                    observation.save()
-                    logger.info(
-                        "Created new observation with wn_id %s and internal id %s",
-                        mapped_data["wn_id"],
-                        mapped_data["id"],
-                    )
-                    created += 1
-                else:
-                    observation.modified_by = system_user
-                    observation.save()
-                    logger.info(
-                        "Updated observation with wn_id %s and internal id %s", mapped_data["wn_id"], mapped_data["id"]
-                    )
-                    updated += 1
+                logger.info("Observation with wn_id %s is ready to be created.", wn_id)
 
-            if not data.get("next"):  # If there's no next page, break from the loop
-                break
-            offset += len(data["results"])
-        except requests.RequestException:
-            logger.exception("Failed to fetch observations")
-            break  # Stop the process in case of a request failure
+        if not data.get("next"):
+            break
+        offset += len(data["results"])
 
-    logger.info("Finished processing %s observations. Created %s, Updated %s", created + updated, created, updated)
+    logger.info("Fetched %s observations", len(observations_to_create) + len(observations_to_update))
+    logger.info(
+        "Creating %s observations, updating %s observations", len(observations_to_create), len(observations_to_update)
+    )
+    with transaction.atomic():  # Ensure that all operations are atomic
+        create_observations(observations_to_create)
+        update_observations(observations_to_update, wn_ids_to_update)
+
+    logger.info(
+        "Finished processing observations. Created: %s, Updated: %s",
+        len(observations_to_create),
+        len(observations_to_update),
+    )

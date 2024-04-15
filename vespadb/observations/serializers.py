@@ -8,7 +8,6 @@ from rest_framework import serializers
 from rest_framework.request import Request
 
 from vespadb.observations.models import Municipality, Observation
-from vespadb.users.models import VespaUser
 
 if TYPE_CHECKING:
     from rest_framework.request import Request
@@ -95,26 +94,26 @@ class ObservationSerializer(serializers.ModelSerializer):
         """
         data: dict[str, Any] = super().to_representation(instance)
         request: Request = self.context.get("request")
-
         if request and request.user.is_authenticated:
             if not request.user.is_staff:
+                # Filter fields for non-staff users based on their permissions
                 user: VespaUser = request.user
                 user_municipality_ids = user.municipalities.values_list("id", flat=True)
-
                 if (
                     user.personal_data_access
                     and instance.municipality
                     and instance.municipality.id in user_municipality_ids
                 ):
-                    fields_to_include = user_read_fields + conditional_fields
+                    fields_to_include = set(user_read_fields + conditional_fields)
                 else:
-                    fields_to_include = user_read_fields
-            else:
-                fields_to_include = list(self.Meta.fields)  # Admin users can see all fields
-        else:
-            fields_to_include = public_read_fields
-
-        return {field: data[field] for field in fields_to_include if field in data}
+                    fields_to_include = set(user_read_fields)
+                # Filter the data to include only the permitted fields
+                filtered_data = {field: data[field] for field in fields_to_include if field in data}
+                return filtered_data
+            # If user is staff, return all fields as is, no need to modify `data`
+            return data
+        # For unauthenticated or public access, restrict to public_read_fields
+        return {field: data[field] for field in public_read_fields if field in data}
 
     def validate_location(self, value: dict[str, float]) -> Point:
         """Validate the input location data. Override this method to implement custom validation logic as needed.

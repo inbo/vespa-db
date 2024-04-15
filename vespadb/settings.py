@@ -127,7 +127,7 @@ LOGGING = {
         },
         "vespadb.observations": {
             "handlers": ["console"],
-            "level": "DEBUG",
+            "level": "INFO",
             "propagate": False,
         },
     },

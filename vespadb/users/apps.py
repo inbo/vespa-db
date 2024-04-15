@@ -17,7 +17,8 @@ class UsersConfig(AppConfig):
 
         Every time Django application starts, Django will execute the ready method.
         """
-        from vespadb.users.models import UserType, VespaUser
+        from vespadb.users.models import UserType, VespaUser  # noqa: PLC0415
+
         for user_type in [UserType.SYNC, UserType.IMPORT]:
             with suppress(IntegrityError):
                 VespaUser.objects.get_or_create(username=user_type.value, defaults={"user_type": user_type.value})

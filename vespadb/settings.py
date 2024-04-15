@@ -119,16 +119,16 @@ LOGGING = {
             "class": "logging.StreamHandler",
         },
     },
-    'loggers': {
-        'celery': {
-            'handlers': ['console'],
-            'level': 'DEBUG',
-            'propagate': True,
+    "loggers": {
+        "celery": {
+            "handlers": ["console"],
+            "level": "DEBUG",
+            "propagate": True,
         },
-        'vespadb.observations': {
-            'handlers': ['console'],
-            'level': 'DEBUG',
-            'propagate': False,
+        "vespadb.observations": {
+            "handlers": ["console"],
+            "level": "DEBUG",
+            "propagate": False,
         },
     },
     "root": {

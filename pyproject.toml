@@ -38,6 +38,7 @@ django-celery-beat = "^2.6.0"
 django-celery-results = "^2.5.1"
 types-requests = "^2.31.0.20240406"
 types-pytz = "^2024.1.0.20240203"
+requests = "^2.31.0"
 
 [tool.poetry.group.dev.dependencies]  # https://python-poetry.org/docs/master/managing-dependencies/
 coverage = { extras = ["toml"], version = ">=7.4.1" }

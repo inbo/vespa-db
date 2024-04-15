@@ -5,8 +5,6 @@ from contextlib import suppress
 from django.apps import AppConfig
 from django.db.utils import IntegrityError
 
-from vespadb.users.models import UserType, VespaUser
-
 
 class UsersConfig(AppConfig):
     """VespaDB Users App Configurations."""
@@ -19,6 +17,7 @@ class UsersConfig(AppConfig):
 
         Every time Django application starts, Django will execute the ready method.
         """
+        from vespadb.users.models import UserType, VespaUser
         for user_type in [UserType.SYNC, UserType.IMPORT]:
             with suppress(IntegrityError):
                 VespaUser.objects.get_or_create(username=user_type.value, defaults={"user_type": user_type.value})

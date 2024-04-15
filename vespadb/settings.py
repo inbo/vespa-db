@@ -11,9 +11,9 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
 import os
-from datetime import timedelta
 from pathlib import Path
 
+from celery.schedules import crontab
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -119,6 +119,18 @@ LOGGING = {
             "class": "logging.StreamHandler",
         },
     },
+    'loggers': {
+        'celery': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'vespadb.observations': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+    },
     "root": {
         "handlers": ["console"],
         "level": "DEBUG",
@@ -201,8 +213,8 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 
 CELERY_BEAT_SCHEDULE = {
-    "fetch_observations_daily": {
-        "task": "vespadb.observations.tasks.fetch_observations",
-        "schedule": timedelta(weeks=1),  # TODO: set correct schedule
+    "fetch_and_update_observations": {
+        "task": "vespadb.observations.tasks.fetch_and_update_observations",
+        "schedule": crontab(hour=4, minute=0),  # Runs every day at 04 AM
     },
 }

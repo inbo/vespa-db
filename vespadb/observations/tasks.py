@@ -162,6 +162,3 @@ def fetch_and_update_observations(self: Task) -> None:
         len(observations_to_create),
         len(observations_to_update),
     )
-
-
-fetch_and_update_observations()

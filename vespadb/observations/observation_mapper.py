@@ -20,7 +20,7 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
     # Check for required fields
     required_fields = ["id", "date", "point", "created", "modified", "species"]
     for field in required_fields:
-        if field not in external_data or external_data[field] in {None, ""}:
+        if field not in external_data or external_data[field] is None or not external_data[field]:
             logger.exception(
                 "Missing required field: %s in observation external ID %s", field, external_data.get("id", "Unknown")
             )

@@ -4,6 +4,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from django.contrib.gis.geos import Point
+from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.request import Request
 
@@ -154,7 +155,6 @@ class ObservationPatchSerializer(serializers.ModelSerializer):
             "created_by",
             "duplicate",
             "reserved_by",
-            "reserved_datetime",
             "eradication_datetime",
             "eradicator_name",
             "eradication_result",
@@ -163,16 +163,67 @@ class ObservationPatchSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [field for field in "__all__" if field not in user_read_fields]
 
+    def update(self, instance: Observation, validated_data: dict[Any, Any]) -> Observation:
+        """
+        Update method to handle observation reservations.
 
-class AdminObservationPatchSerializer(serializers.ModelSerializer):
-    """Serializer for admin users allowing update operations on all fields of the Observation model. This serializer grants full access to all fields, including those that are typically restricted, providing admins with complete control over Observation records."""
+        This method checks if the `reserved_by` field is being updated. If it is and the current value is None,
+        it sets `reserved_datetime` to the current time and updates `reserved_by` to the current user.
 
-    class Meta:
-        """Meta class for the AdminObservationPatchSerializer."""
+        It also prevents non-admin users from updating observations that are reserved by someone else.
 
-        model = Observation
-        fields = "__all__"  # Admins can update all fields except id.
-        read_only_fields = ("id",)
+        Parameters
+        ----------
+            instance (Observation): The observation instance that is being updated.
+            validated_data (dict): Dictionary of new data for the observation.
+
+        Returns
+        -------
+            Observation: The updated observation instance.
+
+        Raises
+        ------
+            serializers.ValidationError: If a non-admin user tries to update an observation reserved by another user.
+        """
+        user = self.context["request"].user
+
+        # Conditionally set `reserved_by` and `reserved_datetime` for all users
+        if "reserved_by" in validated_data and instance.reserved_by is None:
+            validated_data["reserved_datetime"] = timezone.now()
+            instance.reserved_by = user
+
+        # Prevent non-admin users from updating observations reserved by others
+        if not user.is_staff and instance.reserved_by and instance.reserved_by != user:
+            raise serializers.ValidationError("You cannot edit an observation reserved by another user.")
+
+        # Allow admins to update all fields
+        if user.is_staff:
+            instance = super().update(instance, validated_data)
+            return instance
+
+        # For regular users, restrict the set of fields they can update
+        allowed_fields = [
+            "nest_height",
+            "nest_size",
+            "nest_location",
+            "nest_type",
+            "notes",
+            "modified_by",
+            "created_by",
+            "duplicate",
+            "reserved_by",
+            "eradication_datetime",
+            "eradicator_name",
+            "eradication_result",
+            "eradication_product",
+            "eradication_notes",
+        ]
+
+        for field in set(validated_data) - set(allowed_fields):
+            validated_data.pop(field)
+
+        instance = super().update(instance, validated_data)
+        return instance
 
 
 # Municipality serializers

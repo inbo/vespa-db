@@ -16,9 +16,13 @@
         </div>
         <div>
             <button v-if="isLoggedIn && canEdit && !isEditing" class="btn btn-success me-2"
-                @click="startEdit">Edit</button>
-            <button v-if="isEditing && canEdit" class="btn btn-success me-2" @click="confirmUpdate">Confirm</button>
-            <button v-if="isEditing && canEdit" class="btn btn-secondary" @click="cancelEdit">Cancel</button>
+                @click="startEdit">Wijzig</button>
+            <button v-if="isLoggedIn && canEdit && !isEditing && !selectedObservation.reserved_by"
+                class="btn btn-success me-2" @click="reserveObservation">Reserveren</button>
+            <button v-if="isUserReserver" class="btn btn-danger me-2" @click="cancelReservation">Reservatie
+                annuleren</button>
+            <button v-if="isEditing && canEdit" class="btn btn-success me-2" @click="confirmUpdate">Bevestig</button>
+            <button v-if="isEditing && canEdit" class="btn btn-secondary" @click="cancelEdit">Annuleer</button>
         </div>
     </div>
 </template>
@@ -35,8 +39,10 @@ export default {
         const isEditing = computed(() => vespaStore.isEditing);
         const isLoggedIn = computed(() => vespaStore.isLoggedIn);
         const canEdit = computed(() => {
-            console.log(selectedObservation.value);
             return vespaStore.canEditObservation(selectedObservation.value);
+        });
+        const isUserReserver = computed(() => {
+            return vespaStore.isLoggedIn && vespaStore.selectedObservation.reserved_by === vespaStore.user.id;
         });
 
         const editableFields = [
@@ -66,6 +72,14 @@ export default {
             vespaStore.isEditing = true;
         };
 
+        const reserveObservation = async () => {
+            if (!selectedObservation.value.reserved_by) {
+                await vespaStore.reserveObservation(selectedObservation.value);
+            } else {
+                alert('This observation is already reserved.');
+            }
+        };
+
         const confirmUpdate = async () => {
             await vespaStore.updateObservation(selectedObservation.value);
             vespaStore.isEditing = false;
@@ -73,6 +87,10 @@ export default {
 
         const cancelEdit = () => {
             vespaStore.isEditing = false;
+        };
+
+        const cancelReservation = async () => {
+            await vespaStore.cancelReservation(selectedObservation.value);
         };
 
         return {
@@ -84,7 +102,10 @@ export default {
             cancelEdit,
             closeDetails,
             editableFields,
-            canEdit
+            reserveObservation,
+            canEdit,
+            cancelReservation,
+            isUserReserver
         };
     },
 };

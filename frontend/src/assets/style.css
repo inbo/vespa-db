@@ -39,3 +39,7 @@
 .filter-panel {
     z-index: 1040;
 }
+
+.navbar {
+    z-index: 1051;
+}

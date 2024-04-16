@@ -7,7 +7,6 @@ import { defineStore } from 'pinia';
 export const useVespaStore = defineStore('vespaStore', {
     state: () => ({
         isLoggedIn: false,
-        userId: null,
         loading: false,
         error: null,
         municipalities: [],
@@ -94,6 +93,38 @@ export const useVespaStore = defineStore('vespaStore', {
                     maxZoom: 18,
                 }).addTo(this.map);
                 this.updateMarkers();
+            }
+        },
+        async reserveObservation(observation) {
+            try {
+                const reservedObservation = {
+                    ...observation,
+                    reserved_by: this.user.id
+                };
+                const response = await ApiService.patch(`/observations/${observation.id}/`, reservedObservation);
+                if (response.status === 200) {
+                    this.selectedObservation = { ...this.selectedObservation, ...response.data };
+                } else {
+                    throw new Error('Failed to reserve the observation');
+                }
+            } catch (error) {
+                console.error('Error reserving the observation:', error);
+            }
+        },
+        async cancelReservation(observation) {
+            try {
+                const updatedObservation = {
+                    ...observation,
+                    reserved_by: null
+                };
+                const response = await ApiService.patch(`/observations/${observation.id}/`, updatedObservation);
+                if (response.status === 200) {
+                    this.selectedObservation = { ...this.selectedObservation, ...response.data };
+                } else {
+                    throw new Error('Failed to cancel the reservation');
+                }
+            } catch (error) {
+                console.error('Error canceling the reservation:', error);
             }
         },
         async updateMarkers() {

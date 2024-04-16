@@ -8,6 +8,7 @@ from urllib.parse import urlencode
 from django.conf import settings
 from django.core.cache import cache
 from django.core.serializers import serialize
+from django.db.models import Q, QuerySet
 from django.http import HttpResponse, JsonResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg import openapi
@@ -24,7 +25,6 @@ from rest_framework_gis.filters import DistanceToPointFilter
 from vespadb.observations.filters import ObservationFilter
 from vespadb.observations.models import Municipality, Observation
 from vespadb.observations.serializers import (
-    AdminObservationPatchSerializer,
     MunicipalitySerializer,
     ObservationPatchSerializer,
     ObservationSerializer,
@@ -71,8 +71,6 @@ class ObservationsViewSet(ModelViewSet):
         :return: Serializer class
         """
         if self.request.method == "PATCH":
-            if self.request.user.is_staff:
-                return AdminObservationPatchSerializer
             return ObservationPatchSerializer
         return super().get_serializer_class()
 
@@ -94,6 +92,27 @@ class ObservationsViewSet(ModelViewSet):
         else:
             permission_classes = [AllowAny()]
         return permission_classes
+
+    def get_queryset(self) -> QuerySet:
+        """
+        Return observations based on the reservation status and user privileges.
+
+        Admin users can see all observations. Authenticated users see their reservations and unreserved observations.
+        Unauthenticated users see only unreserved observations.
+        """
+        base_queryset: QuerySet = super().get_queryset()
+        user = self.request.user
+
+        # Check if the user is an admin; if true, return all observations
+        if user.is_staff:
+            return base_queryset
+
+        # For authenticated users, filter by their reservations or non-reserved observations
+        if user.is_authenticated:
+            return base_queryset.filter(Q(reserved_by=None) | Q(reserved_by=user))
+
+        # Unauthenticated users see only non-reserved observations
+        return base_queryset.filter(reserved_by=None)
 
     def create(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """

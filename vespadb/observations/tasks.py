@@ -104,6 +104,7 @@ def fetch_and_update_observations(self: Task) -> None:
     All observations that have been modified by waarnmeingen in the last two weeks are fetched.
     Only observations with a modified by field set to the system user are updated.
     """
+    logger.info("start updating observations")
     token = get_oauth_token()
     if not token:
         raise self.retry(exc=Exception("Failed to obtain OAuth2 token"))
@@ -133,6 +134,8 @@ def fetch_and_update_observations(self: Task) -> None:
             if wn_id in existing_observations_dict:
                 # Check if modified_by is system_user before update
                 if existing_observations_dict[wn_id] == system_user.id:
+                    # Update only observations that have been modified by the system user
+                    # This is to prevent overwriting manual changes made by users
                     wn_ids_to_update.append(wn_id)
                     observations_to_update.append(Observation(wn_id=wn_id, **mapped_data, modified_by=system_user))
                     logger.info("Observation with wn_id %s is ready to be updated.", wn_id)
@@ -159,3 +162,6 @@ def fetch_and_update_observations(self: Task) -> None:
         len(observations_to_create),
         len(observations_to_update),
     )
+
+
+fetch_and_update_observations()

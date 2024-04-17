@@ -1,6 +1,9 @@
 import ApiService from '@/services/apiService';
 
 import L from 'leaflet';
+import { MarkerClusterGroup } from 'leaflet.markercluster';
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
+import 'leaflet.markercluster/dist/leaflet.markercluster';
 import 'leaflet/dist/leaflet.css';
 import { defineStore } from 'pinia';
 
@@ -9,6 +12,7 @@ export const useVespaStore = defineStore('vespaStore', {
         isLoggedIn: false,
         loading: false,
         error: null,
+        markerClusterGroup: null,
         municipalities: [],
         selectedMunicipalities: [],
         observations: [],
@@ -36,18 +40,21 @@ export const useVespaStore = defineStore('vespaStore', {
         },
     },
     actions: {
-        async getObservations(filterQuery = '') {
+        async getObservations(params) {
             try {
-                const response = await ApiService.get(`/observations${filterQuery}`);
+                this.loading = true;
+                const response = await ApiService.get(`/observations/dynamic-geojson?${params}`);
                 if (response.status === 200) {
-                    this.observations = response.data;
+                    this.observations = response.data.features; // Assuming GeoJSON format
                     this.updateMarkers();
                 } else {
                     throw new Error(`Network response was not ok, status code: ${response.status}`);
                 }
             } catch (error) {
-                console.error('There has been a problem with your fetch operation:', error);
+                console.error('Error fetching observations:', error.message);
                 this.error = error.message || 'Failed to fetch observations';
+            } finally {
+                this.loading = false;
             }
         },
         createFilterQuery() {
@@ -85,14 +92,35 @@ export const useVespaStore = defineStore('vespaStore', {
 
             await this.getObservations(filterQuery.length > 0 ? `?${filterQuery}` : '');
         },
-        initializeMapAndMarkers() {
-            if (!this.map && document.getElementById('mapid')) {
-                this.map = L.map('mapid').setView([51.0, 4.5], 9);
+        initializeMapAndMarkers(elementId) {
+            if (!this.map) {
+                this.map = L.map(elementId).setView([50.8503, 4.3517], 8);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     attribution: 'Map data © OpenStreetMap contributors',
                     maxZoom: 18,
                 }).addTo(this.map);
-                this.updateMarkers();
+
+                this.markerClusterGroup = new MarkerClusterGroup();
+                this.map.addLayer(this.markerClusterGroup);
+
+                // Listen for zoom end event to manage layers
+                this.map.on('zoomend', () => {
+                    this.loadGeoJsonData();
+                    this.manageLayersBasedOnZoom();
+                });
+
+                this.loadGeoJsonData();
+            }
+        },
+        manageLayersBasedOnZoom() {
+            this.map.addLayer(this.markerClusterGroup);
+        },
+        loadGeoJsonData() {
+            if (this.map) {
+                const bbox = this.map.getBounds().toBBoxString();
+                let params = `bbox=${bbox}`;
+                params += "&detail=true"; // Detailed data for individual markers
+                this.getObservations(params);
             }
         },
         async reserveObservation(observation) {
@@ -127,35 +155,49 @@ export const useVespaStore = defineStore('vespaStore', {
                 console.error('Error canceling the reservation:', error);
             }
         },
-        async updateMarkers() {
-            // Clear existing markers if any
-            this.markers.forEach(marker => marker.remove());
-            this.markers = [];
+        updateMarkers() {
+            if (this.map && this.markerClusterGroup) {
+                this.markerClusterGroup.clearLayers();  // Clear previous markers from the cluster group
 
-            if (this.map && this.observations.length) {
-                // Create a marker for each observation and add a click event listener
-                this.observations.forEach((observation) => {
-                    const locationRegex = /POINT \(([^ ]+) ([^ ]+)\)/;
-                    const match = observation.location.match(locationRegex);
-                    if (match) {
-                        const [, longitude, latitude] = match;
-                        if (this.map) {
-                            const marker = L.marker([parseFloat(latitude), parseFloat(longitude)], {
-                                icon: L.divIcon({
-                                    className: 'custom-div-icon',
-                                    html: "<i class='fa fa-bug' style='color: black; font-size: 24px;'></i>",
-                                    iconSize: [30, 42],
-                                    iconAnchor: [15, 42]
-                                })
-                            }).on('click', () => {
-                                this.selectObservation(observation);
-                            });
-                            this.markers.push(marker);
-                            marker.addTo(this.map);
-                        }
+                const geoJsonLayer = L.geoJSON(this.observations, {
+                    pointToLayer: (feature, latlng) => {
+                        return this.createCircleMarker(feature, latlng);
                     }
                 });
+
+                this.markerClusterGroup.addLayer(geoJsonLayer);
             }
+        },
+        createCircleMarker(feature, latlng) {
+            let markerOptions = {
+                radius: 5 + (feature.properties.observations_count || 0) * 0.5,
+                fillColor: this.getColor(feature.properties.observations_count || 1),
+                color: '#000',
+                weight: 1,
+                opacity: 1,
+                fillOpacity: 0.8
+            };
+            return L.circleMarker(latlng, markerOptions).bindPopup(`Observatie ID: ${feature.properties.id}`);
+        },
+        async fetchObservationDetails(observationId) {
+            try {
+                const response = await ApiService.get(`/observations/${observationId}`);
+                if (response.status === 200) {
+                    this.selectedObservation = response.data;
+                    this.isDetailsPaneOpen = true;
+                } else {
+                    console.error('Failed to fetch observation details:', response.status);
+                }
+            } catch (error) {
+                console.error('Error fetching observation details:', error);
+            }
+        },
+        getColor(count) {
+            return count > 10 ? '#800026' :
+                count > 5 ? '#BD0026' :
+                    count > 3 ? '#E31A1C' :
+                        count > 1 ? '#FC4E2A' :
+                            '#FFEDA0';
         },
         async updateObservation() {
             try {
@@ -309,7 +351,6 @@ export const useVespaStore = defineStore('vespaStore', {
             }
         },
         selectObservation(observation) {
-            console.log("Selected Observation: ", observation);
             this.selectedObservation = observation;
             this.isDetailsPaneOpen = true;
         },

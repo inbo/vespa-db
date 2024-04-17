@@ -1,13 +1,12 @@
 """Views for the observations app."""
 
 import csv
+import json
 import logging
 from typing import TYPE_CHECKING, Any
-from urllib.parse import urlencode
 
-from django.conf import settings
-from django.core.cache import cache
-from django.core.serializers import serialize
+from django.contrib.gis.db.models.functions import Transform
+from django.contrib.gis.geos import fromstr
 from django.db.models import Q, QuerySet
 from django.http import HttpResponse, JsonResponse
 from django_filters.rest_framework import DjangoFilterBackend
@@ -34,6 +33,7 @@ if TYPE_CHECKING:
     from vespadb.users.models import VespaUser
 
 logger = logging.getLogger(__name__)
+BBOX_LENGTH = 4
 
 
 class ObservationsViewSet(ModelViewSet):
@@ -127,21 +127,34 @@ class ObservationsViewSet(ModelViewSet):
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
-    @action(detail=False, methods=["get"], permission_classes=[AllowAny])
-    def geojson(self, request: Request) -> Response:
-        """Serve Observation data in GeoJSON format."""
-        query_params = request.query_params.dict()
-        sorted_query_params_string = urlencode(sorted(query_params.items()))
-        cache_key = f"observations_geojson_data_{sorted_query_params_string}"
-        data = cache.get(cache_key)
+    @action(detail=False, methods=["get"], url_path="dynamic-geojson")
+    def geojson(self, request: Request) -> HttpResponse:
+        """Return GeoJSON data based on the request parameters."""
+        bbox_str = request.GET.get("bbox", None)
+        bbox = None
 
-        if not data:
-            observations = self.get_queryset()
-            data = serialize("geojson", observations, geometry_field="location", fields=("id", "location"))
-            refresh_rate = settings.REDIS_REFRESH_RATE_MIN
-            cache.set(cache_key, data, refresh_rate * 60)
+        if bbox_str:
+            bbox_coords = bbox_str.split(",")
+            if len(bbox_coords) == BBOX_LENGTH:
+                xmin, ymin, xmax, ymax = map(float, bbox_coords)
+                polygon_wkt = f"POLYGON(({xmin} {ymin}, {xmin} {ymax}, {xmax} {ymax}, {xmax} {ymin}, {xmin} {ymin}))"
+                bbox = fromstr(polygon_wkt, srid=4326)
+            else:
+                return HttpResponse("Invalid bbox format", status=400)
 
-        return HttpResponse(data, content_type="application/json")
+        # Fetch individual observations
+        observations = (
+            Observation.objects.filter(location__within=bbox)
+            .annotate(point=Transform("location", 4326))
+            .values("id", "point")
+        )
+
+        features = [
+            {"type": "Feature", "properties": {"id": obs["id"]}, "geometry": json.loads(obs["point"].geojson)}
+            for obs in observations
+            if obs["point"]
+        ]
+        return JsonResponse({"type": "FeatureCollection", "features": features})
 
     @action(detail=False, methods=["post"], permission_classes=[IsAdminUser])
     def bulk_import(self, request: Request) -> Response:

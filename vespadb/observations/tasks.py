@@ -7,11 +7,12 @@ from typing import Any
 
 import requests
 from celery import Task, shared_task
-from django.db import transaction
+from django.db import models, transaction
 from django.utils import timezone
+from django.utils.timezone import now
 from dotenv import load_dotenv
 
-from vespadb.observations.models import Observation
+from vespadb.observations.models import Municipality, Observation, Province
 from vespadb.observations.observation_mapper import map_external_data_to_observation_model
 from vespadb.permissions import SYSTEM_USER_OBSERVATION_FIELDS_TO_UPDATE as FIELDS_TO_UPDATE
 from vespadb.users.models import UserType
@@ -53,7 +54,7 @@ def fetch_observations_page(token: str, modified_since: str, offset: int = 0) ->
     try:
         headers = {"Authorization": f"Bearer {token}"}
         params: dict[str, str | int] = {
-            "modified_since": modified_since,
+            "modified_after": modified_since,
             "limit": 100,
             "offset": offset,
         }
@@ -83,17 +84,27 @@ def create_observations(observations_to_create: list[Observation]) -> None:
 
 def update_observations(observations_to_update: list[Observation], wn_ids_to_update: list[str]) -> None:
     """Update existing observations."""
-    if observations_to_update:
-        # Map updated observations by wn_id for easy access during update
-        observations_update_dict = {obs.wn_id: obs for obs in observations_to_update}
-        # Fetch all observations to be updated from the database in one query
-        existing_observations_to_update = Observation.objects.filter(wn_id__in=wn_ids_to_update)
-        for observation in existing_observations_to_update:
-            updated_observation = observations_update_dict[observation.wn_id]
-            for field in FIELDS_TO_UPDATE:
-                if hasattr(observation, field) and hasattr(updated_observation, field):
-                    setattr(observation, field, getattr(updated_observation, field))
-        Observation.objects.bulk_update(existing_observations_to_update, FIELDS_TO_UPDATE, batch_size=BATCH_SIZE)
+    # Map updated observations by wn_id for easy access during update
+    observations_update_dict = {obs.wn_id: obs for obs in observations_to_update}
+    # Fetch all observations to be updated from the database in one query
+    existing_observations_to_update = Observation.objects.filter(wn_id__in=wn_ids_to_update)
+    for observation in existing_observations_to_update:
+        updated_observation = observations_update_dict[observation.wn_id]
+        for field in FIELDS_TO_UPDATE:
+            if hasattr(observation, field):
+                new_value = getattr(updated_observation, field)
+                field_type = getattr(Observation, field).field
+
+                if isinstance(field_type, models.ForeignKey):
+                    # Check if the field is a foreign key relation to Municipality or Province
+                    if isinstance(field_type.related_model, Municipality):
+                        new_value = updated_observation.municipality_id
+                    elif isinstance(field_type.related_model, Province):
+                        new_value = updated_observation.province_id
+                setattr(observation, field, new_value)
+
+    logger.info("Updating %s observations", len(existing_observations_to_update))
+    Observation.objects.bulk_update(existing_observations_to_update, FIELDS_TO_UPDATE, batch_size=BATCH_SIZE)
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
@@ -109,43 +120,58 @@ def fetch_and_update_observations(self: Task) -> None:
     if not token:
         raise self.retry(exc=Exception("Failed to obtain OAuth2 token"))
 
-    modified_since = (timezone.now() - timedelta(weeks=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    modified_since = (timezone.now() - timedelta(weeks=200)).isoformat()
 
     # Pre-fetch existing observations to minimize query overhead
     existing_observations_dict = {
         obs["wn_id"]: obs["modified_by"] for obs in Observation.objects.all().values("wn_id", "modified_by")
     }
     system_user = get_system_user(UserType.SYNC)
-
     observations_to_create, wn_ids_to_update = [], []
     observations_to_update: list[Observation] = []
-
     offset = 0
     while True:
         data = fetch_observations_page(token, modified_since, offset)
 
-        for external_data in data["results"]:
-            mapped_data = map_external_data_to_observation_model(external_data)
-            if mapped_data is None:
-                continue
+        if data:
+            for external_data in data["results"]:
+                mapped_data = map_external_data_to_observation_model(external_data)
+                current_time = now()
 
-            wn_id = mapped_data.pop("wn_id")
+                if mapped_data is None:
+                    continue
 
-            if wn_id in existing_observations_dict:
-                # Check if modified_by is system_user before update
-                if existing_observations_dict[wn_id] == system_user.id:
-                    # Update only observations that have been modified by the system user
-                    # This is to prevent overwriting manual changes made by users
-                    wn_ids_to_update.append(wn_id)
-                    observations_to_update.append(Observation(wn_id=wn_id, **mapped_data, modified_by=system_user))
-                    logger.info("Observation with wn_id %s is ready to be updated.", wn_id)
-            else:
-                observations_to_create.append(
-                    Observation(wn_id=wn_id, **mapped_data, created_by=system_user, modified_by=system_user)
-                )
-                logger.info("Observation with wn_id %s is ready to be created.", wn_id)
+                wn_id = mapped_data.pop("wn_id")
 
-        if not data.get("next"):
+                if wn_id in existing_observations_dict:
+                    # Check if modified_by is system_user before update
+                    if existing_observations_dict[wn_id] == system_user.id:
+                        # Update only observations that have been modified by the system user
+                        # This is to prevent overwriting manual changes made by users
+                        wn_ids_to_update.append(wn_id)
+                        observations_to_update.append(
+                            Observation(
+                                wn_id=wn_id, **mapped_data, modified_by=system_user, modified_datetime=current_time
+                            )
+                        )
+                        logger.info("Observation with wn_id %s is ready to be updated.", wn_id)
+                else:
+                    observations_to_create.append(
+                        Observation(
+                            wn_id=wn_id,
+                            **mapped_data,
+                            created_by=system_user,
+                            modified_by=system_user,
+                            created_datetime=current_time,
+                            modified_datetime=current_time,
+                        )
+                    )
+                    logger.info("Observation with wn_id %s is ready to be created.", wn_id)
+
+            if not data.get("next"):
+                break
+        else:
+            logger.error("No data retrieved, breaking out of the loop.")
             break
         offset += len(data["results"])
 

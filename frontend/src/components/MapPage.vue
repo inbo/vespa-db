@@ -1,26 +1,25 @@
 <template>
-<div class="d-flex flex-column vh-100">
-    <NavbarComponent />
-    <div class="flex-grow-1 position-relative">
-        <button class="btn-filter-toggle" @click="toggleFilterPane">
-            <i class="fas fa-sliders-h"></i> Filters
-        </button>
-        <div v-if="viewMode === 'map'" :key="mapKey" id="mapid" class="h-100"></div>
-        <TableViewComponent v-else></TableViewComponent>
-
-        <div class="filter-panel" :class="{ 'panel-active': isFilterPaneOpen }">
-            <FilterComponent/>
-        </div>
-        <div class="details-panel" :class="{ 'panel-active': isDetailsPaneOpen }">
-            <div class="d-flex justify-content-between align-items-center">
-                <h3>Observatie details</h3>
-                <button type="button" class="btn-close" aria-label="Close" @click="toggleDetailsPane"></button>
+    <div class="d-flex flex-column vh-100">
+        <NavbarComponent />
+        <div class="flex-grow-1 position-relative">
+            <button class="btn-filter-toggle" @click="toggleFilterPane">
+                <i class="fas fa-sliders-h"></i> Filters
+            </button>
+            <div v-show="viewMode === 'map'" :key="mapKey" ref="mapContainer" class="h-100"></div>
+            <TableViewComponent v-if="viewMode !== 'map'"></TableViewComponent>
+            <div class="filter-panel" :class="{ 'panel-active': isFilterPaneOpen }">
+                <FilterComponent />
             </div>
-            <ObservationDetailsComponent/>
+            <div class="details-panel" :class="{ 'panel-active': isDetailsPaneOpen }">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h3>Observatie details</h3>
+                    <button type="button" class="btn-close" aria-label="Close" @click="toggleDetailsPane"></button>
+                </div>
+                <ObservationDetailsComponent />
+            </div>
         </div>
+        <FooterComponent />
     </div>
-    <FooterComponent />
-</div>
 </template>
   
 <script>
@@ -42,7 +41,7 @@ export default {
     },
     setup() {
         const vespaStore = useVespaStore();
-
+        const mapContainer = ref(null);
         const selectedObservation = computed(() => vespaStore.selectedObservation);
         const isEditing = computed(() => vespaStore.isEditing);
         const markers = computed(() => vespaStore.markers);
@@ -88,8 +87,9 @@ export default {
             await vespaStore.getObservations();
             if (!vespaStore.map) {
                 //Initializing map
-                vespaStore.initializeMapAndMarkers();
+                vespaStore.initializeMapAndMarkers(mapContainer.value);
             }
+
         });
 
         return {
@@ -106,7 +106,8 @@ export default {
             confirmUpdate,
             cancelEdit,
             viewMode,
-            mapKey
+            mapKey,
+            mapContainer
         };
     },
 };

@@ -9,6 +9,8 @@ from django.contrib.gis.geos import Point
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+from vespadb.observations.utils import check_if_point_in_anb_area, get_municipality_from_coordinates
+
 logger = logging.getLogger(__name__)
 
 
@@ -133,25 +135,6 @@ class ANB(models.Model):
     def __str__(self) -> str:
         """Return the string representation of the model."""
         return str(self.domain)
-
-
-def get_municipality_from_coordinates(longitude: float, latitude: float) -> Municipality | None:
-    """Get the municipality for a given long and lat."""
-    point_to_check = Point(longitude, latitude, srid=4326)
-    point_to_check.transform(31370)
-
-    municipalities_containing_point = Municipality.objects.filter(polygon__contains=point_to_check)
-    municipality: Municipality | None = municipalities_containing_point.first()
-    return municipality
-
-
-def check_if_point_in_anb_area(longitude: float, latitude: float) -> bool:
-    """Check if a given point is in an ANB area."""
-    point_to_check = Point(longitude, latitude, srid=4326)
-    point_to_check.transform(31370)
-
-    anb_areas_containing_point = ANB.objects.filter(polygon__contains=point_to_check)
-    return bool(anb_areas_containing_point)
 
 
 class Observation(models.Model):

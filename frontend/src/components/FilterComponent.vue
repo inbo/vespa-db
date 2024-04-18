@@ -7,37 +7,37 @@
         </div>
         <div class="col-12" v-if="formattedMunicipalities.length > 0">
           <v-autocomplete v-model="selectedMunicipalities" :items="municipalities.length ? municipalities.map(municipality => ({
-          title: municipality.name,
-          value: municipality.id
-        })) : []" item-text="title" item-value="value" label="gemeente(s)" multiple chips dense solo
+            title: municipality.name,
+            value: municipality.id
+          })) : []" item-text="title" item-value="value" label="gemeente(s)" multiple chips dense solo
             @change="emitFilterUpdate">
           </v-autocomplete>
         </div>
         <div class="col-12">
-          <v-autocomplete v-model="selectedYears" :items="jaartallen" label="jaartal(len)" multiple chips dense
-            solo @change="emitFilterUpdate"></v-autocomplete>
+          <v-autocomplete v-model="selectedYears" :items="jaartallen" label="jaartal(len)" multiple chips dense solo
+            @change="emitFilterUpdate"></v-autocomplete>
         </div>
         <div class="col-12">
           <v-autocomplete v-model="selectedNestType" :items="nestType.length ? nestType.map(nesttype => ({
-          title: nesttype.name,
-          value: nesttype.value
-        })) : []" item-text="title" item-value="value" label="nest type" multiple chips dense solo
+            title: nesttype.name,
+            value: nesttype.value
+          })) : []" item-text="title" item-value="value" label="nest type" multiple chips dense solo
             @change="emitFilterUpdate">
           </v-autocomplete>
         </div>
         <div class="col-12">
           <v-autocomplete v-model="selectedNestStatus" :items="nestStatus.length ? nestStatus.map(neststatus => ({
-          title: neststatus.name,
-          value: neststatus.value
-        })) : []" item-text="title" item-value="value" label="nest status" multiple chips dense solo
+            title: neststatus.name,
+            value: neststatus.value
+          })) : []" item-text="title" item-value="value" label="nest status" multiple chips dense solo
             @change="emitFilterUpdate">
           </v-autocomplete>
         </div>
         <div class="col-12">
           <v-autocomplete v-model="anbAreasActief" :items="anbAreaOptions.length ? anbAreaOptions.map(anb => ({
-          title: anb.name,
-          value: anb.value
-        })) : []" item-text="title" item-value="value" label="ANB" multiple chips dense solo
+            title: anb.name,
+            value: anb.value
+          })) : []" item-text="title" item-value="value" label="ANB" multiple chips dense solo
             @change="emitFilterUpdate">
           </v-autocomplete>
         </div>

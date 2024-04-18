@@ -59,6 +59,7 @@ export default {
         };
 
         onMounted(() => {
+            vespaStore.applyFilters();
             vespaStore.getObservations();
         });
 

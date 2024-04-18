@@ -44,11 +44,11 @@ export const useVespaStore = defineStore('vespaStore', {
         },
     },
     actions: {
-        async getObservations(filterQuery = '', page = 1, page_size = 10) {
+        async getObservations(page = 1, page_size = 10) {
             this.loadingObservations = true;
+            const filterQuery = this.createFilterQuery();
             try {
-                const prefix = filterQuery ? '&' : '?';
-                const response = await ApiService.get(`/observations${filterQuery}${prefix}page=${page}&page_size=${page_size}`);
+                const response = await ApiService.get(`/observations?${filterQuery}&page=${page}&page_size=${page_size}`);
                 if (response.status === 200) {
                     this.observations = response.data.results;
                     this.totalObservations = response.data.total;
@@ -64,15 +64,12 @@ export const useVespaStore = defineStore('vespaStore', {
                 this.loadingObservations = false;
             }
         },
-        async getObservationsGeoJson(params) {
-            if (!params || params.trim() === "") {
-                console.error('getObservations was called with undefined or empty parameters.');
-                return;
-            }
-
+        async getObservationsGeoJson() {
             this.loading = true;
+            const filterQuery = this.createFilterQuery();
+            const bbox = this.map.getBounds().toBBoxString();
             try {
-                const response = await ApiService.get(`/observations/dynamic-geojson?${params}`);
+                const response = await ApiService.get(`/observations/dynamic-geojson?${filterQuery}&bbox=${bbox}`);
                 if (response.status === 200) {
                     this.observations = response.data.features;
                     this.updateMarkers();
@@ -97,7 +94,7 @@ export const useVespaStore = defineStore('vespaStore', {
                 filterQuery += `year_range=${this.filters.years.join(',')}&`;
             }
 
-            if (this.filters.anbAreasActief !== null && typeof this.filters.anbAreasActief !== 'undefined') {
+            if (this.filters.anbAreasActief !== null && this.filters.anbAreasActief !== undefined) {
                 filterQuery += `anb=${this.filters.anbAreasActief}&`;
             }
 
@@ -108,6 +105,7 @@ export const useVespaStore = defineStore('vespaStore', {
             if (this.filters.nestStatus) {
                 filterQuery += `nest_status=${this.filters.nestStatus}&`;
             }
+
             return filterQuery.endsWith('&') ? filterQuery.slice(0, -1) : filterQuery;
         },
         async applyFilters(filters) {
@@ -119,7 +117,11 @@ export const useVespaStore = defineStore('vespaStore', {
 
             const filterQuery = this.createFilterQuery();
 
-            this.loadGeoJsonData();
+            if (this.viewMode === 'map') {
+                this.loadGeoJsonData();
+            } else {
+                this.getObservations(filterQuery);
+            }
         },
         initializeMapAndMarkers(elementId) {
             if (!this.map) {

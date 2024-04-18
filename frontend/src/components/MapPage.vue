@@ -84,12 +84,10 @@ export default {
         });
         onMounted(async () => {
             if (!vespaStore.map) {
-                // Initializing map
                 vespaStore.initializeMapAndMarkers(mapContainer.value);
             } else {
-                // Wait until map bounds are ready or other necessary data is loaded.
                 await nextTick();
-                vespaStore.loadGeoJsonData();  // This should only be called when we are sure that bbox and filters are defined.
+                vespaStore.loadGeoJsonData();
             }
         });
 

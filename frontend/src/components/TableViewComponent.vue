@@ -49,12 +49,15 @@ export default {
         const tableHeaders = ref(['ID', 'Location', 'Province']);
 
         const fetchPage = (direction) => {
+            let url;
             if (direction === 'next' && nextPage.value) {
-                const pageParams = new URLSearchParams(nextPage.value.split('?')[1]);
-                vespaStore.getObservations('', pageParams.get('page'), pageParams.get('page_size'));
+                url = nextPage.value;
             } else if (direction === 'prev' && previousPage.value) {
-                const pageParams = new URLSearchParams(previousPage.value.split('?')[1]);
-                vespaStore.getObservations('', pageParams.get('page'), pageParams.get('page_size'));
+                url = previousPage.value;
+            }
+            if (url) {
+                const pageParams = new URLSearchParams(url.split('?')[1]);
+                vespaStore.getObservations(pageParams.get('page'), pageParams.get('page_size'));
             }
         };
 

@@ -44,7 +44,7 @@ export const useVespaStore = defineStore('vespaStore', {
         },
     },
     actions: {
-        async getObservations(page = 1, page_size = 10) {
+        async getObservations(page = 1, page_size = 25) {
             this.loadingObservations = true;
             const filterQuery = this.createFilterQuery();
             try {

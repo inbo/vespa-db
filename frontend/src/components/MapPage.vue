@@ -5,8 +5,7 @@
             <button class="btn-filter-toggle" @click="toggleFilterPane">
                 <i class="fas fa-sliders-h"></i> Filters
             </button>
-            <div v-show="viewMode === 'map'" :key="mapKey" ref="mapContainer" class="h-100"></div>
-            <TableViewComponent v-if="viewMode !== 'map'"></TableViewComponent>
+            <div ref="mapContainer" class="h-100"></div>
             <div class="filter-panel" :class="{ 'panel-active': isFilterPaneOpen }">
                 <FilterComponent />
             </div>
@@ -25,23 +24,20 @@
 <script>
 import { useVespaStore } from '@/stores/vespaStore';
 import 'leaflet/dist/leaflet.css';
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onActivated, onMounted, ref } from 'vue';
 import FilterComponent from './FilterComponent.vue';
 import FooterComponent from './FooterComponent.vue';
 import NavbarComponent from './NavbarComponent.vue';
 import ObservationDetailsComponent from './ObservationDetailsComponent.vue';
-import TableViewComponent from './TableViewComponent.vue';
 export default {
     components: {
         NavbarComponent,
         FooterComponent,
         FilterComponent,
         ObservationDetailsComponent,
-        TableViewComponent
     },
     setup() {
         const vespaStore = useVespaStore();
-        const mapContainer = ref(null);
         const selectedObservation = computed(() => vespaStore.selectedObservation);
         const isEditing = computed(() => vespaStore.isEditing);
         const markers = computed(() => vespaStore.markers);
@@ -49,7 +45,7 @@ export default {
         const isLoggedIn = computed(() => vespaStore.isLoggedIn);
         const isDetailsPaneOpen = computed(() => vespaStore.isDetailsPaneOpen);
         const isFilterPaneOpen = ref(false);
-        const viewMode = computed(() => vespaStore.viewMode);
+        const mapContainer = ref(null);
         const mapKey = ref(0);
 
         const startEdit = () => {
@@ -69,27 +65,21 @@ export default {
         const toggleDetailsPane = () => {
             vespaStore.isDetailsPaneOpen = !vespaStore.isDetailsPaneOpen;
         };
-
-        watch(() => vespaStore.viewMode, async (newVal) => {
-            console.log(`View mode changing to ${newVal}`);
-            if (newVal === 'map') {
-                mapKey.value++;
-                await nextTick();
-                if (vespaStore.map) {
-                    vespaStore.map.remove();
-                    vespaStore.map = null;
-                }
-                vespaStore.initializeMapAndMarkers();
-            }
-        });
-        onMounted(async () => {
+        const initializeMap = () => {
             if (!vespaStore.map) {
+                console.log('initializing map');
                 vespaStore.initializeMapAndMarkers(mapContainer.value);
             } else {
-                await nextTick();
-                vespaStore.loadGeoJsonData();
+                console.log('map already initialized');
+                nextTick(() => {
+                    vespaStore.map = null
+                    vespaStore.initializeMapAndMarkers(mapContainer.value);
+                });
             }
-        });
+        };
+
+        onMounted(initializeMap);
+        onActivated(initializeMap);
 
         return {
             isDetailsPaneOpen,
@@ -104,8 +94,6 @@ export default {
             startEdit,
             confirmUpdate,
             cancelEdit,
-            viewMode,
-            mapKey,
             mapContainer
         };
     },

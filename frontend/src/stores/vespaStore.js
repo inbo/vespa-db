@@ -1,7 +1,6 @@
 import ApiService from '@/services/apiService';
 
 import L from 'leaflet';
-import { MarkerClusterGroup } from 'leaflet.markercluster';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import 'leaflet.markercluster/dist/leaflet.markercluster';
 import 'leaflet/dist/leaflet.css';
@@ -50,7 +49,7 @@ export const useVespaStore = defineStore('vespaStore', {
             try {
                 const response = await ApiService.get(`/observations?${filterQuery}&page=${page}&page_size=${page_size}`);
                 if (response.status === 200) {
-                    this.observations = response.data.results;
+                    this.observations = response.data.results;  // Updating observations instead
                     this.totalObservations = response.data.total;
                     this.nextPage = response.data.next;
                     this.previousPage = response.data.previous;
@@ -71,7 +70,7 @@ export const useVespaStore = defineStore('vespaStore', {
             try {
                 const response = await ApiService.get(`/observations/dynamic-geojson?${filterQuery}&bbox=${bbox}`);
                 if (response.status === 200) {
-                    this.observations = response.data.features;
+                    this.observations = response.data.features;  // Updating observations instead
                     this.updateMarkers();
                 } else {
                     throw new Error(`Network response was not ok, status code: ${response.status}`);
@@ -114,45 +113,53 @@ export const useVespaStore = defineStore('vespaStore', {
             this.filters.anbAreasActief = filters.anbAreasActief;
             this.filters.nestType = filters.nestType;
             this.filters.nestStatus = filters.nestStatus;
-
-            const filterQuery = this.createFilterQuery();
-
+        },
+        async applyFiltersAndReload(filters) {
+            this.applyFilters(filters)
+            console.log("Applying filters:", this.filters)
+            console.log("viewmode:", this.viewMode)
             if (this.viewMode === 'map') {
-                this.loadGeoJsonData();
+                console.log("in if")
+                this.loadGeoJsonData(true);
             } else {
-                this.getObservations(filterQuery);
+                this.getObservations();
             }
         },
         initializeMapAndMarkers(elementId) {
             if (!this.map) {
-                this.map = L.map(elementId).setView([50.8503, 4.3517], 8);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: 'Map data © OpenStreetMap contributors',
-                    maxZoom: 18,
-                }).addTo(this.map);
-
-                this.markerClusterGroup = new MarkerClusterGroup();
-                this.map.addLayer(this.markerClusterGroup);
-
-                this.map.whenReady(() => {
-                    this.loadGeoJsonData();
+                this.map = L.map(elementId, {
+                    center: [50.8503, 4.3517],
+                    zoom: 8,
+                    layers: [
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            attribution: 'Map data © OpenStreetMap contributors'
+                        }),
+                        this.markerClusterGroup = new L.MarkerClusterGroup()
+                    ]
                 });
 
                 this.map.on('zoomend', () => {
                     this.loadGeoJsonData();
                 });
+
+                if (this.filters) {
+                    this.applyFilters(this.filters);
+                }
+                this.loadGeoJsonData();
+                this.updateMarkers();
+            } else {
+                this.map._onResize();
             }
         },
         manageLayersBasedOnZoom() {
             this.map.addLayer(this.markerClusterGroup);
         },
         loadGeoJsonData() {
-            if (this.map) {
-                const bbox = this.map.getBounds().toBBoxString();
-                let params = this.createFilterQuery();
-                params = params ? `${params}&bbox=${bbox}` : `bbox=${bbox}`;
-                this.getObservationsGeoJson(params);
-            }
+            if (!this.map) return;
+            const bbox = this.map.getBounds().toBBoxString();
+            let params = this.createFilterQuery();
+            params = params ? `${params}&bbox=${bbox}` : `bbox=${bbox}`;
+            this.getObservationsGeoJson(params);
         },
         async reserveObservation(observation) {
             try {
@@ -187,23 +194,24 @@ export const useVespaStore = defineStore('vespaStore', {
             }
         },
         updateMarkers() {
-            if (this.map && this.markerClusterGroup) {
-                this.markerClusterGroup.clearLayers();  // Clear previous markers from the cluster group
-
-                const geoJsonLayer = L.geoJSON(this.observations, {
-                    pointToLayer: (feature, latlng) => {
-                        return this.createCircleMarker(feature, latlng);
-                    }
-                });
-
-                this.markerClusterGroup.addLayer(geoJsonLayer);
+            if (!this.map || !this.markerClusterGroup || !this.observations.length) {
+                console.error("No map, marker cluster group, or map observations available");
+                return;
             }
+            this.markerClusterGroup.clearLayers();
+
+            const geoJsonLayer = L.geoJSON(this.observations, {
+                pointToLayer: (feature, latlng) => this.createCircleMarker(feature, latlng)
+            });
+
+            this.markerClusterGroup.addLayer(geoJsonLayer);
+            this.map.addLayer(this.markerClusterGroup);
         },
         createCircleMarker(feature, latlng) {
             let markerOptions = {
                 radius: 5 + (feature.properties.observations_count || 0) * 0.5,
-                fillColor: this.getColor(feature.properties.observations_count || 1),
-                color: '#000',
+                fillColor: "#FF7800",
+                color: "#000",
                 weight: 1,
                 opacity: 1,
                 fillOpacity: 0.8

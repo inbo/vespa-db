@@ -109,7 +109,7 @@ export default {
     },
     emitFilterUpdate() {
       const vespaStore = useVespaStore();
-      vespaStore.applyFilters({
+      vespaStore.applyFiltersAndReload({
         municipalities: this.selectedMunicipalities,
         years: this.selectedYears,
         anbAreasActief: this.anbAreasActief,

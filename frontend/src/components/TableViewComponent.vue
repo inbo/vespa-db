@@ -23,11 +23,11 @@
                 </tbody>
             </table>
         </div>
-        <div v-if="totalObservations > 0" class="d-flex justify-content-between mt-3">
-            <button class="btn btn-outline-primary" @click="fetchPage('prev')" :disabled="!previousPage">
+        <div v-if="totalObservations > 0" class="d-flex justify-content-start mt-3">
+            <button class="btn btn-outline-success mr-2" @click="fetchPage('prev')" :disabled="!previousPage">
                 <i class="fas fa-chevron-left"></i> Previous
             </button>
-            <button class="btn btn-outline-primary" @click="fetchPage('next')" :disabled="!nextPage">
+            <button class="btn btn-outline-success" @click="fetchPage('next')" :disabled="!nextPage">
                 Next <i class="fas fa-chevron-right"></i>
             </button>
         </div>
@@ -47,6 +47,7 @@ export default {
         const nextPage = computed(() => vespaStore.nextPage);
         const previousPage = computed(() => vespaStore.previousPage);
         const tableHeaders = ref(['ID', 'Location', 'Province']);
+        const isFilterPaneOpen = ref(false);
 
         const fetchPage = (direction) => {
             let url;
@@ -60,13 +61,18 @@ export default {
                 vespaStore.getObservations(pageParams.get('page'), pageParams.get('page_size'));
             }
         };
+        const toggleFilterPane = () => {
+            isFilterPaneOpen.value = !isFilterPaneOpen.value;
+        };
 
         onMounted(() => {
-            vespaStore.applyFilters();
+            if (vespaStore.filters) {
+                vespaStore.applyFilters(vespaStore.filters);
+            }
             vespaStore.getObservations();
         });
 
-        return { observations, loading, fetchPage, nextPage, previousPage, totalObservations, tableHeaders };
+        return { observations, loading, fetchPage, nextPage, previousPage, totalObservations, tableHeaders, toggleFilterPane, isFilterPaneOpen };
     },
 };
 </script>

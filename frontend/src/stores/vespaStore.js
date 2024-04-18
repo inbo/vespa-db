@@ -16,7 +16,11 @@ export const useVespaStore = defineStore('vespaStore', {
         municipalities: [],
         selectedMunicipalities: [],
         observations: [],
+        totalObservations: 0,
         selectedObservation: null,
+        nextPage: null,
+        previousPage: null,
+        loadingObservations: false,
         markers: [],
         user: {},
         authInterval: null,
@@ -40,7 +44,27 @@ export const useVespaStore = defineStore('vespaStore', {
         },
     },
     actions: {
-        async getObservations(params) {
+        async getObservations(filterQuery = '', page = 1, page_size = 10) {
+            this.loadingObservations = true;
+            try {
+                const prefix = filterQuery ? '&' : '?';
+                const response = await ApiService.get(`/observations${filterQuery}${prefix}page=${page}&page_size=${page_size}`);
+                if (response.status === 200) {
+                    this.observations = response.data.results;
+                    this.totalObservations = response.data.total;
+                    this.nextPage = response.data.next;
+                    this.previousPage = response.data.previous;
+                } else {
+                    throw new Error(`Network response was not ok, status code: ${response.status}`);
+                }
+            } catch (error) {
+                console.error('There has been a problem with your fetch operation:', error);
+                this.error = error.message || 'Failed to fetch observations';
+            } finally {
+                this.loadingObservations = false;
+            }
+        },
+        async getObservationsGeoJson(params) {
             if (!params || params.trim() === "") {
                 console.error('getObservations was called with undefined or empty parameters.');
                 return;
@@ -108,13 +132,12 @@ export const useVespaStore = defineStore('vespaStore', {
                 this.markerClusterGroup = new MarkerClusterGroup();
                 this.map.addLayer(this.markerClusterGroup);
 
-                // Zorg ervoor dat loadGeoJsonData wordt aangeroepen zodra de kaart klaar is
                 this.map.whenReady(() => {
-                    this.loadGeoJsonData(); // Laadt data zodra de kaart gereed is
+                    this.loadGeoJsonData();
                 });
 
                 this.map.on('zoomend', () => {
-                    this.loadGeoJsonData(); // Laadt data op zoomend
+                    this.loadGeoJsonData();
                 });
             }
         },
@@ -126,7 +149,7 @@ export const useVespaStore = defineStore('vespaStore', {
                 const bbox = this.map.getBounds().toBBoxString();
                 let params = this.createFilterQuery();
                 params = params ? `${params}&bbox=${bbox}` : `bbox=${bbox}`;
-                this.getObservations(params);
+                this.getObservationsGeoJson(params);
             }
         },
         async reserveObservation(observation) {

@@ -254,6 +254,44 @@ export const useVespaStore = defineStore('vespaStore', {
                 console.error('Error fetching municipalities:', error);
             }
         },
+        async updateObservation(observation) {
+            try {
+                const response = await ApiService.patch(`/observations/${observation.id}/`, observation);
+                if (response.status !== 200) {
+                    throw new Error('Network response was not ok');
+                }
+            } catch (error) {
+                console.error('Error when updating the observation:', error);
+            }
+        },
+        selectObservation(observation) {
+            this.selectedObservation = observation;
+            this.isDetailsPaneOpen = true;
+        },
+        setViewMode(mode) {
+            this.viewMode = mode;
+        },
+        setUserMunicipalities(municipalities) {
+            console.log("Setting user municipalities:" + municipalities)
+            this.userMunicipalities = municipalities;
+        },
+        async exportData(format) {
+            const filterQuery = this.createFilterQuery();
+            const url = `observations/export?export_format=${format}&${filterQuery}`;
+
+            try {
+                const response = await ApiService.get(url, { responseType: 'blob' });
+                const downloadUrl = window.URL.createObjectURL(new Blob([response.data]));
+                const link = document.createElement('a');
+                link.href = downloadUrl;
+                link.setAttribute('download', `export.${format}`);
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+            } catch (error) {
+                console.error('Error exporting data:', error);
+            }
+        },
         async login({ username, password }) {
             this.loading = true;
             await ApiService
@@ -353,44 +391,6 @@ export const useVespaStore = defineStore('vespaStore', {
                 }
                 return false;
             }
-        },
-        async exportData(format) {
-            const filterQuery = this.createFilterQuery();
-            const url = `observations/export?export_format=${format}&${filterQuery}`;
-
-            try {
-                const response = await ApiService.get(url, { responseType: 'blob' });
-                const downloadUrl = window.URL.createObjectURL(new Blob([response.data]));
-                const link = document.createElement('a');
-                link.href = downloadUrl;
-                link.setAttribute('download', `export.${format}`);
-                document.body.appendChild(link);
-                link.click();
-                link.remove();
-            } catch (error) {
-                console.error('Error exporting data:', error);
-            }
-        },
-        async updateObservation(observation) {
-            try {
-                const response = await ApiService.patch(`/observations/${observation.id}/`, observation);
-                if (response.status !== 200) {
-                    throw new Error('Network response was not ok');
-                }
-            } catch (error) {
-                console.error('Error when updating the observation:', error);
-            }
-        },
-        selectObservation(observation) {
-            this.selectedObservation = observation;
-            this.isDetailsPaneOpen = true;
-        },
-        setViewMode(mode) {
-            this.viewMode = mode;
-        },
-        setUserMunicipalities(municipalities) {
-            console.log("Setting user municipalities:" + municipalities)
-            this.userMunicipalities = municipalities;
         },
     },
 });

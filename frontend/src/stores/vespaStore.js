@@ -41,11 +41,16 @@ export const useVespaStore = defineStore('vespaStore', {
     },
     actions: {
         async getObservations(params) {
+            if (!params || params.trim() === "") {
+                console.error('getObservations was called with undefined or empty parameters.');
+                return;
+            }
+
+            this.loading = true;
             try {
-                this.loading = true;
                 const response = await ApiService.get(`/observations/dynamic-geojson?${params}`);
                 if (response.status === 200) {
-                    this.observations = response.data.features; // Assuming GeoJSON format
+                    this.observations = response.data.features;
                     this.updateMarkers();
                 } else {
                     throw new Error(`Network response was not ok, status code: ${response.status}`);
@@ -90,7 +95,7 @@ export const useVespaStore = defineStore('vespaStore', {
 
             const filterQuery = this.createFilterQuery();
 
-            await this.getObservations(filterQuery.length > 0 ? `?${filterQuery}` : '');
+            this.loadGeoJsonData();
         },
         initializeMapAndMarkers(elementId) {
             if (!this.map) {
@@ -103,13 +108,14 @@ export const useVespaStore = defineStore('vespaStore', {
                 this.markerClusterGroup = new MarkerClusterGroup();
                 this.map.addLayer(this.markerClusterGroup);
 
-                // Listen for zoom end event to manage layers
-                this.map.on('zoomend', () => {
-                    this.loadGeoJsonData();
-                    this.manageLayersBasedOnZoom();
+                // Zorg ervoor dat loadGeoJsonData wordt aangeroepen zodra de kaart klaar is
+                this.map.whenReady(() => {
+                    this.loadGeoJsonData(); // Laadt data zodra de kaart gereed is
                 });
 
-                this.loadGeoJsonData();
+                this.map.on('zoomend', () => {
+                    this.loadGeoJsonData(); // Laadt data op zoomend
+                });
             }
         },
         manageLayersBasedOnZoom() {
@@ -118,8 +124,8 @@ export const useVespaStore = defineStore('vespaStore', {
         loadGeoJsonData() {
             if (this.map) {
                 const bbox = this.map.getBounds().toBBoxString();
-                let params = `bbox=${bbox}`;
-                params += "&detail=true"; // Detailed data for individual markers
+                let params = this.createFilterQuery();
+                params = params ? `${params}&bbox=${bbox}` : `bbox=${bbox}`;
                 this.getObservations(params);
             }
         },

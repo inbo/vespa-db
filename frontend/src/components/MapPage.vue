@@ -83,13 +83,14 @@ export default {
             }
         });
         onMounted(async () => {
-            //MapPage mounted
-            await vespaStore.getObservations();
             if (!vespaStore.map) {
-                //Initializing map
+                // Initializing map
                 vespaStore.initializeMapAndMarkers(mapContainer.value);
+            } else {
+                // Wait until map bounds are ready or other necessary data is loaded.
+                await nextTick();
+                vespaStore.loadGeoJsonData();  // This should only be called when we are sure that bbox and filters are defined.
             }
-
         });
 
         return {

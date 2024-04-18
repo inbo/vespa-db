@@ -20,6 +20,7 @@ from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_gis.filters import DistanceToPointFilter
+from django.contrib.gis.geos import GEOSGeometry
 
 from vespadb.observations.filters import ObservationFilter
 from vespadb.observations.models import Municipality, Observation
@@ -130,29 +131,36 @@ class ObservationsViewSet(ModelViewSet):
     @action(detail=False, methods=["get"], url_path="dynamic-geojson")
     def geojson(self, request: Request) -> HttpResponse:
         """Return GeoJSON data based on the request parameters."""
-        bbox_str = request.GET.get("bbox", None)
-        bbox = None
-
+        bbox_str = request.GET.get("bbox")
         if bbox_str:
-            bbox_coords = bbox_str.split(",")
-            if len(bbox_coords) == BBOX_LENGTH:
-                xmin, ymin, xmax, ymax = map(float, bbox_coords)
-                polygon_wkt = f"POLYGON(({xmin} {ymin}, {xmin} {ymax}, {xmax} {ymax}, {xmax} {ymin}, {xmin} {ymin}))"
-                bbox = fromstr(polygon_wkt, srid=4326)
-            else:
-                return HttpResponse("Invalid bbox format", status=400)
+            try:
+                bbox_coords = list(map(float, bbox_str.split(',')))
+                if len(bbox_coords) == 4:
+                    xmin, ymin, xmax, ymax = bbox_coords
+                    bbox_wkt = f"POLYGON(({xmin} {ymin}, {xmin} {ymax}, {xmax} {ymax}, {xmax} {ymin}, {xmin} {ymin}))"
+                    bbox = GEOSGeometry(bbox_wkt, srid=4326)
+                else:
+                    return HttpResponse("Invalid bbox format", status=status.HTTP_400_BAD_REQUEST)
+            except ValueError:
+                return HttpResponse("Invalid bbox values", status=status.HTTP_400_BAD_REQUEST)
+        else:
+            bbox = None
 
-        # Fetch individual observations
-        observations = (
-            Observation.objects.filter(location__within=bbox)
-            .annotate(point=Transform("location", 4326))
-            .values("id", "point")
-        )
-
+        # Apply filters
+        queryset = self.filter_queryset(self.get_queryset())
+        
+        if bbox:
+            queryset = queryset.filter(location__within=bbox)
+        
+        queryset = queryset.annotate(point=Transform('location', 4326))
+        
         features = [
-            {"type": "Feature", "properties": {"id": obs["id"]}, "geometry": json.loads(obs["point"].geojson)}
-            for obs in observations
-            if obs["point"]
+            {
+                "type": "Feature",
+                "properties": {"id": obs.id},
+                "geometry": json.loads(obs.point.geojson) if obs.point else None
+            }
+            for obs in queryset
         ]
         return JsonResponse({"type": "FeatureCollection", "features": features})
 

@@ -25,7 +25,7 @@ export const useVespaStore = defineStore('vespaStore', {
         filters: {
             municipalities: [],
             years: [],
-            anbAreasActief: false,
+            anbAreasActief: null,
             nestType: null,
             nestStatus: null,
         },

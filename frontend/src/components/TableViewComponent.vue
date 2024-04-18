@@ -18,8 +18,7 @@
                     <tr v-for="observation in observations" :key="observation.id">
                         <td>{{ observation.id }}</td>
                         <td>{{ observation.location }}</td>
-                        <td>{{ observation.nest_height }}</td>
-                        <!-- Add other necessary fields as needed -->
+                        <td>{{ observation.province }}</td>
                     </tr>
                 </tbody>
             </table>
@@ -47,7 +46,7 @@ export default {
         const totalObservations = computed(() => vespaStore.totalObservations);
         const nextPage = computed(() => vespaStore.nextPage);
         const previousPage = computed(() => vespaStore.previousPage);
-        const tableHeaders = ref(['ID', 'Location', 'Nest Height']); // Extend as needed
+        const tableHeaders = ref(['ID', 'Location', 'Province']);
 
         const fetchPage = (direction) => {
             if (direction === 'next' && nextPage.value) {

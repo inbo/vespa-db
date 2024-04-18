@@ -127,6 +127,50 @@ class ObservationsViewSet(ModelViewSet):
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+    
+    def get_paginated_response(self, data: list[dict[str, Any]]) -> Response:
+        """
+        Construct the paginated response for the observations data.
+
+        This method adds pagination links and the total count of observations to the response.
+
+        Parameters:
+        - data (List[Dict[str, Any]]): Serialized data for the current page.
+
+        Returns:
+        - Response: A response object containing the paginated data and navigation links.
+        """
+        assert self.paginator is not None
+        return Response({
+            'total': self.paginator.page.paginator.count,
+            'next': self.paginator.get_next_link(),
+            'previous': self.paginator.get_previous_link(),
+            'results': data
+        })
+    
+    def list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        """
+        Handle requests for the list of observations with pagination.
+
+        Override the default list method to apply pagination and return paginated response.
+
+        Parameters:
+        - request (Request): The incoming HTTP request.
+        - *args (Any): Additional positional arguments.
+        - **kwargs (Any): Additional keyword arguments.
+
+        Returns:
+        - Response: The paginated response containing the observations data or full list if pagination is not applied.
+        """
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     @action(detail=False, methods=["get"], url_path="dynamic-geojson")
     def geojson(self, request: Request) -> HttpResponse:
@@ -230,6 +274,7 @@ class MunicipalityViewSet(ReadOnlyModelViewSet):
 
     queryset = Municipality.objects.all().order_by("name")
     serializer_class = MunicipalitySerializer
+    pagination_class = None
 
     def get_permissions(self) -> list[BasePermission]:
         """Determine the set of permissions that apply to the current action."""

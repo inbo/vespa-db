@@ -1,10 +1,8 @@
 <template>
   <div id="app">
-    <router-view v-slot="{ Component }">
-      <keep-alive include="MapPage">
-        <component :is="Component" />
-      </keep-alive>
-    </router-view>
+    <keep-alive>
+      <router-view />
+    </keep-alive>
   </div>
 </template>
 <script>

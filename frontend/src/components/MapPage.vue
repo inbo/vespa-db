@@ -7,7 +7,6 @@
             </button>
             <div id="map" class="h-100"></div>
             <div class="filter-panel" :class="{ 'panel-active': isFilterPaneOpen }">
-                <!-- Start of the merged filter component -->
                 <div class="collapse d-block" id="filtersCollapse">
                     <div class="container-fluid mt-1">
                         <div class="row">
@@ -53,7 +52,6 @@
                         </div>
                     </div>
                 </div>
-                <!-- End of the merged filter component -->
             </div>
             <div class="details-panel" :class="{ 'panel-active': isDetailsPaneOpen }">
                 <div class="d-flex justify-content-between align-items-center">
@@ -89,11 +87,11 @@ export default {
         const isDetailsPaneOpen = computed(() => vespaStore.isDetailsPaneOpen);
         const isFilterPaneOpen = ref(false);
         const selectedMunicipalities = ref([]);
+        const jaartallen = ref([2020, 2021, 2022, 2023, 2024]);
         const municipalities = ref([]);
         const selectedYears = ref([]);
         const selectedNestType = ref([]);
         const selectedNestStatus = ref([]);
-        const jaartallen = [2020, 2021, 2022, 2023, 2024];
         const anbAreasActief = ref(null);
         const nestType = [
             { name: 'AH - actief embryonaal nest', value: 'AH_actief_embryonaal_nest' },
@@ -224,12 +222,12 @@ export default {
             selectedYears,
             selectedNestType,
             selectedNestStatus,
-            jaartallen,
             anbAreasActief,
             nestType,
             nestStatus,
             anbAreaOptions,
             formattedMunicipalities,
+            jaartallen,
             emitFilterUpdate,
         };
     },

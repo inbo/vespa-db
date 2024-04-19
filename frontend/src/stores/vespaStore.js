@@ -119,9 +119,8 @@ export const useVespaStore = defineStore('vespaStore', {
             this.filters.nestType = filters.nestType;
             this.filters.nestStatus = filters.nestStatus;
         },
-        async refresh_data() {
-            console.log("viewmode:", this.viewMode)
-            if (this.viewMode === 'map') {
+        async refresh_data(viewMode) {
+            if (viewMode === 'map') {
                 await this.getObservationsGeoJson();
                 this.markerClusterGroup.clearLayers();
                 this.updateMarkers()

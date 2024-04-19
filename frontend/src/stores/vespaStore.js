@@ -11,7 +11,6 @@ export const useVespaStore = defineStore('vespaStore', {
         isLoggedIn: false,
         loading: false,
         error: null,
-        markerClusterGroup: null,
         municipalities: [],
         selectedMunicipalities: [],
         observations: [],
@@ -21,10 +20,11 @@ export const useVespaStore = defineStore('vespaStore', {
         previousPage: null,
         loadingObservations: false,
         markers: [],
-        user: {},
+        markerClusterGroup: null,
         authInterval: null,
         isEditing: false,
         map: null,
+        viewMode: 'map',
         filters: {
             municipalities: [],
             years: [],
@@ -33,8 +33,7 @@ export const useVespaStore = defineStore('vespaStore', {
             nestStatus: null,
         },
         isDetailsPaneOpen: false,
-        markerClickHandler: null,
-        viewMode: 'map',
+        user: {},
         userMunicipalities: [],
     }),
     getters: {
@@ -114,13 +113,10 @@ export const useVespaStore = defineStore('vespaStore', {
             this.filters.nestType = filters.nestType;
             this.filters.nestStatus = filters.nestStatus;
         },
-        async applyFiltersAndReload(filters) {
-            this.applyFilters(filters)
-            console.log("Applying filters:", this.filters)
+        async load_data() {
             console.log("viewmode:", this.viewMode)
             if (this.viewMode === 'map') {
-                console.log("in if")
-                this.loadGeoJsonData(true);
+                this.loadGeoJsonData();
             } else {
                 this.getObservations();
             }
@@ -150,6 +146,31 @@ export const useVespaStore = defineStore('vespaStore', {
             } else {
                 this.map._onResize();
             }
+        },
+        updateMarkers() {
+            if (!this.map || !this.markerClusterGroup || !this.observations.length) {
+                console.error("No map, marker cluster group, or map observations available");
+                return;
+            }
+            this.markerClusterGroup.clearLayers();
+
+            const geoJsonLayer = L.geoJSON(this.observations, {
+                pointToLayer: (feature, latlng) => this.createCircleMarker(feature, latlng)
+            });
+
+            this.markerClusterGroup.addLayer(geoJsonLayer);
+            this.map.addLayer(this.markerClusterGroup);
+        },
+        createCircleMarker(feature, latlng) {
+            let markerOptions = {
+                radius: 5 + (feature.properties.observations_count || 0) * 0.5,
+                fillColor: "#FF7800",
+                color: "#000",
+                weight: 1,
+                opacity: 1,
+                fillOpacity: 0.8
+            };
+            return L.circleMarker(latlng, markerOptions).bindPopup(`Observatie ID: ${feature.properties.id}`);
         },
         manageLayersBasedOnZoom() {
             this.map.addLayer(this.markerClusterGroup);
@@ -193,31 +214,6 @@ export const useVespaStore = defineStore('vespaStore', {
                 console.error('Error canceling the reservation:', error);
             }
         },
-        updateMarkers() {
-            if (!this.map || !this.markerClusterGroup || !this.observations.length) {
-                console.error("No map, marker cluster group, or map observations available");
-                return;
-            }
-            this.markerClusterGroup.clearLayers();
-
-            const geoJsonLayer = L.geoJSON(this.observations, {
-                pointToLayer: (feature, latlng) => this.createCircleMarker(feature, latlng)
-            });
-
-            this.markerClusterGroup.addLayer(geoJsonLayer);
-            this.map.addLayer(this.markerClusterGroup);
-        },
-        createCircleMarker(feature, latlng) {
-            let markerOptions = {
-                radius: 5 + (feature.properties.observations_count || 0) * 0.5,
-                fillColor: "#FF7800",
-                color: "#000",
-                weight: 1,
-                opacity: 1,
-                fillOpacity: 0.8
-            };
-            return L.circleMarker(latlng, markerOptions).bindPopup(`Observatie ID: ${feature.properties.id}`);
-        },
         async fetchObservationDetails(observationId) {
             try {
                 const response = await ApiService.get(`/observations/${observationId}`);
@@ -230,13 +226,6 @@ export const useVespaStore = defineStore('vespaStore', {
             } catch (error) {
                 console.error('Error fetching observation details:', error);
             }
-        },
-        getColor(count) {
-            return count > 10 ? '#800026' :
-                count > 5 ? '#BD0026' :
-                    count > 3 ? '#E31A1C' :
-                        count > 1 ? '#FC4E2A' :
-                            '#FFEDA0';
         },
         async updateObservation() {
             try {
@@ -271,17 +260,6 @@ export const useVespaStore = defineStore('vespaStore', {
             } catch (error) {
                 console.error('Error when updating the observation:', error);
             }
-        },
-        selectObservation(observation) {
-            this.selectedObservation = observation;
-            this.isDetailsPaneOpen = true;
-        },
-        setViewMode(mode) {
-            this.viewMode = mode;
-        },
-        setUserMunicipalities(municipalities) {
-            console.log("Setting user municipalities:" + municipalities)
-            this.userMunicipalities = municipalities;
         },
         async exportData(format) {
             const filterQuery = this.createFilterQuery();
@@ -331,7 +309,7 @@ export const useVespaStore = defineStore('vespaStore', {
                     if (data.isAuthenticated && data.user) {
                         console.log(data.user)
                         this.user = data.user;
-                        this.setUserMunicipalities(data.user.municipalities);
+                        this.userMunicipalities = data.user.municipalities;
                         this.error = "";
                         this.isLoggedIn = true;
                         this.loading = false;

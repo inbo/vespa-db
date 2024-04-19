@@ -55,7 +55,7 @@ export default {
     const viewMode = computed(() => vespaStore.viewMode);
 
     const setViewMode = (mode) => {
-      vespaStore.setViewMode(mode);
+      vespaStore.viewMode = mode;
     };
     const logout = async () => {
       await vespaStore.logout();

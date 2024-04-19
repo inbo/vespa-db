@@ -194,8 +194,6 @@ export default {
                     vespaStore.map.addLayer(markerClusterGroup);
                 });
             } else {
-                console.log("using existing data")
-                console.log("length obs:" + vespaStore.observations.length)
                 const geoJsonLayer = L.geoJSON(vespaStore.observations, {
                     pointToLayer: (feature, latlng) => vespaStore.createCircleMarker(feature, latlng)
                 });

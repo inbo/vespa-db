@@ -176,7 +176,12 @@ class ObservationsViewSet(ModelViewSet):
     @action(detail=False, methods=["get"], url_path="dynamic-geojson")
     def geojson(self, request: Request) -> HttpResponse:
         """Return GeoJSON data based on the request parameters."""
-        sorted_params = "&".join(sorted(request.GET.urlencode().split("&")))
+        # Create a modified query dictionary excluding 'bbox'
+        query_params = request.GET.copy()
+        bbox_str = query_params.pop('bbox', None)
+
+        # Sort parameters and create a cache key without 'bbox'
+        sorted_params = "&".join(sorted(f"{key}={value}" for key, value in query_params.items()))
         cache_key = f"vespadb::{request.path}::{sorted_params}"
         logger.info(f"Checking cache for {cache_key}")
 

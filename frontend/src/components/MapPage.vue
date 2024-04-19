@@ -17,7 +17,6 @@
                 <ObservationDetailsComponent />
             </div>
         </div>
-        <FooterComponent />
     </div>
 </template>
   
@@ -26,13 +25,11 @@ import { useVespaStore } from '@/stores/vespaStore';
 import 'leaflet/dist/leaflet.css';
 import { computed, nextTick, onActivated, onMounted, ref } from 'vue';
 import FilterComponent from './FilterComponent.vue';
-import FooterComponent from './FooterComponent.vue';
 import NavbarComponent from './NavbarComponent.vue';
 import ObservationDetailsComponent from './ObservationDetailsComponent.vue';
 export default {
     components: {
         NavbarComponent,
-        FooterComponent,
         FilterComponent,
         ObservationDetailsComponent,
     },

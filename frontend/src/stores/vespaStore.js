@@ -63,19 +63,13 @@ export const useVespaStore = defineStore('vespaStore', {
             }
         },
         async getObservationsGeoJson() {
-            console.log("getObservationsGeoJson")
             this.loading = true;
             const filterQuery = this.createFilterQuery();
-            console.log("map bounds:", this.map.getBounds().toBBoxString())
             const bbox = this.map.getBounds().toBBoxString();
             try {
-                console.log("api request")
                 const response = await ApiService.get(`/observations/dynamic-geojson?${filterQuery}&bbox=${bbox}`);
-                console.log("response:", response)
                 if (response.status === 200) {
-                    console.log("this observations update:" + response.data.features.length)
                     this.observations = response.data.features;
-                    console.log("this observations update:" + this.observations.length)
 
                 } else {
                     throw new Error(`Network response was not ok, status code: ${response.status}`);
@@ -118,15 +112,6 @@ export const useVespaStore = defineStore('vespaStore', {
             this.filters.anbAreasActief = filters.anbAreasActief;
             this.filters.nestType = filters.nestType;
             this.filters.nestStatus = filters.nestStatus;
-        },
-        async refresh_data(viewMode) {
-            if (viewMode === 'map') {
-                await this.getObservationsGeoJson();
-                this.markerClusterGroup.clearLayers();
-                this.updateMarkers()
-            } else {
-                this.getObservations();
-            }
         },
         initializeMap() {
             if (!this.map) {

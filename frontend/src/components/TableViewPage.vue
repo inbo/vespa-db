@@ -138,13 +138,11 @@ export default {
             { name: 'Wel in ANB gebied', value: true }
         ]);
 
-        // Computed property for formatted municipalities
         const formattedMunicipalities = computed(() => municipalities.value.map(municipality => ({
             name: municipality.name,
             id: municipality.id
         })));
 
-        // Method to fetch municipalities
         const fetchMunicipalities = async () => {
             try {
                 const response = await ApiService.get('/municipalities/');
@@ -162,7 +160,6 @@ export default {
             emitFilterUpdate();
         }, { deep: true });
 
-        // Method to update filters and refresh data
         const emitFilterUpdate = () => {
             vespaStore.applyFilters({
                 municipalities: selectedMunicipalities.value,

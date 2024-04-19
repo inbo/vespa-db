@@ -82,7 +82,7 @@ export default {
         const selectedObservation = computed(() => vespaStore.selectedObservation);
         const isEditing = computed(() => vespaStore.isEditing);
         const map = computed(() => vespaStore.map);
-        const markerClusterGroup = L.markerClusterGroup({ spiderfyOnMaxZoom: false, showCoverageOnHover: false, zoomToBoundsOnClick: false });
+        const markerClusterGroup = L.markerClusterGroup({ spiderfyOnMaxZoom: false, showCoverageOnHover: true, zoomToBoundsOnClick: true });
         const isLoggedIn = computed(() => vespaStore.isLoggedIn);
         const isDetailsPaneOpen = computed(() => vespaStore.isDetailsPaneOpen);
         const isFilterPaneOpen = ref(false);

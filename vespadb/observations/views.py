@@ -4,6 +4,7 @@ import csv
 import json
 import logging
 from typing import TYPE_CHECKING, Any
+from django.core.cache import cache
 
 from django.contrib.gis.db.models.functions import Transform
 from django.contrib.gis.geos import fromstr
@@ -35,7 +36,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 BBOX_LENGTH = 4
-
+CACHE_EXPIRATION = 86400  # 24 hours
 
 class ObservationsViewSet(ModelViewSet):
     """ViewSet for the Observation model."""
@@ -175,6 +176,16 @@ class ObservationsViewSet(ModelViewSet):
     @action(detail=False, methods=["get"], url_path="dynamic-geojson")
     def geojson(self, request: Request) -> HttpResponse:
         """Return GeoJSON data based on the request parameters."""
+        sorted_params = "&".join(sorted(request.GET.urlencode().split("&")))
+        cache_key = f"vespadb::{request.path}::{sorted_params}"
+        logger.info(f"Checking cache for {cache_key}")
+
+        # Attempt to get cached data
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            logger.info("Cache hit - Returning cached response")
+            return JsonResponse(cached_data, safe=False)
+        
         bbox_str = request.GET.get("bbox")
         if bbox_str:
             try:
@@ -206,7 +217,9 @@ class ObservationsViewSet(ModelViewSet):
             }
             for obs in queryset
         ]
-        return JsonResponse({"type": "FeatureCollection", "features": features})
+        geojson_response = {"type": "FeatureCollection", "features": features}
+        cache.set(cache_key, geojson_response, CACHE_EXPIRATION)  # 24 hours
+        return JsonResponse(geojson_response)
 
     @action(detail=False, methods=["post"], permission_classes=[IsAdminUser])
     def bulk_import(self, request: Request) -> Response:

@@ -5,7 +5,7 @@
             <button class="btn-filter-toggle" @click="toggleFilterPane">
                 <i class="fas fa-sliders-h"></i> Filters
             </button>
-            <div ref="mapContainer" class="h-100"></div>
+            <div id="map" class="h-100"></div>
             <div class="filter-panel" :class="{ 'panel-active': isFilterPaneOpen }">
                 <FilterComponent />
             </div>
@@ -23,7 +23,7 @@
 <script>
 import { useVespaStore } from '@/stores/vespaStore';
 import 'leaflet/dist/leaflet.css';
-import { computed, nextTick, onActivated, onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import FilterComponent from './FilterComponent.vue';
 import NavbarComponent from './NavbarComponent.vue';
 import ObservationDetailsComponent from './ObservationDetailsComponent.vue';
@@ -37,13 +37,10 @@ export default {
         const vespaStore = useVespaStore();
         const selectedObservation = computed(() => vespaStore.selectedObservation);
         const isEditing = computed(() => vespaStore.isEditing);
-        const markers = computed(() => vespaStore.markers);
         const map = computed(() => vespaStore.map);
         const isLoggedIn = computed(() => vespaStore.isLoggedIn);
         const isDetailsPaneOpen = computed(() => vespaStore.isDetailsPaneOpen);
         const isFilterPaneOpen = ref(false);
-        const mapContainer = ref(null);
-        const mapKey = ref(0);
 
         const startEdit = () => {
             isEditing.value = true;
@@ -62,21 +59,38 @@ export default {
         const toggleDetailsPane = () => {
             vespaStore.isDetailsPaneOpen = !vespaStore.isDetailsPaneOpen;
         };
-        const initializeMap = () => {
-            if (!vespaStore.map) {
-                console.log('initializing map');
-                vespaStore.initializeMapAndMarkers(mapContainer.value);
-            } else {
-                console.log('map already initialized');
-                nextTick(() => {
-                    vespaStore.map = null
-                    vespaStore.initializeMapAndMarkers(mapContainer.value);
-                });
-            }
-        };
+        onMounted(() => {
+            vespaStore.map = L.map('map', {
+                center: [50.8503, 4.3517],
+                zoom: 8,
+                layers: [
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: 'Map data © OpenStreetMap contributors'
+                    }),
+                ]
+            });
+            const markerClusterGroup = L.markerClusterGroup({ spiderfyOnMaxZoom: false, showCoverageOnHover: false, zoomToBoundsOnClick: false });
+            if (vespaStore.observations.length === 0) {
+                vespaStore.getObservationsGeoJson().then(geoJson => {
+                    const geoJsonLayer = L.geoJSON(vespaStore.observations, {
+                        pointToLayer: (feature, latlng) => vespaStore.createCircleMarker(feature, latlng)
+                    });
 
-        onMounted(initializeMap);
-        onActivated(initializeMap);
+                    markerClusterGroup.addLayer(geoJsonLayer);
+                    vespaStore.map.addLayer(markerClusterGroup);
+                });
+            } else {
+                console.log("using existing data")
+                console.log("length obs:" + vespaStore.observations.length)
+                const geoJsonLayer = L.geoJSON(vespaStore.observations, {
+                    pointToLayer: (feature, latlng) => vespaStore.createCircleMarker(feature, latlng)
+                });
+
+                markerClusterGroup.addLayer(geoJsonLayer);
+                vespaStore.map.addLayer(markerClusterGroup);
+            }
+        });
+
 
         return {
             isDetailsPaneOpen,
@@ -85,13 +99,11 @@ export default {
             toggleDetailsPane,
             selectedObservation,
             isEditing,
-            markers,
             map,
             isLoggedIn,
             startEdit,
             confirmUpdate,
             cancelEdit,
-            mapContainer
         };
     },
 };

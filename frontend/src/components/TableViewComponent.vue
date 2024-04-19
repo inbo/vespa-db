@@ -5,7 +5,7 @@
                 <span class="visually-hidden">Loading...</span>
             </div>
         </div>
-        <div v-else-if="observations.length > 0" class="table-responsive">
+        <div v-else-if="table_observations.length > 0" class="table-responsive">
             <table class="table table-hover table-sm">
                 <thead class="table-light">
                     <tr>
@@ -15,7 +15,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="observation in observations" :key="observation.id">
+                    <tr v-for="observation in table_observations" :key="observation.id">
                         <td>{{ observation.id }}</td>
                         <td>{{ observation.location }}</td>
                         <td>{{ observation.province }}</td>
@@ -42,6 +42,7 @@ export default {
     setup() {
         const vespaStore = useVespaStore();
         const loading = computed(() => vespaStore.loadingObservations);
+        const table_observations = computed(() => vespaStore.table_observations);
         const observations = computed(() => vespaStore.observations);
         const totalObservations = computed(() => vespaStore.totalObservations);
         const nextPage = computed(() => vespaStore.nextPage);
@@ -72,7 +73,7 @@ export default {
             vespaStore.getObservations();
         });
 
-        return { observations, loading, fetchPage, nextPage, previousPage, totalObservations, tableHeaders, toggleFilterPane, isFilterPaneOpen };
+        return { observations, table_observations, loading, fetchPage, nextPage, previousPage, totalObservations, tableHeaders, toggleFilterPane, isFilterPaneOpen };
     },
 };
 </script>

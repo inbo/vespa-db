@@ -14,12 +14,12 @@ export const useVespaStore = defineStore('vespaStore', {
         municipalities: [],
         selectedMunicipalities: [],
         observations: [],
+        table_observations: [],
         totalObservations: 0,
         selectedObservation: null,
         nextPage: null,
         previousPage: null,
         loadingObservations: false,
-        markers: [],
         markerClusterGroup: null,
         authInterval: null,
         isEditing: false,
@@ -48,7 +48,7 @@ export const useVespaStore = defineStore('vespaStore', {
             try {
                 const response = await ApiService.get(`/observations?${filterQuery}&page=${page}&page_size=${page_size}`);
                 if (response.status === 200) {
-                    this.observations = response.data.results;  // Updating observations instead
+                    this.table_observations = response.data.results;  // Updating observations instead
                     this.totalObservations = response.data.total;
                     this.nextPage = response.data.next;
                     this.previousPage = response.data.previous;
@@ -63,14 +63,20 @@ export const useVespaStore = defineStore('vespaStore', {
             }
         },
         async getObservationsGeoJson() {
+            console.log("getObservationsGeoJson")
             this.loading = true;
             const filterQuery = this.createFilterQuery();
+            console.log("map bounds:", this.map.getBounds().toBBoxString())
             const bbox = this.map.getBounds().toBBoxString();
             try {
+                console.log("api request")
                 const response = await ApiService.get(`/observations/dynamic-geojson?${filterQuery}&bbox=${bbox}`);
+                console.log("response:", response)
                 if (response.status === 200) {
-                    this.observations = response.data.features;  // Updating observations instead
-                    this.updateMarkers();
+                    console.log("this observations update:" + response.data.features.length)
+                    this.observations = response.data.features;
+                    console.log("this observations update:" + this.observations.length)
+
                 } else {
                     throw new Error(`Network response was not ok, status code: ${response.status}`);
                 }
@@ -113,36 +119,28 @@ export const useVespaStore = defineStore('vespaStore', {
             this.filters.nestType = filters.nestType;
             this.filters.nestStatus = filters.nestStatus;
         },
-        async load_data() {
+        async refresh_data() {
             console.log("viewmode:", this.viewMode)
             if (this.viewMode === 'map') {
-                this.loadGeoJsonData();
+                await this.getObservationsGeoJson();
+                this.markerClusterGroup.clearLayers();
+                this.updateMarkers()
             } else {
                 this.getObservations();
             }
         },
-        initializeMapAndMarkers(elementId) {
+        initializeMap() {
             if (!this.map) {
-                this.map = L.map(elementId, {
+                this.map = L.map('map', {
                     center: [50.8503, 4.3517],
                     zoom: 8,
                     layers: [
                         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                             attribution: 'Map data © OpenStreetMap contributors'
                         }),
-                        this.markerClusterGroup = new L.MarkerClusterGroup()
+                        vespaStore.markerClusterGroup = new L.MarkerClusterGroup()
                     ]
                 });
-
-                this.map.on('zoomend', () => {
-                    this.loadGeoJsonData();
-                });
-
-                if (this.filters) {
-                    this.applyFilters(this.filters);
-                }
-                this.loadGeoJsonData();
-                this.updateMarkers();
             } else {
                 this.map._onResize();
             }
@@ -152,12 +150,10 @@ export const useVespaStore = defineStore('vespaStore', {
                 console.error("No map, marker cluster group, or map observations available");
                 return;
             }
-            this.markerClusterGroup.clearLayers();
-
+            console.log("length:", this.observations.length)
             const geoJsonLayer = L.geoJSON(this.observations, {
                 pointToLayer: (feature, latlng) => this.createCircleMarker(feature, latlng)
             });
-
             this.markerClusterGroup.addLayer(geoJsonLayer);
             this.map.addLayer(this.markerClusterGroup);
         },
@@ -171,16 +167,6 @@ export const useVespaStore = defineStore('vespaStore', {
                 fillOpacity: 0.8
             };
             return L.circleMarker(latlng, markerOptions).bindPopup(`Observatie ID: ${feature.properties.id}`);
-        },
-        manageLayersBasedOnZoom() {
-            this.map.addLayer(this.markerClusterGroup);
-        },
-        loadGeoJsonData() {
-            if (!this.map) return;
-            const bbox = this.map.getBounds().toBBoxString();
-            let params = this.createFilterQuery();
-            params = params ? `${params}&bbox=${bbox}` : `bbox=${bbox}`;
-            this.getObservationsGeoJson(params);
         },
         async reserveObservation(observation) {
             try {

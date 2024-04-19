@@ -116,7 +116,7 @@ export default {
         nestType: this.selectedNestType,
         nestStatus: this.selectedNestStatus,
       });
-      vespaStore.load_data();
+      vespaStore.refresh_data();
     },
   },
   created() {

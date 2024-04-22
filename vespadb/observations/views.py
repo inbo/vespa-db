@@ -4,10 +4,10 @@ import csv
 import json
 import logging
 from typing import TYPE_CHECKING, Any
-from django.core.cache import cache
 
 from django.contrib.gis.db.models.functions import Transform
-from django.contrib.gis.geos import fromstr
+from django.contrib.gis.geos import GEOSGeometry
+from django.core.cache import cache
 from django.db.models import Q, QuerySet
 from django.http import HttpResponse, JsonResponse
 from django_filters.rest_framework import DjangoFilterBackend
@@ -21,7 +21,6 @@ from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_gis.filters import DistanceToPointFilter
-from django.contrib.gis.geos import GEOSGeometry
 
 from vespadb.observations.filters import ObservationFilter
 from vespadb.observations.models import Municipality, Observation
@@ -37,6 +36,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 BBOX_LENGTH = 4
 CACHE_EXPIRATION = 86400  # 24 hours
+
 
 class ObservationsViewSet(ModelViewSet):
     """ViewSet for the Observation model."""
@@ -128,39 +128,43 @@ class ObservationsViewSet(ModelViewSet):
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
-    
+
     def get_paginated_response(self, data: list[dict[str, Any]]) -> Response:
         """
         Construct the paginated response for the observations data.
 
         This method adds pagination links and the total count of observations to the response.
 
-        Parameters:
+        Parameters
+        ----------
         - data (List[Dict[str, Any]]): Serialized data for the current page.
 
-        Returns:
+        Returns
+        -------
         - Response: A response object containing the paginated data and navigation links.
         """
         assert self.paginator is not None
         return Response({
-            'total': self.paginator.page.paginator.count,
-            'next': self.paginator.get_next_link(),
-            'previous': self.paginator.get_previous_link(),
-            'results': data
+            "total": self.paginator.page.paginator.count,
+            "next": self.paginator.get_next_link(),
+            "previous": self.paginator.get_previous_link(),
+            "results": data,
         })
-    
+
     def list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """
         Handle requests for the list of observations with pagination.
 
         Override the default list method to apply pagination and return paginated response.
 
-        Parameters:
+        Parameters
+        ----------
         - request (Request): The incoming HTTP request.
         - *args (Any): Additional positional arguments.
         - **kwargs (Any): Additional keyword arguments.
 
-        Returns:
+        Returns
+        -------
         - Response: The paginated response containing the observations data or full list if pagination is not applied.
         """
         queryset = self.filter_queryset(self.get_queryset())
@@ -178,7 +182,7 @@ class ObservationsViewSet(ModelViewSet):
         """Return GeoJSON data based on the request parameters."""
         # Create a modified query dictionary excluding 'bbox'
         query_params = request.GET.copy()
-        bbox_str = query_params.pop('bbox', None)
+        bbox_str = query_params.pop("bbox", None)
 
         # Sort parameters and create a cache key without 'bbox'
         sorted_params = "&".join(sorted(f"{key}={value}" for key, value in query_params.items()))
@@ -190,12 +194,12 @@ class ObservationsViewSet(ModelViewSet):
         if cached_data:
             logger.info("Cache hit - Returning cached response")
             return JsonResponse(cached_data, safe=False)
-        
+
         bbox_str = request.GET.get("bbox")
         if bbox_str:
             try:
-                bbox_coords = list(map(float, bbox_str.split(',')))
-                if len(bbox_coords) == 4:
+                bbox_coords = list(map(float, bbox_str.split(",")))
+                if len(bbox_coords) == BBOX_LENGTH:
                     xmin, ymin, xmax, ymax = bbox_coords
                     bbox_wkt = f"POLYGON(({xmin} {ymin}, {xmin} {ymax}, {xmax} {ymax}, {xmax} {ymin}, {xmin} {ymin}))"
                     bbox = GEOSGeometry(bbox_wkt, srid=4326)
@@ -208,17 +212,17 @@ class ObservationsViewSet(ModelViewSet):
 
         # Apply filters
         queryset = self.filter_queryset(self.get_queryset())
-        
+
         if bbox:
             queryset = queryset.filter(location__within=bbox)
-        
-        queryset = queryset.annotate(point=Transform('location', 4326))
-        
+
+        queryset = queryset.annotate(point=Transform("location", 4326))
+
         features = [
             {
                 "type": "Feature",
                 "properties": {"id": obs.id},
-                "geometry": json.loads(obs.point.geojson) if obs.point else None
+                "geometry": json.loads(obs.point.geojson) if obs.point else None,
             }
             for obs in queryset
         ]

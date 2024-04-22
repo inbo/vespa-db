@@ -65,9 +65,8 @@ export const useVespaStore = defineStore('vespaStore', {
         async getObservationsGeoJson() {
             this.loading = true;
             const filterQuery = this.createFilterQuery();
-            const bbox = this.map.getBounds().toBBoxString();
             try {
-                const response = await ApiService.get(`/observations/dynamic-geojson?${filterQuery}&bbox=${bbox}`);
+                const response = await ApiService.get(`/observations/dynamic-geojson?${filterQuery}`);
                 if (response.status === 200) {
                     this.observations = response.data.features;
 
@@ -112,6 +111,18 @@ export const useVespaStore = defineStore('vespaStore', {
             this.filters.anbAreasActief = filters.anbAreasActief;
             this.filters.nestType = filters.nestType;
             this.filters.nestStatus = filters.nestStatus;
+        },
+        async fetchMunicipalities() {
+            try {
+                const response = await ApiService.get('/municipalities/');
+                if (response.status === 200) {
+                    this.municipalities.value = response.data;
+                } else {
+                    console.error('Failed to fetch municipalities: Status Code', response.status);
+                }
+            } catch (error) {
+                console.error('Error fetching municipalities:', error);
+            }
         },
         createCircleMarker(feature, latlng) {
             let markerOptions = {

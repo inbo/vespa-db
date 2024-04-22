@@ -168,7 +168,7 @@ export default {
                 nestType: selectedNestType.value.map(type => type.value),
                 nestStatus: selectedNestStatus.value.map(status => status.value),
             });
-            vespaStore.getObservations();;
+            vespaStore.getObservations();
         };
 
         const toggleFilterPane = () => {

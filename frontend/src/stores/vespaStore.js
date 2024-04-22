@@ -113,34 +113,6 @@ export const useVespaStore = defineStore('vespaStore', {
             this.filters.nestType = filters.nestType;
             this.filters.nestStatus = filters.nestStatus;
         },
-        initializeMap() {
-            if (!this.map) {
-                this.map = L.map('map', {
-                    center: [50.8503, 4.3517],
-                    zoom: 8,
-                    layers: [
-                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                            attribution: 'Map data © OpenStreetMap contributors'
-                        }),
-                        vespaStore.markerClusterGroup = new L.MarkerClusterGroup()
-                    ]
-                });
-            } else {
-                this.map._onResize();
-            }
-        },
-        updateMarkers() {
-            if (!this.map || !this.markerClusterGroup || !this.observations.length) {
-                console.error("No map, marker cluster group, or map observations available");
-                return;
-            }
-            console.log("length:", this.observations.length)
-            const geoJsonLayer = L.geoJSON(this.observations, {
-                pointToLayer: (feature, latlng) => this.createCircleMarker(feature, latlng)
-            });
-            this.markerClusterGroup.addLayer(geoJsonLayer);
-            this.map.addLayer(this.markerClusterGroup);
-        },
         createCircleMarker(feature, latlng) {
             let markerOptions = {
                 radius: 5 + (feature.properties.observations_count || 0) * 0.5,

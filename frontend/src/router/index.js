@@ -3,6 +3,8 @@ import { createRouter, createWebHistory } from 'vue-router';
 import ChangePasswordPage from '../components/ChangePasswordPage.vue';
 import Login from '../components/LoginPage.vue';
 import MapPage from '../components/MapPage.vue';
+import TableViewPage from '../components/TableViewPage.vue';
+
 const routes = [
   {
     path: '/login',
@@ -13,6 +15,11 @@ const routes = [
     path: '/map',
     name: 'MapPage',
     component: MapPage
+  },
+  {
+    path: '/table',
+    name: 'TableView',
+    component: TableViewPage
   },
   {
     path: '/',

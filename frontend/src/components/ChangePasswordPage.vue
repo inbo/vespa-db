@@ -9,15 +9,18 @@
               <h2 class="card-title text-center">Wijzig Wachtwoord</h2>
               <div class="mb-3">
                 <label for="oldPassword" class="form-label">Huidig Wachtwoord</label>
-                <input type="password" id="oldPassword" class="form-control" v-model="oldPassword" placeholder="Huidig wachtwoord">
+                <input type="password" id="oldPassword" class="form-control" v-model="oldPassword"
+                  placeholder="Huidig wachtwoord">
               </div>
               <div class="mb-3">
                 <label for="newPassword" class="form-label">Nieuw Wachtwoord</label>
-                <input type="password" id="newPassword" class="form-control" v-model="newPassword" placeholder="Nieuw wachtwoord">
+                <input type="password" id="newPassword" class="form-control" v-model="newPassword"
+                  placeholder="Nieuw wachtwoord">
               </div>
               <div class="mb-3">
                 <label for="confirmNewPassword" class="form-label">Bevestig Nieuw Wachtwoord</label>
-                <input type="password" id="confirmNewPassword" class="form-control" v-model="confirmNewPassword" placeholder="Bevestig nieuw wachtwoord">
+                <input type="password" id="confirmNewPassword" class="form-control" v-model="confirmNewPassword"
+                  placeholder="Bevestig nieuw wachtwoord">
               </div>
               <button @click="changePassword" class="btn btn-success w-100">Wijzig Wachtwoord</button>
               <p v-if="error" class="mt-3 text-danger">{{ error }}</p>
@@ -27,20 +30,17 @@
         </div>
       </div>
     </div>
-    <footer-component></footer-component>
   </div>
 </template>
   
 <script>
-import FooterComponent from '@/components/FooterComponent.vue';
 import NavbarComponent from '@/components/NavbarComponent.vue';
 import { useVespaStore } from '@/stores/vespaStore';
 import { computed, ref } from 'vue';
-    
+
 export default {
   components: {
     NavbarComponent,
-    FooterComponent,
   },
   setup() {
     const vespaStore = useVespaStore();
@@ -49,7 +49,7 @@ export default {
     const confirmNewPassword = ref('');
     const successMessage = ref('');
     const error = computed(() => {
-        return Array.isArray(vespaStore.error) ? vespaStore.error.join(', ') : vespaStore.error;
+      return Array.isArray(vespaStore.error) ? vespaStore.error.join(', ') : vespaStore.error;
     });
 
     const changePassword = async () => {

@@ -2,11 +2,10 @@
     <div class="d-flex flex-column vh-100">
         <NavbarComponent />
         <div class="flex-grow-1 position-relative">
-            <button class="btn-filter-toggle" @click="toggleFilterPane">
+            <button class="btn-filter-toggle" @click="toggleFilterPanel">
                 <i class="fas fa-sliders-h"></i> Filters
             </button>
-            <div v-show="viewMode === 'map'" :key="mapKey" ref="mapContainer" class="h-100"></div>
-            <TableViewComponent v-if="viewMode !== 'map'"></TableViewComponent>
+            <div id="map" class="h-100"></div>
             <div class="filter-panel" :class="{ 'panel-active': isFilterPaneOpen }">
                 <FilterComponent />
             </div>
@@ -18,39 +17,32 @@
                 <ObservationDetailsComponent />
             </div>
         </div>
-        <FooterComponent />
     </div>
 </template>
   
 <script>
 import { useVespaStore } from '@/stores/vespaStore';
 import 'leaflet/dist/leaflet.css';
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import FilterComponent from './FilterComponent.vue';
-import FooterComponent from './FooterComponent.vue';
 import NavbarComponent from './NavbarComponent.vue';
 import ObservationDetailsComponent from './ObservationDetailsComponent.vue';
-import TableViewComponent from './TableViewComponent.vue';
+
 export default {
     components: {
         NavbarComponent,
-        FooterComponent,
         FilterComponent,
         ObservationDetailsComponent,
-        TableViewComponent
     },
     setup() {
         const vespaStore = useVespaStore();
-        const mapContainer = ref(null);
         const selectedObservation = computed(() => vespaStore.selectedObservation);
         const isEditing = computed(() => vespaStore.isEditing);
-        const markers = computed(() => vespaStore.markers);
         const map = computed(() => vespaStore.map);
+        const markerClusterGroup = L.markerClusterGroup({ spiderfyOnMaxZoom: false, showCoverageOnHover: true, zoomToBoundsOnClick: true });
         const isLoggedIn = computed(() => vespaStore.isLoggedIn);
         const isDetailsPaneOpen = computed(() => vespaStore.isDetailsPaneOpen);
         const isFilterPaneOpen = ref(false);
-        const viewMode = computed(() => vespaStore.viewMode);
-        const mapKey = ref(0);
 
         const startEdit = () => {
             isEditing.value = true;
@@ -63,52 +55,69 @@ export default {
         const cancelEdit = () => {
             isEditing.value = false;
         };
-        const toggleFilterPane = () => {
-            isFilterPaneOpen.value = !isFilterPaneOpen.value;
-        };
         const toggleDetailsPane = () => {
             vespaStore.isDetailsPaneOpen = !vespaStore.isDetailsPaneOpen;
         };
+        const toggleFilterPanel = () => {
+            isFilterPaneOpen.value = !isFilterPaneOpen.value;
+        };
+        const updateMarkers = () => {
+            vespaStore.getObservationsGeoJson().then(geoJson => {
+                const geoJsonLayer = L.geoJSON(vespaStore.observations, {
+                    pointToLayer: (feature, latlng) => vespaStore.createCircleMarker(feature, latlng)
+                });
 
-        watch(() => vespaStore.viewMode, async (newVal) => {
-            console.log(`View mode changing to ${newVal}`);
-            if (newVal === 'map') {
-                mapKey.value++;
-                await nextTick();
-                if (vespaStore.map) {
-                    vespaStore.map.remove();
-                    vespaStore.map = null;
-                }
-                vespaStore.initializeMapAndMarkers();
-            }
-        });
-        onMounted(async () => {
-            //MapPage mounted
-            await vespaStore.getObservations();
-            if (!vespaStore.map) {
-                //Initializing map
-                vespaStore.initializeMapAndMarkers(mapContainer.value);
-            }
+                markerClusterGroup.addLayer(geoJsonLayer);
+                vespaStore.map.addLayer(markerClusterGroup);
+            });
+        };
+        const clearAndupdateMarkers = () => {
+            markerClusterGroup.clearLayers();
+            vespaStore.observations = [];
+            updateMarkers();
+        };
+        watch(() => vespaStore.filters, (newFilters) => {
+            clearAndupdateMarkers();
+        }, { deep: true });
 
+        onMounted(() => {
+            vespaStore.fetchMunicipalities();
+            vespaStore.map = L.map('map', {
+                center: [50.8503, 4.3517],
+                zoom: 8,
+                layers: [
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: 'Map data © OpenStreetMap contributors'
+                    }),
+                ]
+            });
+            if (vespaStore.observations.length === 0) {
+                updateMarkers();
+            } else {
+                // In a happy flow, this would not apply  
+                const geoJsonLayer = L.geoJSON(vespaStore.observations, {
+                    pointToLayer: (feature, latlng) => vespaStore.createCircleMarker(feature, latlng)
+                });
+
+                markerClusterGroup.addLayer(geoJsonLayer);
+                vespaStore.map.addLayer(markerClusterGroup);
+            }
         });
 
         return {
             isDetailsPaneOpen,
             isFilterPaneOpen,
-            toggleFilterPane,
             toggleDetailsPane,
+            toggleFilterPanel,
             selectedObservation,
             isEditing,
-            markers,
             map,
             isLoggedIn,
             startEdit,
             confirmUpdate,
             cancelEdit,
-            viewMode,
-            mapKey,
-            mapContainer
         };
     },
 };
 </script>
+  

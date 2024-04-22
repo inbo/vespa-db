@@ -6,7 +6,8 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from django.contrib.gis.db.models.functions import Transform
-from django.contrib.gis.geos import fromstr
+from django.contrib.gis.geos import GEOSGeometry
+from django.core.cache import cache
 from django.db.models import Q, QuerySet
 from django.http import HttpResponse, JsonResponse
 from django_filters.rest_framework import DjangoFilterBackend
@@ -34,6 +35,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 BBOX_LENGTH = 4
+CACHE_EXPIRATION = 86400  # 24 hours
 
 
 class ObservationsViewSet(ModelViewSet):
@@ -127,34 +129,106 @@ class ObservationsViewSet(ModelViewSet):
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
+    def get_paginated_response(self, data: list[dict[str, Any]]) -> Response:
+        """
+        Construct the paginated response for the observations data.
+
+        This method adds pagination links and the total count of observations to the response.
+
+        Parameters
+        ----------
+        - data (List[Dict[str, Any]]): Serialized data for the current page.
+
+        Returns
+        -------
+        - Response: A response object containing the paginated data and navigation links.
+        """
+        assert self.paginator is not None
+        return Response({
+            "total": self.paginator.page.paginator.count,
+            "next": self.paginator.get_next_link(),
+            "previous": self.paginator.get_previous_link(),
+            "results": data,
+        })
+
+    def list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        """
+        Handle requests for the list of observations with pagination.
+
+        Override the default list method to apply pagination and return paginated response.
+
+        Parameters
+        ----------
+        - request (Request): The incoming HTTP request.
+        - *args (Any): Additional positional arguments.
+        - **kwargs (Any): Additional keyword arguments.
+
+        Returns
+        -------
+        - Response: The paginated response containing the observations data or full list if pagination is not applied.
+        """
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
     @action(detail=False, methods=["get"], url_path="dynamic-geojson")
     def geojson(self, request: Request) -> HttpResponse:
         """Return GeoJSON data based on the request parameters."""
-        bbox_str = request.GET.get("bbox", None)
-        bbox = None
+        # Create a modified query dictionary excluding 'bbox'
+        query_params = request.GET.copy()
+        bbox_str = query_params.pop("bbox", None)
 
+        # Sort parameters and create a cache key without 'bbox'
+        sorted_params = "&".join(sorted(f"{key}={value}" for key, value in query_params.items()))
+        cache_key = f"vespadb::{request.path}::{sorted_params}"
+        logger.info(f"Checking cache for {cache_key}")
+
+        # Attempt to get cached data
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            logger.info("Cache hit - Returning cached response")
+            return JsonResponse(cached_data, safe=False)
+
+        bbox_str = request.GET.get("bbox")
         if bbox_str:
-            bbox_coords = bbox_str.split(",")
-            if len(bbox_coords) == BBOX_LENGTH:
-                xmin, ymin, xmax, ymax = map(float, bbox_coords)
-                polygon_wkt = f"POLYGON(({xmin} {ymin}, {xmin} {ymax}, {xmax} {ymax}, {xmax} {ymin}, {xmin} {ymin}))"
-                bbox = fromstr(polygon_wkt, srid=4326)
-            else:
-                return HttpResponse("Invalid bbox format", status=400)
+            try:
+                bbox_coords = list(map(float, bbox_str.split(",")))
+                if len(bbox_coords) == BBOX_LENGTH:
+                    xmin, ymin, xmax, ymax = bbox_coords
+                    bbox_wkt = f"POLYGON(({xmin} {ymin}, {xmin} {ymax}, {xmax} {ymax}, {xmax} {ymin}, {xmin} {ymin}))"
+                    bbox = GEOSGeometry(bbox_wkt, srid=4326)
+                else:
+                    return HttpResponse("Invalid bbox format", status=status.HTTP_400_BAD_REQUEST)
+            except ValueError:
+                return HttpResponse("Invalid bbox values", status=status.HTTP_400_BAD_REQUEST)
+        else:
+            bbox = None
 
-        # Fetch individual observations
-        observations = (
-            Observation.objects.filter(location__within=bbox)
-            .annotate(point=Transform("location", 4326))
-            .values("id", "point")
-        )
+        # Apply filters
+        queryset = self.filter_queryset(self.get_queryset())
+
+        if bbox:
+            queryset = queryset.filter(location__within=bbox)
+
+        queryset = queryset.annotate(point=Transform("location", 4326))
 
         features = [
-            {"type": "Feature", "properties": {"id": obs["id"]}, "geometry": json.loads(obs["point"].geojson)}
-            for obs in observations
-            if obs["point"]
+            {
+                "type": "Feature",
+                "properties": {"id": obs.id},
+                "geometry": json.loads(obs.point.geojson) if obs.point else None,
+            }
+            for obs in queryset
         ]
-        return JsonResponse({"type": "FeatureCollection", "features": features})
+        geojson_response = {"type": "FeatureCollection", "features": features}
+        cache.set(cache_key, geojson_response, CACHE_EXPIRATION)  # 24 hours
+        return JsonResponse(geojson_response)
 
     @action(detail=False, methods=["post"], permission_classes=[IsAdminUser])
     def bulk_import(self, request: Request) -> Response:
@@ -222,6 +296,7 @@ class MunicipalityViewSet(ReadOnlyModelViewSet):
 
     queryset = Municipality.objects.all().order_by("name")
     serializer_class = MunicipalitySerializer
+    pagination_class = None
 
     def get_permissions(self) -> list[BasePermission]:
         """Determine the set of permissions that apply to the current action."""

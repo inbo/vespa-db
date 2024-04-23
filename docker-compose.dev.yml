@@ -24,18 +24,15 @@ services:
     working_dir: /workspaces/vespadb/
     environment:
       - PYTHONPATH=/workspaces/vespadb
-      - debug=True
     depends_on:
       - db
 
   db:
     image: postgis/postgis:latest
-    environment:
-      POSTGRES_DB: vespadb
-      POSTGRES_USER: vespauser
-      POSTGRES_PASSWORD: vespauserpassword
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    env_file:
+      - .env
 
   pgadmin:
     image: dpage/pgadmin4

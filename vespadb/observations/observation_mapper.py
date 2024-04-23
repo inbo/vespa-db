@@ -19,7 +19,7 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
     :param external_data: A dictionary of external API data.
     :return: A dictionary suitable for creating or updating an Observation model instance, or None if an error occurs.
     """
-    # TODO: add mappign for attributes
+    # TODO: add mapping for attributes
     required_fields = ["id", "date", "point", "created", "modified", "species"]
     for field in required_fields:
         if field not in external_data or external_data[field] is None:

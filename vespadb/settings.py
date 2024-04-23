@@ -27,12 +27,11 @@ AUTH_USER_MODEL = "users.VespaUser"
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-d^lhi8mkvk(r6a*!i-bgm@iw8_ve4ra9p)643puh^=!c*jchgr"  # noqa: S105
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
-ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+DEBUG = os.getenv("DJANGO_DEBUG", "False") == "True"
+ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "localhost").split(",")
 
 # Application definition
 INSTALLED_APPS = [
@@ -67,13 +66,14 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-CORS_ALLOWED_ORIGINS = ["http://localhost:4173", "http://localhost:3000"]
-CSRF_TRUSTED_ORIGINS = ["http://localhost:4173", "http://localhost:3000", "http://localhost:8001"]
-
-SESSION_COOKIE_DOMAIN = "localhost"
-CSRF_COOKIE_DOMAIN = "localhost"
-
+# list of origins authorized to make requests
+CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+CSRF_TRUSTED_ORIGINS = os.getenv("CSRF_TRUSTED_ORIGINS", "http://localhost:3000").split(",")
+SESSION_COOKIE_DOMAIN = os.getenv("SESSION_COOKIE_DOMAIN", "localhost")
+CSRF_COOKIE_DOMAIN = os.getenv("CSRF_COOKIE_DOMAIN", "localhost")
+# whether the server allows cookies in the cross-site HTTP requests.
 CORS_ALLOW_CREDENTIALS = True
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.SessionAuthentication",
@@ -83,20 +83,20 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 25,
 }
 
-SESSION_COOKIE_AGE = 60 * 60
+SESSION_COOKIE_AGE = int(os.getenv("REDIS_CACHE_EXPIRATION", "3600"))  # 1 hour
 SESSION_SAVE_EVERY_REQUEST = True
-
 SESSION_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_SECURE = False
+REDIS_CACHE_EXPIRATION = os.getenv("REDIS_CACHE_EXPIRATION", "86400")  # 24 hours
 
 DATABASES = {
     "default": {
         "ENGINE": "django.contrib.gis.db.backends.postgis",
-        "NAME": "vespadb",
-        "USER": "vespauser",
-        "PASSWORD": "vespauserpassword",
-        "HOST": "db",
-        "PORT": "5432",
+        "NAME": os.getenv("POSTGRES_DB", "vespadb"),
+        "USER": os.getenv("POSTGRES_USER", "vespauser"),
+        "PASSWORD": os.getenv("POSTGRES_PASSWORD", "vespauserpassword"),
+        "HOST": os.getenv("POSTGRES_HOST", "db"),
+        "PORT": os.getenv("POSTGRES_PORT", "5432"),
     }
 }
 
@@ -105,7 +105,7 @@ REDIS_REFRESH_RATE_MIN = int(os.getenv("REDIS_REFRESH_RATE_MIN", "15"))  # defau
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": "redis://redis:6379/1",
+        "LOCATION": os.getenv("REDIS_LOCATION", "redis://redis:6379/1"),
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         },
@@ -207,8 +207,7 @@ LOGIN_URL = "/login/"
 
 
 # Celery specifications
-
-CELERY_BROKER_URL = "redis://redis:6379/0"
+CELERY_BROKER_URL = (os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0"),)
 CELERY_RESULT_BACKEND = "django-db"
 CELERY_ACCEPT_CONTENT = ["application/json"]
 CELERY_TASK_SERIALIZER = "json"

@@ -24,7 +24,6 @@ services:
     working_dir: /workspaces/vespadb/
     environment:
       - PYTHONPATH=/workspaces/vespadb
-      - debug=True
     depends_on:
       - db
 

@@ -14,7 +14,7 @@ services:
   app:
     build:
       context: .
-      target: dev
+      target: app
     tty: true
     ports:
       - "8001:8000"
@@ -24,7 +24,7 @@ services:
     working_dir: /workspaces/vespadb/
     environment:
       - PYTHONPATH=/workspaces/vespadb
-      - debug=True
+      - debug=False
     depends_on:
       - db
 

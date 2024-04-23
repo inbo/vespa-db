@@ -34,3 +34,17 @@ This command imports ANB aread into the database
 
 This command imports provinces into the database
 
+
+#### assign_provinces_to_municipalities Command
+
+Fills in the province field for each municipality
+
+## Cronjobs
+
+#### Update observations observations.org
+
+Fetch observations updated on observations.org last 2 weeks and sync with database. Runs every day at 04 AM.
+
+#### Audit user reservations
+
+Audit check if reserved by is valid for all users. Runs every Sunday at 03 AM

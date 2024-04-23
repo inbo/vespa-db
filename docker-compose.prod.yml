@@ -1,0 +1,50 @@
+version: "3.9"
+
+services:
+  app:
+    image: registry.example.com/vespadb/app:latest
+    ports:
+      - "80:8000"
+    environment:
+      - PYTHONPATH=/workspaces/vespadb
+      - DJANGO_SETTINGS_MODULE=vespadb.settings.production
+      - SECRET_KEY=${SECRET_KEY}
+      - DATABASE_URL=postgres://vespauser:${POSTGRES_PASSWORD}@db/vespadb
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+
+  db:
+    image: postgis/postgis:latest
+    environment:
+      POSTGRES_DB: vespadb
+      POSTGRES_USER: vespauser
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: "redis:alpine"
+
+  celery_worker:
+    image: registry.example.com/vespadb/app:latest
+    command: celery -A vespadb worker -l info
+    depends_on:
+      - db
+      - redis
+
+  celery_beat:
+    image: registry.example.com/vespadb/app:latest
+    command: celery -A vespadb beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    depends_on:
+      - db
+      - redis
+
+volumes:
+  postgres_data:
+
+
+networks:
+  default:
+    name: vespadb-network

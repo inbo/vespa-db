@@ -4,6 +4,7 @@ services:
   devcontainer:
     build:
       context: .
+      dockerfile: Dockerfile.dev
       args:
         PYTHON_VERSION: ${PYTHON_VERSION:-3.11.6}
       target: dev
@@ -14,6 +15,7 @@ services:
   app:
     build:
       context: .
+      dockerfile: Dockerfile.dev
       target: app
     tty: true
     ports:
@@ -24,8 +26,10 @@ services:
     working_dir: /workspaces/vespadb/
     environment:
       - PYTHONPATH=/workspaces/vespadb
+      - DEBUG=True
     depends_on:
       - db
+      - redis
 
   db:
     image: postgis/postgis:latest

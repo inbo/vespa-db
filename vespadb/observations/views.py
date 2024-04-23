@@ -117,6 +117,17 @@ class ObservationsViewSet(ModelViewSet):
         # Unauthenticated users see only non-reserved observations
         return base_queryset.filter(reserved_by=None)
 
+    def perform_update(self, serializer: BaseSerializer) -> None:
+        """
+        Set modified_by to the current user and modified_datetime to the current UTC time upon updating an observation.
+
+        Parameters
+        ----------
+        serializer: BaseSerializer
+            The serializer containing the validated data.
+        """
+        serializer.save(modified_by=self.request.user, modified_datetime=now())
+
     def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """
         Handle updates to an observation, including potential changes to the 'reserved_by' field and 'reserved_datetime'.
@@ -172,6 +183,19 @@ class ObservationsViewSet(ModelViewSet):
         - Response: The HTTP response with the partial update result.
         """
         return self.update(request, *args, partial=True, **kwargs)
+
+    def perform_create(self, serializer: BaseSerializer) -> None:
+        """
+        Set created_by, modified_by to the current user and created_datetime, modified_datetime to the current UTC time upon creating an observation.
+
+        Parameters
+        ----------
+        serializer: BaseSerializer
+            The serializer containing the validated data.
+        """
+        serializer.save(
+            created_by=self.request.user, modified_by=self.request.user, created_datetime=now(), modified_datetime=now()
+        )
 
     def create(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """

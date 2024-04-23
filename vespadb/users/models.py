@@ -39,3 +39,4 @@ class VespaUser(AbstractUser):
         blank=True,
         related_name="users",
     )
+    reservation_count = models.IntegerField(default=0)

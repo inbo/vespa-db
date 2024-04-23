@@ -10,6 +10,7 @@ from django.contrib.gis.geos import GEOSGeometry
 from django.core.cache import cache
 from django.db.models import Q, QuerySet
 from django.http import HttpResponse, JsonResponse
+from django.utils.timezone import now
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
@@ -116,6 +117,62 @@ class ObservationsViewSet(ModelViewSet):
         # Unauthenticated users see only non-reserved observations
         return base_queryset.filter(reserved_by=None)
 
+    def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        """
+        Handle updates to an observation, including potential changes to the 'reserved_by' field and 'reserved_datetime'.
+
+        Parameters
+        ----------
+        - request (Request): The incoming HTTP request.
+        - *args (Any): Additional positional arguments.
+        - **kwargs (Any): Additional keyword arguments.
+
+        Returns
+        -------
+        - Response: The HTTP response with the update result.
+        """
+        observation = self.get_object()
+        previous_reserved_by = observation.reserved_by
+        serializer = self.get_serializer(observation, data=request.data, partial=False)
+        serializer.is_valid(raise_exception=True)
+        new_reserved_by = serializer.validated_data.get("reserved_by")
+
+        # Update reservation count and reserved datetime based on changes to reserved_by
+        if new_reserved_by != previous_reserved_by:
+            if previous_reserved_by is not None:
+                previous_reserved_by.reservation_count -= 1
+                previous_reserved_by.save(update_fields=["reservation_count"])
+            if new_reserved_by is not None:
+                new_reserved_by.reservation_count += 1
+                new_reserved_by.save(update_fields=["reservation_count"])
+                observation.reserved_datetime = now()
+            else:
+                # If reserved_by is set to None, clear the reserved_datetime
+                observation.reserved_datetime = None
+
+        self.perform_update(serializer)
+
+        # Save any changes made to reserved_datetime
+        observation.save()
+
+        return Response(serializer.data)
+
+    def partial_update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        """
+        Handle partial updates to an observation, especially for changes to 'reserved_by'.
+
+        Parameters
+        ----------
+        - request (Request): The incoming HTTP request.
+        - *args (Any): Additional positional arguments.
+        - **kwargs (Any): Additional keyword arguments.
+
+        Returns
+        -------
+        - Response: The HTTP response with the partial update result.
+        """
+        return self.update(request, *args, partial=True, **kwargs)
+
     def create(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """
         Override the create method to determine the municipality for a new Observation instance based on the provided point location.
@@ -128,6 +185,33 @@ class ObservationsViewSet(ModelViewSet):
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def destroy(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        """
+        Override the destroy method to update the reservation count when an observation is deleted.
+
+        Parameters
+        ----------
+        - request (Request): The incoming HTTP request.
+        - *args (Any): Additional positional arguments.
+        - **kwargs (Any): Additional keyword arguments.
+
+        Returns
+        -------
+        - Response: The HTTP response indicating the result of the delete operation.
+        """
+        observation = self.get_object()
+        reserved_by = observation.reserved_by
+
+        # Perform the standard delete operation
+        response = super().destroy(request, *args, **kwargs)
+
+        # If the observation was reserved, decrement the reservation count of the user
+        if reserved_by:
+            reserved_by.reservation_count -= 1
+            reserved_by.save(update_fields=["reservation_count"])
+
+        return response
 
     def get_paginated_response(self, data: list[dict[str, Any]]) -> Response:
         """

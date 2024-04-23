@@ -14,7 +14,7 @@ services:
   app:
     build:
       context: .
-      target: dev
+      target: app
     tty: true
     ports:
       - "8001:8000"

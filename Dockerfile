@@ -1,3 +1,4 @@
+# FRONTEND DEPLOYMENT
 # First stage: Install Node.js and build the Vue.js project
 FROM node:lts AS frontend-builder
 
@@ -13,6 +14,13 @@ COPY ./frontend/ .
 # Execute build
 RUN npm run build
 
+# Stage 2: Serve the application using Nginx
+FROM nginx:stable-alpine
+COPY --from=frontend-builder /app/dist /usr/share/nginx/html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+
+# BACKEND DEPLOYMENT
 # Base stage for the Python environment
 FROM python:3.11.6-slim AS base
 
@@ -71,7 +79,8 @@ COPY poetry.lock* pyproject.toml /workspaces/vespadb/
 # Install the project dependencies - make sure to use the virtual environment
 RUN poetry install --no-root --no-interaction --no-ansi
 
-CMD ["zsh"]
+ENTRYPOINT ["/opt/vespadb-env/bin/poe"]
+CMD ["serve"]
 
 # Application stage setup
 FROM base AS app

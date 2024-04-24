@@ -1,6 +1,6 @@
 # FRONTEND DEPLOYMENT
 # First stage: Install Node.js and build the Vue.js project
-FROM node:lts AS frontend-builder
+FROM node:lts AS build-stage
 
 # Set the working directory
 WORKDIR /app
@@ -11,12 +11,14 @@ COPY ./frontend/package*.json ./
 RUN npm install
 
 COPY ./frontend/ .
-# Execute build
-RUN npm run build
 
-# Stage 2: Serve the application using Nginx
-FROM nginx:stable-alpine
-COPY --from=frontend-builder /app/dist /usr/share/nginx/html
+# Execute build
+RUN npm run build 
+
+FROM nginx:stable-alpine as frontend-prod
+COPY default.conf /etc/nginx/conf.d/default.conf
+COPY --from=build-stage /app/dist /usr/share/nginx/html
+RUN nginx -t
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
 

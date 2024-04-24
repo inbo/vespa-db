@@ -1,7 +1,7 @@
 <template>
   <nav class="navbar navbar-expand-lg navbar-dark bg-success">
     <div class="container-fluid">
-      <a class="navbar-brand" href="/">VespaWatch Dashboard</a>
+      <a class="navbar-brand" href="/">VespaDB</a>
       <div class="d-flex align-items-center">
         <!-- View Mode Toggle -->
         <div class="btn-group me-2" role="group">

@@ -61,10 +61,23 @@ export default {
         const toggleFilterPanel = () => {
             isFilterPaneOpen.value = !isFilterPaneOpen.value;
         };
+        const openObservationDetails = async (properties) => {
+            try {
+                await vespaStore.fetchObservationDetails(properties.id);
+                toggleDetailsPane();
+            } catch (error) {
+                console.error("Failed to fetch observation details:", error);
+            }
+        };
+
         const updateMarkers = () => {
             vespaStore.getObservationsGeoJson().then(geoJson => {
                 const geoJsonLayer = L.geoJSON(vespaStore.observations, {
-                    pointToLayer: (feature, latlng) => vespaStore.createCircleMarker(feature, latlng)
+                    pointToLayer: (feature, latlng) => {
+                        const marker = vespaStore.createCircleMarker(feature, latlng);
+                        marker.on('click', () => openObservationDetails(feature.properties));
+                        return marker;
+                    }
                 });
 
                 markerClusterGroup.addLayer(geoJsonLayer);
@@ -76,6 +89,7 @@ export default {
             vespaStore.observations = [];
             updateMarkers();
         };
+
         watch(() => vespaStore.filters, (newFilters) => {
             clearAndupdateMarkers();
         }, { deep: true });
@@ -93,14 +107,6 @@ export default {
             });
             if (vespaStore.observations.length === 0) {
                 updateMarkers();
-            } else {
-                // In a happy flow, this would not apply  
-                const geoJsonLayer = L.geoJSON(vespaStore.observations, {
-                    pointToLayer: (feature, latlng) => vespaStore.createCircleMarker(feature, latlng)
-                });
-
-                markerClusterGroup.addLayer(geoJsonLayer);
-                vespaStore.map.addLayer(markerClusterGroup);
             }
         });
 

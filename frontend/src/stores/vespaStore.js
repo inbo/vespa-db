@@ -126,7 +126,7 @@ export const useVespaStore = defineStore('vespaStore', {
         },
         createCircleMarker(feature, latlng) {
             let markerOptions = {
-                radius: 5 + (feature.properties.observations_count || 0) * 0.5,
+                radius: 10 + (feature.properties.observations_count || 0) * 0.5,
                 fillColor: "#FF7800",
                 color: "#000",
                 weight: 1,
@@ -172,7 +172,6 @@ export const useVespaStore = defineStore('vespaStore', {
                 const response = await ApiService.get(`/observations/${observationId}`);
                 if (response.status === 200) {
                     this.selectedObservation = response.data;
-                    this.isDetailsPaneOpen = true;
                 } else {
                     console.error('Failed to fetch observation details:', response.status);
                 }

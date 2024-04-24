@@ -24,8 +24,8 @@ class NestHeightEnum(models.TextChoices):
 class NestSizeEnum(models.TextChoices):
     """Enum for the size of the nest."""
 
-    LESS_THAN_25_CM = "minder_dan_25_cm", _("Minder dan 25 cm")
-    MORE_THAN_25_CM = "meer_dan_25_cm", _("Meer dan 25 cm")
+    LESS_THAN_25_CM = "kleiner_dan_25_cm", _("Kleiner dan 25 cm")
+    MORE_THAN_25_CM = "groter_dan_25_cm", _("Groter dan 25 cm")
 
 
 class NestLocationEnum(models.TextChoices):
@@ -39,19 +39,16 @@ class NestLocationEnum(models.TextChoices):
     )
     OUTSIDE_NATURALLY_COVERED = "buiten_natuurlijk_overdekt", _("Buiten, natuurlijk overdekt")
     INSIDE_BUILDING = "binnen_in_gebouw_of_constructie", _("Binnen, in gebouw of constructie")
-    UNKNOWN = "onbekend", _("Onbekend")
 
 
 class NestTypeEnum(models.TextChoices):
     """Enum for the type of the nest."""
 
-    ACTIVE_EMBRYONAL_NEST = "AH_actief_embryonaal_nest", _("AH - actief embryonaal nest")
-    ACTIVE_PRIMARY_NEST = "AH_actief_primair_nest", _("AH - actief primair nest")
-    ACTIVE_SECONDARY_NEST = "AH_actief_secundair_nest", _("AH - actief secundair nest")
-    INACTIVE_EMPTY_NEST = "AH_inactief_leeg_nest", _("AH - inactief/leeg nest")
-    POTENTIAL_NEST = "AH_potentieel_nest", _("AH - potentieel nest (meer info nodig)")
-    NEST_OTHER_SPECIES = "nest_andere_soort", _("Nest andere soort")
-    NO_NEST = "geen_nest", _("Geen nest (object, insect)")
+    ACTIVE_EMBRYONAL_NEST = "actief_embryonaal_nest", _("actief embryonaal nest")
+    ACTIVE_PRIMARY_NEST = "actief_primair_nest", _("actief primair nest")
+    ACTIVE_SECONDARY_NEST = "actief_secundair_nest", _("actief secundair nest")
+    INACTIVE_EMPTY_NEST = "inactief_leeg_nest", _("inactief/leeg nest")
+    POTENTIAL_NEST = "potentieel_nest", _("potentieel nest")
 
 
 class EradicationResultEnum(models.TextChoices):
@@ -71,7 +68,7 @@ class EradicationProductEnum(models.TextChoices):
     VESPA_FICAM_D = "Vespa_Ficam_D", _("Vespa Ficam D")
     TOPSCORE_PAL = "Topscore_PAL", _("Topscore PAL")
     ETHER_ACETONE_ETHYL_ACETATE = "ether_aceton_ethyl_acetate", _("Ether/aceton/ethyl acetate")
-    DIATOMACEOUS_EARTH = "diatomeeenaarde", _("Diatomeënaarde")
+    DIATOMACEOUS_EARTH = "diatomeeënaarde", _("Diatomeeënaarde")
     OTHER = "andere", _("Andere")
     NONE = "geen", _("Geen")
     UNKNOWN = "onbekend", _("Onbekend")

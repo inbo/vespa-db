@@ -59,22 +59,32 @@ class EradicationResultEnum(models.TextChoices):
     UNTREATED = "untreated", _("Niet behandeld")
     UNKNOWN = "unknown", _("Onbekend")
 
-class WnValidationStatusEnum(models.TextChoices):
+
+class ValidationStatusEnum(models.TextChoices):
     """Enum for the result of the eradication."""
 
-    SUCCESSFUL = "successful", _("Succesvol behandeld")
+    UNKNOWN = "onbekend", _("Unknown")
+    APPROVED_WITH_EVIDENCE = "goedgekeurd_met_bewijs", _("Approved (with evidence)")
+    APPROVED_BY_ADMIN = "goedgekeurd_door_admin", _("Approved (by admin)")
+    APPROVED_AUTOMATIC_VALIDATION = "goedgekeurd_automatische_validatie", _("Approved (automatic validation)")
+    IN_PROGRESS = "in_behandeling", _("In progress")
+    REJECTED = "afgewezen", _("Rejected")
+    NOT_EVALUABLE_YET = "nog_niet_te_beoordelen", _("Not evaluable yet")
+
 
 class EradicationMethodEnum(models.TextChoices):
     """Enum for the result of the eradication."""
-    FREEZER = 'diepvries', _('Diepvries')
-    TELESCOPIC_STEM = 'telescoopsteel', _('Telescoopsteel')
-    LOCKABLE_JAR_BOX = 'afsluitbaar potje/doos', _('Afsluitbaar potje/doos')
-    LIQUID_SPRAYER = 'vloeistofverstuiver', _('Vloeistofverstuiver')
-    POWDER_SPRAYER = 'poederverstuiver', _('Poederverstuiver')
-    
-    
+
+    FREEZER = "diepvries", _("Diepvries")
+    TELESCOPIC_STEM = "telescoopsteel", _("Telescoopsteel")
+    LOCKABLE_JAR_BOX = "afsluitbaar potje/doos", _("Afsluitbaar potje/doos")
+    LIQUID_SPRAYER = "vloeistofverstuiver", _("Vloeistofverstuiver")
+    POWDER_SPRAYER = "poederverstuiver", _("Poederverstuiver")
+
+
 class EradicationAfterCareEnum(models.TextChoices):
     """Enum for the result of the eradication."""
+
     NEST_FULLY_REMOVED = (
         "nest_volledig_verwijderd",
         _("Nest volledig verwijderd"),
@@ -87,7 +97,8 @@ class EradicationAfterCareEnum(models.TextChoices):
         "nest_laten_hangen",
         _("Nest laten hangen"),
     )
-    
+
+
 class EradicationProblemsEnum(models.TextChoices):
     """Enum for the result of the eradication."""
 
@@ -107,6 +118,7 @@ class EradicationProblemsEnum(models.TextChoices):
         "poison_projection",
         _("Gif projectie"),
     )
+
 
 class EradicationProductEnum(models.TextChoices):
     """Enum for the product used for the eradication."""
@@ -192,8 +204,8 @@ class Observation(models.Model):
 
     wn_notes = models.TextField(blank=True, null=True)
     wn_admin_notes = models.TextField(blank=True, null=True)
-    wn_validation_status = models.CharField(max_length=50, choices=WnValidationStatusEnum, blank=True, null=True)
-    
+    wn_validation_status = models.CharField(max_length=50, choices=ValidationStatusEnum, blank=True, null=True)
+
     species = models.IntegerField()
     nest_height = models.CharField(max_length=50, choices=NestHeightEnum, blank=True, null=True)
     nest_size = models.CharField(max_length=50, choices=NestSizeEnum, blank=True, null=True)
@@ -252,7 +264,6 @@ class Observation(models.Model):
     )
     anb = models.BooleanField(default=False)
     public_domain = models.BooleanField(blank=True, null=True)
-    
 
     def __str__(self) -> str:
         """Return the string representation of the model."""

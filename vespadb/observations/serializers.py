@@ -20,16 +20,25 @@ logger = logging.getLogger(__name__)
 # Define the fields that public users can read
 public_read_fields = [
     "id",
+    "created_datetime",
+    "modified_datetime",
     "location",
+    "source",
+    "species",
     "nest_height",
     "nest_size",
     "nest_location",
     "nest_type",
+    "observation_datetime",
+    "wn_cluster_id",
+    "modified_by",
     "created_by",
+    "province",
     "eradication_datetime",
     "municipality",
     "province",
     "images",
+    "public_domain",
 ]
 
 # Define the fields that authenticated users can read
@@ -58,12 +67,18 @@ user_read_fields = [
     "reserved_datetime",
     "eradication_datetime",
     "eradicator_name",
+    "eradication_duration",
+    "eradication_persons",
     "eradication_result",
     "eradication_product",
+    "eradication_method",
+    "eradication_aftercare",
+    "eradication_problems",
     "eradication_notes",
     "municipality",
     "province",
     "anb",
+    "public_domain",
 ]
 
 # Define the conditional fields for authenticated users with specific permissions
@@ -157,8 +172,13 @@ class ObservationPatchSerializer(serializers.ModelSerializer):
             "reserved_by",
             "eradication_datetime",
             "eradicator_name",
+            "eradication_duration",
+            "eradication_persons",
             "eradication_result",
             "eradication_product",
+            "eradication_method",
+            "eradication_aftercare",
+            "eradication_problems",
             "eradication_notes",
         ]
         read_only_fields = [field for field in "__all__" if field not in user_read_fields]

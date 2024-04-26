@@ -60,6 +60,66 @@ class EradicationResultEnum(models.TextChoices):
     UNKNOWN = "unknown", _("Onbekend")
 
 
+class ValidationStatusEnum(models.TextChoices):
+    """Enum for the result of the eradication."""
+
+    UNKNOWN = "onbekend", _("Unknown")
+    APPROVED_WITH_EVIDENCE = "goedgekeurd_met_bewijs", _("Approved (with evidence)")
+    APPROVED_BY_ADMIN = "goedgekeurd_door_admin", _("Approved (by admin)")
+    APPROVED_AUTOMATIC_VALIDATION = "goedgekeurd_automatische_validatie", _("Approved (automatic validation)")
+    IN_PROGRESS = "in_behandeling", _("In progress")
+    REJECTED = "afgewezen", _("Rejected")
+    NOT_EVALUABLE_YET = "nog_niet_te_beoordelen", _("Not evaluable yet")
+
+
+class EradicationMethodEnum(models.TextChoices):
+    """Enum for the result of the eradication."""
+
+    FREEZER = "diepvries", _("Diepvries")
+    TELESCOPIC_STEM = "telescoopsteel", _("Telescoopsteel")
+    LOCKABLE_JAR_BOX = "afsluitbaar potje/doos", _("Afsluitbaar potje/doos")
+    LIQUID_SPRAYER = "vloeistofverstuiver", _("Vloeistofverstuiver")
+    POWDER_SPRAYER = "poederverstuiver", _("Poederverstuiver")
+
+
+class EradicationAfterCareEnum(models.TextChoices):
+    """Enum for the result of the eradication."""
+
+    NEST_FULLY_REMOVED = (
+        "nest_volledig_verwijderd",
+        _("Nest volledig verwijderd"),
+    )
+    NEST_PARTIALLY_REMOVED = (
+        "nest_gedeeltelijk_verwijderd",
+        _("Nest gedeeltelijk verwijderd"),
+    )
+    NEST_LEFT_HANGING = (
+        "nest_laten_hangen",
+        _("Nest laten hangen"),
+    )
+
+
+class EradicationProblemsEnum(models.TextChoices):
+    """Enum for the result of the eradication."""
+
+    STINGING = (
+        "stinging",
+        _("Steken"),
+    )
+    NEST_FALLING = (
+        "nest_falling",
+        _("Nest gevallen"),
+    )
+    DIZZINESS = (
+        "dizziness",
+        _("Duizeligheid"),
+    )
+    POISON_PROJECTION = (
+        "poison_projection",
+        _("Gif projectie"),
+    )
+
+
 class EradicationProductEnum(models.TextChoices):
     """Enum for the product used for the eradication."""
 
@@ -70,8 +130,6 @@ class EradicationProductEnum(models.TextChoices):
     ETHER_ACETONE_ETHYL_ACETATE = "ether_aceton_ethyl_acetate", _("Ether/aceton/ethyl acetate")
     DIATOMACEOUS_EARTH = "diatomeeënaarde", _("Diatomeeënaarde")
     OTHER = "andere", _("Andere")
-    NONE = "geen", _("Geen")
-    UNKNOWN = "onbekend", _("Onbekend")
 
 
 class Province(models.Model):
@@ -142,16 +200,17 @@ class Observation(models.Model):
     created_datetime = models.DateTimeField(auto_now_add=True)
     modified_datetime = models.DateTimeField(auto_now=True)
     location = gis_models.PointField()
-    source = models.CharField(max_length=255)
+    source = models.CharField(max_length=255, blank=True, null=True)
 
     wn_notes = models.TextField(blank=True, null=True)
     wn_admin_notes = models.TextField(blank=True, null=True)
+    wn_validation_status = models.CharField(max_length=50, choices=ValidationStatusEnum, blank=True, null=True)
 
     species = models.IntegerField()
-    nest_height = models.CharField(max_length=50, choices=NestHeightEnum)
-    nest_size = models.CharField(max_length=50, choices=NestSizeEnum)
-    nest_location = models.CharField(max_length=50, choices=NestLocationEnum)
-    nest_type = models.CharField(max_length=50, choices=NestTypeEnum)
+    nest_height = models.CharField(max_length=50, choices=NestHeightEnum, blank=True, null=True)
+    nest_size = models.CharField(max_length=50, choices=NestSizeEnum, blank=True, null=True)
+    nest_location = models.CharField(max_length=50, choices=NestLocationEnum, blank=True, null=True)
+    nest_type = models.CharField(max_length=50, choices=NestTypeEnum, blank=True, null=True)
 
     observer_phone_number = models.CharField(max_length=20, blank=True, null=True)
     observer_email = models.EmailField(blank=True, null=True)
@@ -180,8 +239,13 @@ class Observation(models.Model):
 
     eradication_datetime = models.DateTimeField(blank=True, null=True)
     eradicator_name = models.CharField(max_length=255, blank=True, null=True)
+    eradication_duration = models.TimeField(blank=True, null=True)
+    eradication_persons = models.IntegerField(blank=True, null=True)
     eradication_result = models.CharField(max_length=50, choices=EradicationResultEnum)
-    eradication_product = models.CharField(max_length=50, choices=EradicationProductEnum, blank=True, null=True)
+    eradication_product = models.CharField(max_length=50, choices=EradicationProductEnum)
+    eradication_method = models.CharField(max_length=50, choices=EradicationMethodEnum, blank=True, null=True)
+    eradication_aftercare = models.CharField(max_length=50, choices=EradicationAfterCareEnum, blank=True, null=True)
+    eradication_problems = models.CharField(max_length=50, choices=EradicationProblemsEnum, blank=True, null=True)
     eradication_notes = models.TextField(blank=True, null=True)
 
     municipality = models.ForeignKey(
@@ -199,6 +263,7 @@ class Observation(models.Model):
         related_name="observations",
     )
     anb = models.BooleanField(default=False)
+    public_domain = models.BooleanField(blank=True, null=True)
 
     def __str__(self) -> str:
         """Return the string representation of the model."""

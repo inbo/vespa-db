@@ -194,7 +194,7 @@ def fetch_and_update_observations(self: Task) -> None:
 
 
 @shared_task
-def cleanup_reservation_data() -> None:
+def cleanup_expired_reservations() -> None:
     """
     Cleanup reservations that are older than 2 weeks.
 

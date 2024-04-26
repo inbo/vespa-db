@@ -37,7 +37,7 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 BBOX_LENGTH = 4
-
+REDIS_CACHE_EXPIRATION = 86400
 
 class ObservationsViewSet(ModelViewSet):
     """ViewSet for the Observation model."""
@@ -295,7 +295,7 @@ class ObservationsViewSet(ModelViewSet):
             for obs in queryset
         ]
         geojson_response = {"type": "FeatureCollection", "features": features}
-        cache.set(cache_key, geojson_response, settings.REDIS_CACHE_EXPIRATION)  # 24 hours
+        cache.set(cache_key, geojson_response, REDIS_CACHE_EXPIRATION)  # 24 hours
         return JsonResponse(geojson_response)
 
     @action(detail=False, methods=["post"], permission_classes=[IsAdminUser])

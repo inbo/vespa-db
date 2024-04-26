@@ -1,12 +1,6 @@
 version: "3.9"
 
 services:
-  frontend:
-    build:
-      context: .
-      target: frontend-prod
-    ports:
-      - "3000:80"
   devcontainer:
     build:
       context: .

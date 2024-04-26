@@ -1,19 +1,5 @@
 """Fetch and update observations from waarnemingen API."""
-import os
 
-  
-
-from django.core.wsgi import get_wsgi_application
-
-  
-
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "vespadb.settings")
-
-import sys
-
-sys.path.append(os.path.abspath('/workspaces/vespadb'))
-
-application = get_wsgi_application()
 import logging
 import os
 from datetime import timedelta
@@ -241,5 +227,6 @@ def cleanup_expired_reservations() -> None:
         observation.save()
 
     logger.info("Cleaned up reservation data for %s observations", len(observations_to_update))
+
 
 fetch_and_update_observations()

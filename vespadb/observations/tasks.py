@@ -227,6 +227,3 @@ def cleanup_expired_reservations() -> None:
         observation.save()
 
     logger.info("Cleaned up reservation data for %s observations", len(observations_to_update))
-
-
-fetch_and_update_observations()

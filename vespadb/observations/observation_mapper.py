@@ -124,9 +124,10 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
             return None
 
     try:
-        observation_datetime_utc = parse_datetime_with_timezone(
-            external_data["date"], external_data.get("time", "00:00:00")
-        )
+        observation_time = external_data.get("time", "00:00:00")
+        if observation_time is None:
+            observation_time = "00:00:00"
+        observation_datetime_utc = parse_datetime_with_timezone(external_data["date"], observation_time)
         created_datetime = (
             datetime.fromisoformat(external_data["created"])
             .replace(tzinfo=pytz.timezone("Europe/Paris"))
@@ -173,10 +174,12 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
         })
 
     # Eradication specifics
-    if "notes" in external_data and any(
-        keyword in external_data["notes"].upper() for keyword in ERADICATION_KEYWORD_LIST
+    if (
+        "notes" in external_data
+        and external_data["notes"]
+        and any(keyword in external_data["notes"].upper() for keyword in ERADICATION_KEYWORD_LIST)
     ):
-        mapped_data["eradication_datetime"] = external_data["date"]
+        mapped_data["eradication_datetime"] = observation_datetime_utc
         mapped_data["eradicator_name"] = "Gemeld als bestreden"
 
     return mapped_data

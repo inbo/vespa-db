@@ -16,22 +16,48 @@ from pathlib import Path
 from celery.schedules import crontab
 from dotenv import load_dotenv
 
+from vespadb.secrets import get_secret
+
 load_dotenv()
+
+if os.getenv("DJANGO_ENV") == "development":
+    secrets = {
+        "DJANGO_SECRET_KEY": os.getenv("DJANGO_SECRET_KEY"),
+        "DJANGO_ALLOWED_HOSTS": os.getenv("DJANGO_ALLOWED_HOSTS", "localhost").split(","),
+        "CORS_ALLOWED_ORIGINS": os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000").split(","),
+        "CSRF_TRUSTED_ORIGINS": os.getenv("CSRF_TRUSTED_ORIGINS", "http://localhost:3000").split(","),
+        "CSRF_COOKIE_DOMAIN": os.getenv("CSRF_COOKIE_DOMAIN", "localhost"),
+        "SESSION_COOKIE_DOMAIN": os.getenv("SESSION_COOKIE_DOMAIN", "localhost"),
+        "POSTGRES_DB": os.getenv("POSTGRES_DB"),
+        "POSTGRES_USER": os.getenv("POSTGRES_USER"),
+        "POSTGRES_PASSWORD": os.getenv("POSTGRES_PASSWORD"),
+        "POSTGRES_HOST": os.getenv("POSTGRES_HOST"),
+        "POSTGRES_PORT": os.getenv("POSTGRES_PORT"),
+        "REDIS_LOCATION": os.getenv("REDIS_LOCATION", "redis://redis:6379/1"),
+        "CELERY_BROKER_URL": os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0"),
+        "REDIS_CACHE_EXPIRATION": os.getenv("REDIS_CACHE_EXPIRATION", "86400"),
+        "REDIS_REFRESH_RATE_MIN": os.getenv("REDIS_REFRESH_RATE_MIN", "15"),
+        "SESSION_COOKIE_AGE": os.getenv("SESSION_COOKIE_AGE", "3600"),
+        "DJANGO_DEBUG": os.getenv("DJANGO_DEBUG", "False"),
+    }
+else:
+    secrets = get_secret("vespadb-secrets")  # type: ignore[assignment]
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 AUTH_USER_MODEL = "users.VespaUser"
+if secrets is None:
+    raise Exception("Secrets not found")  # noqa: TRY002
 
+print(secrets)
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
-
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
+SECRET_KEY = secrets["DJANGO_SECRET_KEY"]
+ALLOWED_HOSTS = secrets["DJANGO_ALLOWED_HOSTS"]
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DJANGO_DEBUG", "False") == "True"
-ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "localhost").split(",")
+DEBUG = secrets["DJANGO_DEBUG"]
 
 # Application definition
 INSTALLED_APPS = [
@@ -67,10 +93,10 @@ MIDDLEWARE = [
 ]
 
 # list of origins authorized to make requests
-CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000").split(",")
-CSRF_TRUSTED_ORIGINS = os.getenv("CSRF_TRUSTED_ORIGINS", "http://localhost:3000").split(",")
-SESSION_COOKIE_DOMAIN = os.getenv("SESSION_COOKIE_DOMAIN", "localhost")
-CSRF_COOKIE_DOMAIN = os.getenv("CSRF_COOKIE_DOMAIN", "localhost")
+CORS_ALLOWED_ORIGINS = secrets["CORS_ALLOWED_ORIGINS"]
+CSRF_TRUSTED_ORIGINS = secrets["CSRF_TRUSTED_ORIGINS"]
+SESSION_COOKIE_DOMAIN = secrets["SESSION_COOKIE_DOMAIN"]
+CSRF_COOKIE_DOMAIN = secrets["CSRF_COOKIE_DOMAIN"]
 # whether the server allows cookies in the cross-site HTTP requests.
 CORS_ALLOW_CREDENTIALS = True
 
@@ -83,29 +109,27 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 25,
 }
 
-SESSION_COOKIE_AGE = int(os.getenv("REDIS_CACHE_EXPIRATION", "3600"))  # 1 hour
+SESSION_COOKIE_AGE = secrets["SESSION_COOKIE_AGE"]  # 1 hour
 SESSION_SAVE_EVERY_REQUEST = True
 SESSION_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_SECURE = False
-REDIS_CACHE_EXPIRATION = int(os.getenv("REDIS_CACHE_EXPIRATION", "86400"))  # 24 hours
+REDIS_CACHE_EXPIRATION = secrets["REDIS_CACHE_EXPIRATION"]  # 24 hours
+REDIS_REFRESH_RATE_MIN = secrets["REDIS_REFRESH_RATE_MIN"]  # default to 15 minutes
 
 DATABASES = {
     "default": {
         "ENGINE": "django.contrib.gis.db.backends.postgis",
-        "NAME": os.getenv("POSTGRES_DB", "vespadb"),
-        "USER": os.getenv("POSTGRES_USER", "vespauser"),
-        "PASSWORD": os.getenv("POSTGRES_PASSWORD", "vespauserpassword"),
-        "HOST": os.getenv("POSTGRES_HOST", "db"),
-        "PORT": os.getenv("POSTGRES_PORT", "5432"),
+        "NAME": secrets["POSTGRES_DB"],
+        "USER": secrets["POSTGRES_USER"],
+        "PASSWORD": secrets["POSTGRES_PASSWORD"],
+        "HOST": secrets["POSTGRES_HOST"],
+        "PORT": secrets["POSTGRES_PORT"],
     }
 }
-
-REDIS_REFRESH_RATE_MIN = int(os.getenv("REDIS_REFRESH_RATE_MIN", "15"))  # default to 15 minutes
-
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": os.getenv("REDIS_LOCATION", "redis://redis:6379/1"),
+        "LOCATION": secrets["REDIS_LOCATION"],
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         },
@@ -207,7 +231,7 @@ LOGIN_URL = "/login/"
 
 
 # Celery specifications
-CELERY_BROKER_URL = (os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0"),)
+CELERY_BROKER_URL = secrets["CELERY_BROKER_URL"]
 CELERY_RESULT_BACKEND = "django-db"
 CELERY_ACCEPT_CONTENT = ["application/json"]
 CELERY_TASK_SERIALIZER = "json"

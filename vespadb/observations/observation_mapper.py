@@ -23,7 +23,8 @@ from vespadb.observations.models import (
 from vespadb.observations.utils import check_if_point_in_anb_area, get_municipality_from_coordinates
 
 logger = logging.getLogger(__name__)
-ENUMS_MAPPING = {
+
+ENUMS_MAPPING: dict[str, type[TextChoices]] = {
     "Nesthoogte": NestHeightEnum,
     "Nestgrootte": NestSizeEnum,
     "Nestplaats": NestLocationEnum,
@@ -34,19 +35,16 @@ ENUMS_MAPPING = {
     "Product": EradicationProductEnum,
 }
 
+ERADICATION_KEYWORD_LIST = ["BESTREDEN"]
+
 
 def map_attribute_to_enum(value: str, enum: type[TextChoices]) -> TextChoices | None:
     """
     Map a single attribute value to an enum using close match.
 
-    Parameters
-    ----------
-    - value (str): The value from the API that needs to be mapped to an enum.
-    - enum (Type[TextChoices]): The enum type that the value is expected to map to.
-
-    Returns
-    -------
-    - Optional[TextChoices]: The corresponding enum value if a match is found, otherwise None.
+    :param value: The value from the API that needs to be mapped to an enum.
+    :param enum: The enum type that the value is expected to map to.
+    :return: The corresponding enum value if a match is found, otherwise None.
     """
     enum_dict = {e.value: e for e in enum}
     closest_match = get_close_matches(value, enum_dict.keys(), n=1, cutoff=0.6)
@@ -57,19 +55,13 @@ def map_attributes_to_enums(api_attributes: list[dict[str, str]]) -> dict[str, T
     """
     Map API attributes to model enums based on configured mappings.
 
-    Parameters
-    ----------
-    - api_attributes (List[Dict[str, Any]]): A list of dictionaries, each containing attribute details from the API.
-    - enums_mapping (Dict[str, Type[TextChoices]]): A dictionary mapping attribute names to the Django model enums.
-
-    Returns
-    -------
-    - Dict[str, TextChoices]: A dictionary containing the attribute names and their mapped enum values.
+    :param api_attributes: A list of dictionaries, each containing attribute details from the API.
+    :return: A dictionary containing the attribute names and their mapped enum values.
     """
     mapped_values = {}
-    for attribute_dict in api_attributes:
-        attr_name = attribute_dict.get("name")
-        value = str(attribute_dict.get("value"))
+    for attribute in api_attributes:
+        attr_name = attribute.get("name")
+        value = str(attribute.get("value"))
         if attr_name in ENUMS_MAPPING:
             mapped_enum = map_attribute_to_enum(value, ENUMS_MAPPING[attr_name])
             if mapped_enum:
@@ -83,13 +75,8 @@ def map_validation_status_to_enum(validation_status: str) -> ValidationStatusEnu
     """
     Map a single validation status to an enum.
 
-    Parameters
-    ----------
-    - validation_status (str): The validation status from the API that needs to be mapped to an enum.
-
-    Returns
-    -------
-    - ValidationStatusEnum: The corresponding enum value if a match is found, otherwise None.
+    :param validation_status: The validation status from the API that needs to be mapped to an enum.
+    :return: The corresponding enum value if a match is found, otherwise None.
     """
     validation_status_dict = {
         "O": ValidationStatusEnum.UNKNOWN,
@@ -103,6 +90,24 @@ def map_validation_status_to_enum(validation_status: str) -> ValidationStatusEnu
     return cast(ValidationStatusEnum, validation_status_dict.get(validation_status))
 
 
+def parse_datetime_with_timezone(
+    date_str: str, time_str: str = "00:00:00", timezone_str: str = "Europe/Paris"
+) -> datetime:
+    """
+    Parse a datetime string with timezone into a datetime object in UTC.
+
+    :param date_str: Date string in format "%Y-%m-%d".
+    :param time_str: Time string in format "%H:%M:%S", default is "00:00:00".
+    :param timezone_str: Timezone string, default is "Europe/Paris" (CET).
+    :return: Datetime object converted to UTC.
+    :raises ValueError: If the input format is incorrect.
+    """
+    timezone = pytz.timezone(timezone_str)
+    datetime_str = f"{date_str}T{time_str}"
+    datetime_obj = datetime.strptime(datetime_str, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone)
+    return datetime_obj.astimezone(pytz.utc)
+
+
 def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dict[str, Any] | None:
     """
     Map external API data to a Django observation model fields, returning None if the data is incomplete or improperly formatted.
@@ -110,77 +115,71 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
     :param external_data: A dictionary of external API data.
     :return: A dictionary suitable for creating or updating an Observation model instance, or None if an error occurs.
     """
-    # TODO: add mapping for attributes
     required_fields = ["id", "date", "point", "created", "modified", "species"]
     for field in required_fields:
         if field not in external_data or external_data[field] is None:
-            logger.exception(
-                "Missing required field: %s in observation external ID {external_data.get('id', 'Unknown')}", field
+            logger.error(
+                f"Missing required field: {field} in observation external ID {external_data.get('id', 'Unknown')}"
             )
             return None
 
-    # Handle 'time' being None or missing
-    observation_time = external_data.get("time", "00:00:00")
-    if observation_time is None:
-        observation_time = "00:00:00"
-
     try:
-        # Concatenate date and time to form a full datetime string
-        observation_datetime_str = f"{external_data['date']}T{observation_time}"
-        # Assume the datetime is in CET and convert to UTC
-        cet_timezone = pytz.timezone("Europe/Paris")  # CET timezone
-        observation_datetime = datetime.strptime(observation_datetime_str, "%Y-%m-%dT%H:%M:%S").replace(
-            tzinfo=cet_timezone
-        )
-        observation_datetime_utc = observation_datetime.astimezone(pytz.utc)
-    except ValueError as e:
-        logger.exception(
-            f"Invalid date/time format for observation external ID {external_data.get('id', 'Unknown')}: {e}"
-        )
-        return None
-
-    try:
-        # Convert creation and modification datetime from ISO format
+        observation_time = external_data.get("time", "00:00:00")
+        if observation_time is None:
+            observation_time = "00:00:00"
+        observation_datetime_utc = parse_datetime_with_timezone(external_data["date"], observation_time)
         created_datetime = (
-            datetime.fromisoformat(external_data["created"]).replace(tzinfo=cet_timezone).astimezone(pytz.utc)
+            datetime.fromisoformat(external_data["created"])
+            .replace(tzinfo=pytz.timezone("Europe/Paris"))
+            .astimezone(pytz.utc)
         )
         modified_datetime = (
-            datetime.fromisoformat(external_data["modified"]).replace(tzinfo=cet_timezone).astimezone(pytz.utc)
+            datetime.fromisoformat(external_data["modified"])
+            .replace(tzinfo=pytz.timezone("Europe/Paris"))
+            .astimezone(pytz.utc)
         )
     except ValueError as e:
-        logger.exception(f"Invalid ISO date format for external ID {external_data.get('id', 'Unknown')}: {e}")
+        logger.exception(f"Invalid date/time or ISO format: {e} for external ID {external_data.get('id', 'Unknown')}")
         return None
 
     location = Point(external_data["point"]["coordinates"], srid=4326)
+    long, lat = location.x, location.y
+    anb = check_if_point_in_anb_area(long, lat)
+    municipality = get_municipality_from_coordinates(long, lat)
 
-    if location:
-        long, lat = location.x, location.y
-        anb = check_if_point_in_anb_area(long, lat)
-        municipality = get_municipality_from_coordinates(long, lat)
-
-    api_attributes = external_data.get("attributes", {})
-    mapped_enums = map_attributes_to_enums(api_attributes)
-    user = external_data.get("user", {})
+    mapped_enums = map_attributes_to_enums(external_data.get("attributes", []))
+    validation_status = map_validation_status_to_enum(external_data.get("validation_status", "O"))
 
     mapped_data = {
         "wn_id": external_data["id"],
         "location": location,
-        "source": external_data.get("source"),
-        "species": external_data.get("species", 0),
+        "species": external_data.get("species"),
         "observation_datetime": observation_datetime_utc,
         "wn_created_datetime": created_datetime,
         "wn_modified_datetime": modified_datetime,
-        "wn_notes": external_data.get("notes", ""),
-        "wn_admin_notes": external_data.get("admin_notes", ""),
-        "images": external_data.get("photos", []),
         "anb": anb,
         "municipality": municipality,
         "province": municipality.province if municipality else None,
-        "wn_cluster_id": external_data.get("nest"),
-        "wn_validation_status": map_validation_status_to_enum(external_data.get("validation_status", "O")),
-        "observer_phone_number": user.get("phone_number"),  # TODO; check if this is correct
-        "observer_email": user.get("email"),
-        "observer_name": user.get("name"),
+        "wn_validation_status": validation_status,
         **mapped_enums,
     }
+
+    # Additional user data
+    user_data = external_data.get("user", {})
+    if user_data:
+        mapped_data.update({
+            "observer_phone_number": user_data.get("phone_number"),
+            "observer_email": user_data.get("email"),
+            "observer_name": user_data.get("name"),
+        })
+
+    # Eradication specifics
+    if (
+        "notes" in external_data
+        and external_data["notes"]
+        and any(keyword in external_data["notes"].upper() for keyword in ERADICATION_KEYWORD_LIST)
+    ):
+        mapped_data["eradication_datetime"] = observation_datetime_utc
+        mapped_data["eradicator_name"] = "Gemeld als bestreden"
+
     return mapped_data

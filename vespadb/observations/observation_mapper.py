@@ -33,7 +33,7 @@ ENUMS_MAPPING = {
     "Methode": EradicationMethodEnum,
     "Product": EradicationProductEnum,
 }
-
+ERADICATION_KEYWORD_LIST = ["BESTREDEN"]
 
 def map_attribute_to_enum(value: str, enum: type[TextChoices]) -> TextChoices | None:
     """
@@ -138,6 +138,13 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
             f"Invalid date/time format for observation external ID {external_data.get('id', 'Unknown')}: {e}"
         )
         return None
+    
+    if "notes" in external_data:
+        for keyword in ERADICATION_KEYWORD_LIST:
+            if keyword in external_data["notes"].upper():
+                eradication_datetime = external_data["date"]
+                eradicator_name = "Gemeld als bestreden"
+                break
 
     try:
         # Convert creation and modification datetime from ISO format
@@ -183,4 +190,7 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
         "observer_name": user.get("name"),
         **mapped_enums,
     }
+    if eradication_datetime and eradicator_name:
+        mapped_data["eradication_datetime"] = eradication_datetime
+        mapped_data["eradicator_name"] = eradicator_name
     return mapped_data

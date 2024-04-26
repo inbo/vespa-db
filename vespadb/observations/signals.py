@@ -1,21 +1,26 @@
 """Signal handlers for the observations app."""
-from typing import Type, Any
-from django.db.models.signals import pre_save, post_save
+
+from typing import Any
+
 from django.db.models import Model
+from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.utils import timezone
+
 from vespadb.observations.models import Observation
 
+
 @receiver(pre_save, sender=Observation)
-def handle_reservation_change(sender: Type[Model], instance: Observation, **kwargs: Any) -> None:
+def handle_reservation_change(sender: type[Model], instance: Observation, **kwargs: Any) -> None:
     """
     Signal to handle changes in reservation ownership before an Observation is saved.
-    
+
     If the reserved_by user changes, adjust the reservation count for the previously
     reserved user and the newly reserved user. Decrease the count for the old user
     and increase it for the new user.
 
-    Parameters:
+    Parameters
+    ----------
         sender (Type[Model]): The model class that sent the signal.
         instance (Observation): The observation instance being saved.
         **kwargs: Extra keyword arguments.
@@ -30,9 +35,12 @@ def handle_reservation_change(sender: Type[Model], instance: Observation, **kwar
                 instance.reserved_by.reservation_count += 1
                 instance.reserved_by.save()
 
+
 @receiver(post_save, sender=Observation)
-def update_reserved_datetime(sender: Type[Model], instance: Observation, created: bool, **kwargs: Any) -> None:
+def update_reserved_datetime(sender: type[Model], instance: Observation, created: bool, **kwargs: Any) -> None:
     """
+    Update reserved_datetime for an Observation after it has been saved.
+
     Signal to set the reserved_datetime to the current time when a reservation is made,
     if it was not already set. This ensures that every reservation has a datetime
     marking when it was reserved.
@@ -40,7 +48,8 @@ def update_reserved_datetime(sender: Type[Model], instance: Observation, created
     This is triggered after the Observation instance has been saved, to ensure
     that the reserved_by field has been properly updated and committed.
 
-    Parameters:
+    Parameters
+    ----------
         sender (Type[Model]): The model class that sent the signal.
         instance (Observation): The newly saved observation instance.
         created (bool): Flag indicating whether this was a creation or an update.
@@ -48,4 +57,4 @@ def update_reserved_datetime(sender: Type[Model], instance: Observation, created
     """
     if instance.reserved_by and not instance.reserved_datetime:
         instance.reserved_datetime = timezone.now()
-        instance.save(update_fields=['reserved_datetime'])
+        instance.save(update_fields=["reserved_datetime"])

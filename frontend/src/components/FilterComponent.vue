@@ -67,13 +67,11 @@ export default {
     const selectedNestStatus = ref([]);
     const anbAreasActief = ref(null);
     const nestType = ref([
-      { name: 'AH - actief embryonaal nest', value: 'AH_actief_embryonaal_nest' },
-      { name: 'AH - actief primair nest', value: 'AH_actief_primair_nest' },
-      { name: 'AH - actief secundair nest', value: 'AH_actief_secundair_nest' },
-      { name: 'AH - inactief/leeg nest', value: 'AH_inactief_leeg_nest' },
-      { name: 'AH - potentieel nest (meer info nodig)', value: 'AH_potentieel_nest' },
-      { name: 'Nest andere soort', value: 'nest_andere_soort' },
-      { name: 'Geen nest (object, insect)', value: 'geen_nest' }
+      { name: 'actief embryonaal nest', value: 'actief_embryonaal_nest' },
+      { name: 'actief primair nest', value: 'actief_primair_nest' },
+      { name: 'actief secundair nest', value: 'actief_secundair_nest' },
+      { name: 'inactief/leeg nest', value: 'inactief_leeg_nest' },
+      { name: 'potentieel nest (meer info nodig)', value: 'potentieel_nest' },
     ]);
     const nestStatus = ref([
       { name: 'Uitgeroeid', value: 'eradicated' },
@@ -93,8 +91,8 @@ export default {
         municipalities: selectedMunicipalities.value,
         years: selectedYears.value,
         anbAreasActief: anbAreasActief.value,
-        nestType: selectedNestType.value.map(type => type.value),
-        nestStatus: selectedNestStatus.value.map(status => status.value),
+        nestType: selectedNestType.value,
+        nestStatus: selectedNestStatus.value,
       });
     };
 

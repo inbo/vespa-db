@@ -2,15 +2,20 @@
 
 import django_filters
 from django.db.models import QuerySet
-from django_filters import ChoiceFilter
 from rest_framework_gis.filterset import GeoFilterSet
 
-from vespadb.observations.models import NestTypeEnum, Observation
+from vespadb.observations.models import Observation
+from django.db.models import Q
+import logging
 
+logger = logging.getLogger(__name__)
 
 class ListFilter(django_filters.BaseInFilter, django_filters.CharFilter):
     """Filter for a list of values."""
 
+class MultiCharFilter(django_filters.BaseInFilter, django_filters.CharFilter):
+    """Filter for handling multiple character inputs."""
+    pass
 
 class ObservationFilter(GeoFilterSet):
     """Filter for the Observation model."""
@@ -24,35 +29,60 @@ class ObservationFilter(GeoFilterSet):
     min_modified_datetime = django_filters.DateTimeFilter(field_name="modified_datetime", lookup_expr="gte")
     max_modified_datetime = django_filters.DateTimeFilter(field_name="modified_datetime", lookup_expr="lte")
     anb = django_filters.BooleanFilter(field_name="anb")
-    nest_type = ChoiceFilter(field_name="nest_type", choices=NestTypeEnum.choices)
-    nest_status = django_filters.CharFilter(method="filter_nest_status")
+    nest_type = MultiCharFilter(method="filter_nest_type")
+    nest_status = MultiCharFilter(method="filter_nest_status")
 
     def filter_nest_status(self, queryset: QuerySet, name: str, value: str) -> QuerySet:
         """
-        Filter de queryset op basis van neststatus.
+        Filter the queryset based on multiple nest statuses.
 
         Parameters
         ----------
         queryset : QuerySet
-            De initiële queryset die gefilterd moet worden.
+            The initial queryset to be filtered.
         name : str
-            De naam van de filter die toegepast wordt.
-        value : str
-            De gewenste neststatus om op te filteren ('eradicated', 'reserved', 'open').
+            The name of the filter being applied.
+        value : list
+            A list of desired nest statuses to filter by (e.g., ['eradicated', 'reserved']).
 
         Returns
         -------
         QuerySet
-            De gefilterde queryset gebaseerd op de opgegeven neststatus.
+            The filtered queryset based on the provided nest statuses.
         """
-        if value == "eradicated":
-            return queryset.filter(eradication_datetime__isnull=False)
-        if value == "reserved":
-            return queryset.filter(reserved_datetime__isnull=False)
-        if value == "open":
-            return queryset.filter(reserved_datetime__isnull=True, eradication_datetime__isnull=True)
-        return queryset
+        if not value:
+            return queryset
+        query = Q()
+        if "eradicated" in value:
+            query |= Q(eradication_datetime__isnull=False)
+        if "reserved" in value:
+            query |= Q(reserved_datetime__isnull=False)
+        if "open" in value:
+            query |= Q(reserved_datetime__isnull=True, eradication_datetime__isnull=True)
 
+        return queryset.filter(query)
+    def filter_nest_type(self, queryset: QuerySet, name: str, value: str) -> QuerySet:
+        """
+        Filter the queryset based on multiple nest types.
+
+        Parameters
+        ----------
+        queryset : QuerySet
+            The initial queryset to be filtered.
+        name : str
+            The name of the filter being applied.
+        value : list
+            A list of desired nest types to filter by (e.g., ['active_embryonal_nest', 'inactive_empty_nest']).
+
+        Returns
+        -------
+        QuerySet
+            The filtered queryset based on the provided nest types.
+        """
+        if not value:
+            return queryset
+        return queryset.filter(nest_type__in=value)
+    
     def filter_by_year_range(self, queryset: QuerySet[Observation], name: str, value: str) -> QuerySet[Observation]:
         """
         Filter the queryset by a list of years.

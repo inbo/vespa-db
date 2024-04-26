@@ -50,7 +50,6 @@ AUTH_USER_MODEL = "users.VespaUser"
 if secrets is None:
     raise Exception("Secrets not found")  # noqa: TRY002
 
-print(secrets)
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 SECRET_KEY = secrets["DJANGO_SECRET_KEY"]

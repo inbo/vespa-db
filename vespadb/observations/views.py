@@ -128,46 +128,6 @@ class ObservationsViewSet(ModelViewSet):
         """
         serializer.save(modified_by=self.request.user, modified_datetime=now())
 
-    def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
-        """
-        Handle updates to an observation, including potential changes to the 'reserved_by' field and 'reserved_datetime'.
-
-        Parameters
-        ----------
-        - request (Request): The incoming HTTP request.
-        - *args (Any): Additional positional arguments.
-        - **kwargs (Any): Additional keyword arguments.
-
-        Returns
-        -------
-        - Response: The HTTP response with the update result.
-        """
-        observation = self.get_object()
-        previous_reserved_by = observation.reserved_by
-        serializer = self.get_serializer(observation, data=request.data, partial=False)
-        serializer.is_valid(raise_exception=True)
-        new_reserved_by = serializer.validated_data.get("reserved_by")
-
-        # Update reservation count and reserved datetime based on changes to reserved_by
-        if new_reserved_by != previous_reserved_by:
-            if previous_reserved_by is not None:
-                previous_reserved_by.reservation_count -= 1
-                previous_reserved_by.save(update_fields=["reservation_count"])
-            if new_reserved_by is not None:
-                new_reserved_by.reservation_count += 1
-                new_reserved_by.save(update_fields=["reservation_count"])
-                observation.reserved_datetime = now()
-            else:
-                # If reserved_by is set to None, clear the reserved_datetime
-                observation.reserved_datetime = None
-
-        self.perform_update(serializer)
-
-        # Save any changes made to reserved_datetime
-        observation.save()
-
-        return Response(serializer.data)
-
     def partial_update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """
         Handle partial updates to an observation, especially for changes to 'reserved_by'.

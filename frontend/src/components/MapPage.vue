@@ -6,10 +6,12 @@
                 <i class="fas fa-sliders-h"></i> Filters
             </button>
             <div id="map" class="h-100"></div>
-            <div class="filter-panel" :class="{ 'panel-active': isFilterPaneOpen }">
+            <div class="filter-panel" 
+     :class="{'d-none': !isFilterPaneOpen, 'd-block': isFilterPaneOpen, 'col-12': true, 'col-md-6': true, 'col-lg-4': true}">
                 <FilterComponent />
             </div>
-            <div class="details-panel" :class="{ 'panel-active': isDetailsPaneOpen }">
+            <div class="details-panel" 
+     :class="{'d-none': !isDetailsPaneOpen, 'd-block': isDetailsPaneOpen, 'col-12': true, 'col-md-6': true, 'col-lg-4': true}">
                 <div class="d-flex justify-content-between align-items-center">
                     <h3>Observatie details</h3>
                     <button type="button" class="btn-close" aria-label="Close" @click="toggleDetailsPane"></button>

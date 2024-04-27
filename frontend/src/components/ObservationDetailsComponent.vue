@@ -1,19 +1,56 @@
 <template>
     <div v-if="selectedObservation">
-        <div v-for="(value, key) in selectedObservation" :key="key" class="mb-3">
-            <strong>{{ key }}:</strong>
-            <template v-if="isEditing && editableFields.includes(key)">
-                <input v-if="typeof value === 'number'" type="number" v-model="selectedObservation[key]"
-                    class="form-control">
-                <input v-else-if="typeof value === 'string'" type="text" v-model="selectedObservation[key]"
-                    class="form-control">
-            </template>
-            <template v-else>
-                <span v-if="typeof value === 'boolean'">{{ value ? 'Yes' : 'No' }}</span>
-                <span v-else-if="typeof value === 'string' || typeof value === 'number'">{{ value }}</span>
-                <span v-else>Unsupported Type</span>
-            </template>
-        </div>
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Observatie Detail</h5>
+                <dl class="row">
+                    <dt class="col-sm-3">ID</dt>
+                    <dd class="col-sm-9">887</dd>
+
+                    <dt class="col-sm-3">Aangemaakt op</dt>
+                    <dd class="col-sm-9">2024-04-26 09:58</dd>
+
+                    <dt class="col-sm-3">Laatst gewijzigd</dt>
+                    <dd class="col-sm-9">2024-04-26 09:58</dd>
+
+                    <dt class="col-sm-3">Bron</dt>
+                    <dd class="col-sm-9">Unsupported Type</dd>
+
+                    <dt class="col-sm-3">Soort</dt>
+                    <dd class="col-sm-9">8807</dd>
+
+                    <dt class="col-sm-3">Nest Hoogte</dt>
+                    <dd class="col-sm-9">Unsupported Type</dd>
+
+                    <dt class="col-sm-3">Nest Grootte</dt>
+                    <dd class="col-sm-9">Unsupported Type</dd>
+
+                    <dt class="col-sm-3">Nest Locatie</dt>
+                    <dd class="col-sm-9">Unsupported Type</dd>
+
+                    <dt class="col-sm-3">Nest Type</dt>
+                    <dd class="col-sm-9">Type 1</dd>
+
+                    <dt class="col-sm-3">Observatie Datum</dt>
+                    <dd class="col-sm-9">2024-04-13 19:10</dd>
+
+                    <dt class="col-sm-3">Cluster ID</dt>
+                    <dd class="col-sm-9">3</dd>
+
+                    <dt class="col-sm-3">Gewijzigd door</dt>
+                    <dd class="col-sm-9">1</dd>
+
+                    <dt class="col-sm-3">Aangemaakt door</dt>
+                    <dd class="col-sm-9">1</dd>
+
+                    <dt class="col-sm-3">Bestreden op</dt>
+                    <dd class="col-sm-9">23 januari 2024 09:33</dd>
+
+                    <dt class="col-sm-3">Gemeente</dt>
+                    <dd class="col-sm-9">Tienen</dd>
+                </dl>
+            </div>
+    </div>
         <div>
             <button v-if="isLoggedIn && canEdit && !isEditing" class="btn btn-success me-2"
                 @click="startEdit">Wijzig</button>

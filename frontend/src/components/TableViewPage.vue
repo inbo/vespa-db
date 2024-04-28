@@ -5,7 +5,8 @@
             <button class="btn-filter-toggle" @click="toggleFilterPane">
                 <i class="fas fa-sliders-h"></i> Filters
             </button>
-            <div class="filter-panel" :class="{ 'panel-active': isFilterPaneOpen }">
+            <div class="filter-panel" 
+     :class="{'d-none': !isFilterPaneOpen, 'd-block': isFilterPaneOpen, 'col-12': true, 'col-md-6': true, 'col-lg-4': true}">
                 <FilterComponent />
             </div>
             <div class="container mt-4">

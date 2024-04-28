@@ -1,7 +1,7 @@
 """Serializers for the observations app."""
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 
 from django.contrib.gis.geos import Point
 from django.utils import timezone
@@ -39,6 +39,7 @@ public_read_fields = [
     "province",
     "images",
     "public_domain",
+    "municipality_name"
 ]
 
 # Define the fields that authenticated users can read
@@ -79,6 +80,7 @@ user_read_fields = [
     "province",
     "anb",
     "public_domain",
+    "municipality_name",
 ]
 
 # Define the conditional fields for authenticated users with specific permissions
@@ -95,12 +97,26 @@ conditional_fields = [
 class ObservationSerializer(serializers.ModelSerializer):
     """Serializer for the full details of a Observation model instance."""
 
+    municipality_name = serializers.SerializerMethodField()
+
     class Meta:
         """Meta class for the ObservationSerializer."""
 
         model = Observation
         fields = "__all__"
 
+    def get_municipality_name(self, obj: Observation) -> Optional[str]:
+        """
+        Retrieves the name of the municipality associated with the observation, if any.
+
+        Parameters:
+        obj (Observation): The Observation instance.
+
+        Returns:
+        Optional[str]: The name of the municipality or None if not available.
+        """
+        return obj.municipality.name if obj.municipality else None
+    
     def to_representation(self, instance: Observation) -> dict[str, Any]:
         """
         Dynamically filter fields based on user authentication status.
@@ -110,6 +126,7 @@ class ObservationSerializer(serializers.ModelSerializer):
         """
         data: dict[str, Any] = super().to_representation(instance)
         request: Request = self.context.get("request")
+        data['municipality_name'] = self.get_municipality_name(instance)
         if request and request.user.is_authenticated:
             if not request.user.is_staff:
                 # Filter fields for non-staff users based on their permissions

@@ -2,52 +2,48 @@
     <div v-if="selectedObservation">
         <div class="card">
             <div class="card-body">
-                <h5 class="card-title">Observatie Detail</h5>
                 <dl class="row">
-                    <dt class="col-sm-3">ID</dt>
-                    <dd class="col-sm-9">887</dd>
+                    <dt class="col-sm-6">Aangemaakt op</dt>
+                    <dd class="col-sm-9">{{ selectedObservation.created_datetime }}</dd>
 
-                    <dt class="col-sm-3">Aangemaakt op</dt>
-                    <dd class="col-sm-9">2024-04-26 09:58</dd>
+                    <dt class="col-sm-6">Laatst gewijzigd</dt>
+                    <dd class="col-sm-9">{{ selectedObservation.modified_datetime }}</dd>
 
-                    <dt class="col-sm-3">Laatst gewijzigd</dt>
-                    <dd class="col-sm-9">2024-04-26 09:58</dd>
+                    <dt class="col-sm-6">Bron</dt>
+                    <dd class="col-sm-9">{{ selectedObservation.source }}</dd>
 
-                    <dt class="col-sm-3">Bron</dt>
-                    <dd class="col-sm-9">Unsupported Type</dd>
+                    <dt class="col-sm-6">Species</dt>
+                    <dd class="col-sm-9">{{ selectedObservation.species }}</dd>
 
-                    <dt class="col-sm-3">Soort</dt>
-                    <dd class="col-sm-9">8807</dd>
+                    <dt class="col-sm-6">Nest Hoogte</dt>
+                    <dd class="col-sm-9">{{ selectedObservation.nest_height }}</dd>
 
-                    <dt class="col-sm-3">Nest Hoogte</dt>
-                    <dd class="col-sm-9">Unsupported Type</dd>
+                    <dt class="col-sm-6">Nest Grootte</dt>
+                    <dd class="col-sm-9">{{ selectedObservation.nest_size }}</dd>
 
-                    <dt class="col-sm-3">Nest Grootte</dt>
-                    <dd class="col-sm-9">Unsupported Type</dd>
+                    <dt class="col-sm-6">Nest Locatie</dt>
+                    <dd class="col-sm-9">{{ selectedObservation.nest_location }}</dd>
 
-                    <dt class="col-sm-3">Nest Locatie</dt>
-                    <dd class="col-sm-9">Unsupported Type</dd>
+                    <dt class="col-sm-6">Nest Type</dt>
+                    <dd class="col-sm-9">{{ selectedObservation.nest_type }}</dd>
 
-                    <dt class="col-sm-3">Nest Type</dt>
-                    <dd class="col-sm-9">Type 1</dd>
+                    <dt class="col-sm-6">Observatie Datum</dt>
+                    <dd class="col-sm-9">{{ selectedObservation.observation_datetime }}</dd>
 
-                    <dt class="col-sm-3">Observatie Datum</dt>
-                    <dd class="col-sm-9">2024-04-13 19:10</dd>
+                    <dt class="col-sm-6">Cluster ID</dt>
+                    <dd class="col-sm-9">{{ selectedObservation.wn_cluster_id }}</dd>
 
-                    <dt class="col-sm-3">Cluster ID</dt>
-                    <dd class="col-sm-9">3</dd>
+                    <dt class="col-sm-6">Gewijzigd door</dt>
+                    <dd class="col-sm-9">{{ selectedObservation.modified_by }}</dd>
 
-                    <dt class="col-sm-3">Gewijzigd door</dt>
-                    <dd class="col-sm-9">1</dd>
+                    <dt class="col-sm-6">Aangemaakt door</dt>
+                    <dd class="col-sm-9">{{ selectedObservation.created_by }}</dd>
 
-                    <dt class="col-sm-3">Aangemaakt door</dt>
-                    <dd class="col-sm-9">1</dd>
+                    <dt class="col-sm-6">Bestreden op</dt>
+                    <dd class="col-sm-9">{{ selectedObservation.eradication_datetime }}</dd>
 
-                    <dt class="col-sm-3">Bestreden op</dt>
-                    <dd class="col-sm-9">23 januari 2024 09:33</dd>
-
-                    <dt class="col-sm-3">Gemeente</dt>
-                    <dd class="col-sm-9">Tienen</dd>
+                    <dt class="col-sm-6">Gemeente</dt>
+                    <dd class="col-sm-9">{{ selectedObservation.municipality_name }}</dd>
                 </dl>
             </div>
     </div>

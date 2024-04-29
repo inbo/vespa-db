@@ -27,10 +27,11 @@ export const useVespaStore = defineStore('vespaStore', {
         viewMode: 'map',
         filters: {
             municipalities: [],
-            years: [],
             anbAreasActief: null,
             nestType: null,
             nestStatus: null,
+            min_observation_date: null,
+            max_observation_date: null,
         },
         isDetailsPaneOpen: false,
         user: {},
@@ -88,10 +89,6 @@ export const useVespaStore = defineStore('vespaStore', {
                 filterQuery += `municipality_id=${this.filters.municipalities.join(',')}&`;
             }
 
-            if (this.filters.years.length > 0) {
-                filterQuery += `year_range=${this.filters.years.join(',')}&`;
-            }
-
             if (this.filters.anbAreasActief !== null && this.filters.anbAreasActief !== undefined) {
                 filterQuery += `anb=${this.filters.anbAreasActief}&`;
             }
@@ -103,15 +100,18 @@ export const useVespaStore = defineStore('vespaStore', {
             if (this.filters.nestStatus) {
                 filterQuery += `nest_status=${this.filters.nestStatus}&`;
             }
+            if (this.filters.min_observation_date) {
+                filterQuery += `min_observation_datetime=${this.filters.min_observation_date}&`;
+            }
+
+            if (this.filters.max_observation_date) {
+                filterQuery += `max_observation_datetime=${this.filters.max_observation_date}&`;
+            }
 
             return filterQuery.endsWith('&') ? filterQuery.slice(0, -1) : filterQuery;
         },
         async applyFilters(filters) {
-            this.filters.municipalities = filters.municipalities;
-            this.filters.years = filters.years;
-            this.filters.anbAreasActief = filters.anbAreasActief;
-            this.filters.nestType = filters.nestType;
-            this.filters.nestStatus = filters.nestStatus;
+            this.filters = { ...this.filters, ...filters };
         },
         async fetchMunicipalities() {
             try {

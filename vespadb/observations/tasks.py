@@ -204,6 +204,7 @@ def cleanup_expired_reservations() -> None:
 
     This task is intended to be run as a cron job to regularly clean up outdated reservation data.
     """
+    #TODO; reserved_by stays filled in after eradication. So we should check as well if eradication_datetime is filled in
     two_weeks_ago = (timezone.now() - timedelta(weeks=2)).replace(hour=0, minute=0, second=0, microsecond=0)
     observations_to_update = Observation.objects.filter(
         Q(reserved_datetime__lte=two_weeks_ago, reserved_by__isnull=False)

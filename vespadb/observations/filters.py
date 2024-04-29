@@ -22,12 +22,13 @@ class ObservationFilter(GeoFilterSet):
 
     municipality_id = ListFilter(field_name="municipality__id", lookup_expr="in")
     province_id = ListFilter(field_name="province__id", lookup_expr="in")
-    year_range = django_filters.CharFilter(method="filter_by_year_range")
 
     min_created_datetime = django_filters.DateTimeFilter(field_name="created_datetime", lookup_expr="gte")
     max_created_datetime = django_filters.DateTimeFilter(field_name="created_datetime", lookup_expr="lte")
     min_modified_datetime = django_filters.DateTimeFilter(field_name="modified_datetime", lookup_expr="gte")
     max_modified_datetime = django_filters.DateTimeFilter(field_name="modified_datetime", lookup_expr="lte")
+    min_observation_datetime = django_filters.DateTimeFilter(field_name="observation_datetime", lookup_expr="gte")
+    max_observation_datetime = django_filters.DateTimeFilter(field_name="observation_datetime", lookup_expr="lte")
     anb = django_filters.BooleanFilter(field_name="anb")
     nest_type = MultiCharFilter(method="filter_nest_type")
     nest_status = MultiCharFilter(method="filter_nest_status")
@@ -83,29 +84,6 @@ class ObservationFilter(GeoFilterSet):
             return queryset
         return queryset.filter(nest_type__in=value)
     
-    def filter_by_year_range(self, queryset: QuerySet[Observation], name: str, value: str) -> QuerySet[Observation]:
-        """
-        Filter the queryset by a list of years.
-
-        It filters observations to those whose created_datetime falls within the specified years.
-
-        Parameters
-        ----------
-        - queryset: The initial queryset to be filtered.
-        - name: The name of the field being filtered.
-        - value: A list of years (as strings or integers) to filter by.
-
-        Returns
-        -------
-        - A filtered queryset including only those observations whose created_datetime
-        falls within the specified years.
-        """
-        if not value:
-            return queryset
-        # Split the list into distinct years
-        years = [int(year) for year in value.split(",")]
-        # Filter queryset based on those years
-        return queryset.filter(created_datetime__year__in=years)
 
     class Meta:
         """Meta class for the ObservationFilter."""
@@ -114,11 +92,12 @@ class ObservationFilter(GeoFilterSet):
         fields = [
             "municipality_id",
             "province_id",
-            "year_range",
             "min_created_datetime",
             "max_created_datetime",
             "min_modified_datetime",
             "max_modified_datetime",
+            "min_observation_datetime",
+            "max_observation_datetime",
             "anb",
             "nest_type",
         ]

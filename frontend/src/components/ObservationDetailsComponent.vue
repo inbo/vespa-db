@@ -4,10 +4,10 @@
             <div class="card-body">
                 <dl class="row">
                     <dt class="col-sm-6">Aangemaakt op</dt>
-                    <dd class="col-sm-9">{{ selectedObservation.created_datetime }}</dd>
+                    <dd class="col-sm-9">{{ formatDate(selectedObservation.created_datetime) }}</dd>
 
                     <dt class="col-sm-6">Laatst gewijzigd</dt>
-                    <dd class="col-sm-9">{{ selectedObservation.modified_datetime }}</dd>
+                    <dd class="col-sm-9">{{ formatDate(selectedObservation.modified_datetime) }}</dd>
 
                     <dt class="col-sm-6">Bron</dt>
                     <dd class="col-sm-9">{{ selectedObservation.source }}</dd>
@@ -28,7 +28,7 @@
                     <dd class="col-sm-9">{{ selectedObservation.nest_type }}</dd>
 
                     <dt class="col-sm-6">Observatie Datum</dt>
-                    <dd class="col-sm-9">{{ selectedObservation.observation_datetime }}</dd>
+                    <dd class="col-sm-9">{{ formatDate(selectedObservation.observation_datetime) }}</dd>
 
                     <dt class="col-sm-6">Cluster ID</dt>
                     <dd class="col-sm-9">{{ selectedObservation.wn_cluster_id }}</dd>
@@ -40,7 +40,7 @@
                     <dd class="col-sm-9">{{ selectedObservation.created_by }}</dd>
 
                     <dt class="col-sm-6">Bestreden op</dt>
-                    <dd class="col-sm-9">{{ selectedObservation.eradication_datetime }}</dd>
+                    <dd class="col-sm-9">{{ formatDate(selectedObservation.eradication_datetime, 'Onbestreden') }}</dd>
 
                     <dt class="col-sm-6">Gemeente</dt>
                     <dd class="col-sm-9">{{ selectedObservation.municipality_name }}</dd>
@@ -96,6 +96,22 @@ export default {
             "eradication_notes",
         ];
 
+        const formatDate = (isoString, defaultValue = "") => {
+            if (!isoString) {
+                return defaultValue;
+            }
+            const date = new Date(isoString);
+            if (isNaN(date.getTime())) {
+                return defaultValue;
+            }
+            return new Intl.DateTimeFormat('nl-NL', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            }).format(date);
+        };
         const closeDetails = () => {
             emit('closeDetails'); // Use emit from the context
             vespaStore.isDetailsPaneOpen = false;
@@ -138,7 +154,8 @@ export default {
             reserveObservation,
             canEdit,
             cancelReservation,
-            isUserReserver
+            isUserReserver,
+            formatDate
         };
     },
 };

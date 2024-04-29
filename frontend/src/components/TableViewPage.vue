@@ -32,6 +32,10 @@
                                 <tr v-for="observation in table_observations" :key="observation.id">
                                     <td>{{ observation.id }}</td>
                                     <td>{{ observation.municipality_name }}</td>
+                                    <td>{{ formatDate(observation.created_datetime) }}</td>
+                                    <td>{{ formatDate(observation.observation_datetime) }}</td>
+                                    <td>{{ formatDate(observation.eradication_datetime, 'Onbestreden') }}</td>
+                                    <td>{{ observation.species }}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -70,10 +74,31 @@ export default {
         const table_observations = computed(() => vespaStore.table_observations);
         const tableHeaders = ref([
             { text: 'ID', value: 'id' },
-            { text: 'Gemeente', value: 'municipality_name' }
+            { text: 'Gemeente', value: 'municipality_name' },
+            { text: 'Aangemaakt', value: 'created_datetime' },
+            { text: 'Observatie tijdstip', value: 'observation_datetime'},
+            { text: 'Bestreden tijdstip', value: 'eradication_datetime'},
+            { text: 'Soorten', value: 'species'}
         ]);
         const sortBy = ref(null);
         const sortOrder = ref('asc');
+
+        const formatDate = (isoString, defaultValue = "") => {
+            if (!isoString) {
+                return defaultValue;
+            }
+            const date = new Date(isoString);
+            if (isNaN(date.getTime())) {
+                return defaultValue;
+            }
+            return new Intl.DateTimeFormat('nl-NL', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            }).format(date);
+        };
 
         const toggleFilterPane = () => {
             isFilterPaneOpen.value = !isFilterPaneOpen.value;
@@ -109,7 +134,7 @@ export default {
             vespaStore.getObservations();
         });
 
-        return { table_observations, loading, fetchPage, nextPage, previousPage, totalObservations, tableHeaders, toggleSort, toggleFilterPane, isFilterPaneOpen, sortBy, sortOrder };
+        return { table_observations, loading, fetchPage, nextPage, previousPage, totalObservations, tableHeaders, toggleSort, toggleFilterPane, isFilterPaneOpen, sortBy, sortOrder, formatDate };
     }
 };
 </script>

@@ -42,11 +42,12 @@ export const useVespaStore = defineStore('vespaStore', {
         },
     },
     actions: {
-        async getObservations(page = 1, page_size = 25) {
+        async getObservations(page = 1, page_size = 25, sortBy = null, sortOrder = 'asc') {
             this.loadingObservations = true;
+            const orderQuery = sortBy ? `&ordering=${sortOrder === 'asc' ? '' : '-'}${sortBy}` : '';
             const filterQuery = this.createFilterQuery();
             try {
-                const response = await ApiService.get(`/observations?${filterQuery}&page=${page}&page_size=${page_size}`);
+                const response = await ApiService.get(`/observations?${filterQuery}${orderQuery}&page=${page}&page_size=${page_size}`);
                 if (response.status === 200) {
                     this.table_observations = response.data.results;  // Updating observations instead
                     this.totalObservations = response.data.total;

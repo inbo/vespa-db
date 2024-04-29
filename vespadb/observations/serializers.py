@@ -12,7 +12,6 @@ from vespadb.observations.models import Municipality, Observation
 
 if TYPE_CHECKING:
     from rest_framework.request import Request
-
     from vespadb.users.models import VespaUser
 
 logger = logging.getLogger(__name__)

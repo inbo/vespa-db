@@ -137,19 +137,19 @@ export const useVespaStore = defineStore('vespaStore', {
             return L.circleMarker(latlng, markerOptions).bindPopup(`Observatie ID: ${feature.properties.id}`);
         },
         async reserveObservation(observation) {
-            try {
-                const reservedObservation = {
-                    ...observation,
+            if (this.user.reservation_count < 50) {
+                const response = await ApiService.patch(`/observations/${observation.id}/`, {
                     reserved_by: this.user.id
-                };
-                const response = await ApiService.patch(`/observations/${observation.id}/`, reservedObservation);
+                });
                 if (response.status === 200) {
                     this.selectedObservation = { ...this.selectedObservation, ...response.data };
+                    // Perform authCheck to update reservation_count
+                    await this.authCheck();
                 } else {
                     throw new Error('Failed to reserve the observation');
                 }
-            } catch (error) {
-                console.error('Error reserving the observation:', error);
+            } else {
+                alert('You have reached the maximum number of reservations.');
             }
         },
         async cancelReservation(observation) {
@@ -260,7 +260,6 @@ export const useVespaStore = defineStore('vespaStore', {
                 .then((response) => {
                     const data = response.data;
                     if (data.isAuthenticated && data.user) {
-                        console.log(data.user)
                         this.user = data.user;
                         this.userMunicipalities = data.user.municipalities;
                         this.error = "";

@@ -47,7 +47,7 @@
                     <div>
                         <button v-if="isLoggedIn && canEdit && !isEditing" class="btn btn-success me-2"
                             @click="startEdit">Wijzig</button>
-                        <button v-if="isLoggedIn && canEdit && !isEditing && !selectedObservation.reserved_by"
+                        <button v-if="isLoggedIn && canEdit && !isEditing && !selectedObservation.reserved_by && canReserve"
                             class="btn btn-success me-2" @click="reserveObservation">Reserveren</button>
                         <button v-if="isUserReserver" class="btn btn-danger me-2" @click="cancelReservation">Reservatie
                             annuleren</button>
@@ -78,6 +78,7 @@ export default {
         const isUserReserver = computed(() => {
             return vespaStore.isLoggedIn && vespaStore.selectedObservation.reserved_by === vespaStore.user.id;
         });
+        const canReserve = computed(() => vespaStore.user.reservation_count < 50);
 
         const editableFields = [
             "nest_height",
@@ -156,7 +157,8 @@ export default {
             canEdit,
             cancelReservation,
             isUserReserver,
-            formatDate
+            formatDate,
+            canReserve
         };
     },
 };

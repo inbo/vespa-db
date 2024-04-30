@@ -41,6 +41,8 @@ if os.getenv("DJANGO_ENV") == "development":
 else:
     secrets = get_secret("vespadb-secrets")  # type: ignore[assignment]
 
+MAX_RESERVATIONS = 50
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 

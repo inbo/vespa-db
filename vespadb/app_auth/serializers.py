@@ -30,7 +30,16 @@ class UserSerializer(serializers.ModelSerializer):
         """."""
 
         model = User
-        fields = ["id", "username", "first_name", "last_name", "municipalities", "permissions", "personal_data_access", "reservation_count"]
+        fields = [
+            "id",
+            "username",
+            "first_name",
+            "last_name",
+            "municipalities",
+            "permissions",
+            "personal_data_access",
+            "reservation_count",
+        ]
 
 
 class LoginSerializer(serializers.Serializer):

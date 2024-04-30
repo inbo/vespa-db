@@ -2,11 +2,10 @@
 
 from typing import Any
 
-from django.db.models import Model
+from django.db.models import F, Model
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.utils import timezone
-from django.db.models import F
 
 from vespadb.observations.models import Observation
 
@@ -59,9 +58,7 @@ def update_reserved_datetime(sender: type[Model], instance: Observation, created
 
     if not created:
         old_instance = sender.objects.get(pk=instance.pk)
-        # Check if eradication_datetime was updated
-        if not old_instance.eradication_datetime and instance.eradication_datetime:
-            # Ensure that reserved_by is also set
-            if instance.reserved_by:
-                instance.reserved_by.reservation_count = F('reservation_count') - 1
-                instance.reserved_by.save(update_fields=["reservation_count"])
+        # Check if eradication_datetime was updated and reserved by is set
+        if not old_instance.eradication_datetime and instance.eradication_datetime and instance.reserved_by:
+            instance.reserved_by.reservation_count = F("reservation_count") - 1
+            instance.reserved_by.save(update_fields=["reservation_count"])

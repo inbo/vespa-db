@@ -1,21 +1,23 @@
 """Filters for the Observation model."""
 
+import logging
+
 import django_filters
-from django.db.models import QuerySet
+from django.db.models import Q, QuerySet
 from rest_framework_gis.filterset import GeoFilterSet
 
 from vespadb.observations.models import Observation
-from django.db.models import Q
-import logging
 
 logger = logging.getLogger(__name__)
+
 
 class ListFilter(django_filters.BaseInFilter, django_filters.CharFilter):
     """Filter for a list of values."""
 
+
 class MultiCharFilter(django_filters.BaseInFilter, django_filters.CharFilter):
     """Filter for handling multiple character inputs."""
-    pass
+
 
 class ObservationFilter(GeoFilterSet):
     """Filter for the Observation model."""
@@ -62,6 +64,7 @@ class ObservationFilter(GeoFilterSet):
             query |= Q(reserved_datetime__isnull=True, eradication_datetime__isnull=True)
 
         return queryset.filter(query)
+
     def filter_nest_type(self, queryset: QuerySet, name: str, value: str) -> QuerySet:
         """
         Filter the queryset based on multiple nest types.
@@ -83,7 +86,6 @@ class ObservationFilter(GeoFilterSet):
         if not value:
             return queryset
         return queryset.filter(nest_type__in=value)
-    
 
     class Meta:
         """Meta class for the ObservationFilter."""

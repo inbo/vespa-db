@@ -41,7 +41,7 @@ export default {
         const selectedObservation = computed(() => vespaStore.selectedObservation);
         const isEditing = computed(() => vespaStore.isEditing);
         const map = computed(() => vespaStore.map);
-        const markerClusterGroup = L.markerClusterGroup({ spiderfyOnMaxZoom: false, showCoverageOnHover: true, zoomToBoundsOnClick: true });
+        const markerClusterGroup = L.markerClusterGroup({ spiderfyOnMaxZoom: false, showCoverageOnHover: true, zoomToBoundsOnClick: true, disableClusteringAtZoom: 16 });
         const isLoggedIn = computed(() => vespaStore.isLoggedIn);
         const isDetailsPaneOpen = computed(() => vespaStore.isDetailsPaneOpen);
         const isFilterPaneOpen = ref(false);
@@ -101,6 +101,7 @@ export default {
             vespaStore.map = L.map('map', {
                 center: [50.8503, 4.3517],
                 zoom: 8,
+                maxZoom: 20,
                 layers: [
                     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                         attribution: 'Map data © OpenStreetMap contributors'

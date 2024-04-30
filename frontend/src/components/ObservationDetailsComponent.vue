@@ -44,19 +44,20 @@
 
                     <dt class="col-sm-6">Gemeente</dt>
                     <dd class="col-sm-9">{{ selectedObservation.municipality_name }}</dd>
+                    <div>
+                        <button v-if="isLoggedIn && canEdit && !isEditing" class="btn btn-success me-2"
+                            @click="startEdit">Wijzig</button>
+                        <button v-if="isLoggedIn && canEdit && !isEditing && !selectedObservation.reserved_by"
+                            class="btn btn-success me-2" @click="reserveObservation">Reserveren</button>
+                        <button v-if="isUserReserver" class="btn btn-danger me-2" @click="cancelReservation">Reservatie
+                            annuleren</button>
+                        <button v-if="isEditing && canEdit" class="btn btn-success me-2" @click="confirmUpdate">Bevestig</button>
+                        <button v-if="isEditing && canEdit" class="btn btn-secondary" @click="cancelEdit">Annuleer</button>
+                    </div>
                 </dl>
             </div>
     </div>
-        <div>
-            <button v-if="isLoggedIn && canEdit && !isEditing" class="btn btn-success me-2"
-                @click="startEdit">Wijzig</button>
-            <button v-if="isLoggedIn && canEdit && !isEditing && !selectedObservation.reserved_by"
-                class="btn btn-success me-2" @click="reserveObservation">Reserveren</button>
-            <button v-if="isUserReserver" class="btn btn-danger me-2" @click="cancelReservation">Reservatie
-                annuleren</button>
-            <button v-if="isEditing && canEdit" class="btn btn-success me-2" @click="confirmUpdate">Bevestig</button>
-            <button v-if="isEditing && canEdit" class="btn btn-secondary" @click="cancelEdit">Annuleer</button>
-        </div>
+
     </div>
 </template>
 

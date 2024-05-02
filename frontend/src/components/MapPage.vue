@@ -6,12 +6,12 @@
                 <i class="fas fa-sliders-h"></i> Filters
             </button>
             <div id="map" class="h-100"></div>
-            <div class="filter-panel" 
-     :class="{'d-none': !isFilterPaneOpen, 'd-block': isFilterPaneOpen, 'col-12': true, 'col-md-6': true, 'col-lg-4': true}">
+            <div class="filter-panel"
+                :class="{ 'd-none': !isFilterPaneOpen, 'd-block': isFilterPaneOpen, 'col-12': true, 'col-md-6': true, 'col-lg-4': true }">
                 <FilterComponent />
             </div>
-            <div class="details-panel" 
-     :class="{'d-none': !isDetailsPaneOpen, 'd-block': isDetailsPaneOpen, 'col-12': true, 'col-md-6': true, 'col-lg-4': true}">
+            <div class="details-panel"
+                :class="{ 'd-none': !isDetailsPaneOpen, 'd-block': isDetailsPaneOpen, 'col-12': true, 'col-md-6': true, 'col-lg-4': true }">
                 <div class="d-flex justify-content-between align-items-center">
                     <h3>Observatie details</h3>
                     <button type="button" class="btn-close" aria-label="Close" @click="toggleDetailsPane"></button>
@@ -21,7 +21,7 @@
         </div>
     </div>
 </template>
-  
+
 <script>
 import { useVespaStore } from '@/stores/vespaStore';
 import 'leaflet/dist/leaflet.css';
@@ -100,7 +100,7 @@ export default {
             vespaStore.fetchMunicipalities();
             vespaStore.map = L.map('map', {
                 center: [50.8503, 4.3517],
-                zoom: 8,
+                zoom: 9,
                 maxZoom: 20,
                 layers: [
                     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -129,4 +129,3 @@ export default {
     },
 };
 </script>
-  

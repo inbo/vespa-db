@@ -14,23 +14,13 @@
           </v-autocomplete>
         </div>
         <div class="col-12">
-          <v-text-field
-            v-model="minDate"
-            label="Observaties vanaf"
-            prepend-icon="mdi-calendar"
-            readonly
-            @click="toggleMenu1"
-          ></v-text-field>
+          <v-text-field v-model="minDate" label="Observaties vanaf" prepend-icon="mdi-calendar" readonly
+            @click="toggleMenu1"></v-text-field>
           <v-date-picker v-model="minDate" v-show="menu1" @input="closeMenu1" @change="closeMenu1"></v-date-picker>
         </div>
         <div class="col-12">
-          <v-text-field
-            v-model="maxDate"
-            label="Observaties tot"
-            prepend-icon="mdi-calendar"
-            readonly
-            @click="toggleMenu2"
-          ></v-text-field>
+          <v-text-field v-model="maxDate" label="Observaties tot" prepend-icon="mdi-calendar" readonly
+            @click="toggleMenu2"></v-text-field>
           <v-date-picker v-model="maxDate" v-show="menu2" @input="closeMenu2" @change="closeMenu2"></v-date-picker>
         </div>
         <div class="col-12">
@@ -97,7 +87,7 @@ export default {
       { name: 'Niet in ANB gebied', value: false },
       { name: 'Wel in ANB gebied', value: true }
     ]);
-    const minDate = ref(null);
+    const minDate = ref(new Date(new Date().getFullYear(), 3, 1));
     const maxDate = ref(null);
     const selectedObservationStart = ref(false);
     const selectedObservationEnd = ref(false);
@@ -144,9 +134,8 @@ export default {
     onMounted(() => {
       vespaStore.fetchMunicipalities();
     });
-    return { municipalities, loading, formattedMunicipalities, nestType, minDate, selectedObservationStart, selectedObservationEnd, nestStatus, anbAreaOptions, selectedMunicipalities, selectedNestType, selectedNestStatus, anbAreasActief, emitFilterUpdate, minDate, maxDate, menu1, menu2, toggleMenu1, closeMenu1, toggleMenu2, closeMenu2  };
+    return { municipalities, loading, formattedMunicipalities, nestType, minDate, selectedObservationStart, selectedObservationEnd, nestStatus, anbAreaOptions, selectedMunicipalities, selectedNestType, selectedNestStatus, anbAreasActief, emitFilterUpdate, minDate, maxDate, menu1, menu2, toggleMenu1, closeMenu1, toggleMenu2, closeMenu2 };
 
   }
 };
 </script>
-  

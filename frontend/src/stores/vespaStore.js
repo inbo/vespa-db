@@ -67,11 +67,12 @@ export const useVespaStore = defineStore('vespaStore', {
         async getObservationsGeoJson() {
             this.loading = true;
             const filterQuery = this.createFilterQuery();
+            const additionalFilters = this.isLoggedIn ? '' : `&min_observation_datetime=${new Date('April 1, 2021').toISOString()}`;
+
             try {
-                const response = await ApiService.get(`/observations/dynamic-geojson?${filterQuery}`);
+                const response = await ApiService.get(`/observations/dynamic-geojson?${filterQuery}${additionalFilters}`);
                 if (response.status === 200) {
                     this.observations = response.data.features;
-
                 } else {
                     throw new Error(`Network response was not ok, status code: ${response.status}`);
                 }

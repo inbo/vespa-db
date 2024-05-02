@@ -707,6 +707,17 @@ files = [
 Django = ">=3.2"
 
 [[package]]
+name = "django-ratelimit"
+version = "4.1.0"
+description = "Cache-based rate-limiting for Django."
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "django-ratelimit-4.1.0.tar.gz", hash = "sha256:555943b283045b917ad59f196829530d63be2a39adb72788d985b90c81ba808b"},
+    {file = "django_ratelimit-4.1.0-py2.py3-none-any.whl", hash = "sha256:d047a31cf94d83ef1465d7543ca66c6fc16695559b5f8d814d1b51df15110b92"},
+]
+
+[[package]]
 name = "django-redis"
 version = "5.4.0"
 description = "Full featured redis cache backend for Django."
@@ -2616,4 +2627,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11.6,<4.0"
-content-hash = "2f7c43a4d1a7da04b434a86f08150c4f6e936f7a0fc9d4fb364cd1f157e9e67d"
+content-hash = "d5e03d29ed748383ea5d1a451b291f6de2090081c44f6353aa86c00289a19f32"

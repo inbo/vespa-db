@@ -240,12 +240,8 @@ CELERY_BEAT_SCHEDULE = {
         "task": "vespadb.observations.tasks.fetch_and_update_observations",
         "schedule": crontab(hour=4, minute=0),  # Runs every day at 04 AM
     },
-    "audit_user_reservations": {
-        "task": "vespadb.users.tasks.audit_user_reservations",
-        "schedule": crontab(day_of_week="sunday", hour=3, minute=0),  # Runs every Sunday at 03 AM
-    },
     "remove_expired_reservations": {
-        "task": "vespadb.observations.tasks.cleanup_expired_reservations",
-        "schedule": crontab(day_of_week="monday", hour=5, minute=0),  # Runs every Monday at 05 AM
+        "task": "vespadb.observations.tasks.free_expired_reservations_and_audit_reservation_count",
+        "schedule": crontab(hour=7, minute=0),  # Runs every day at 05 AM
     },
 }

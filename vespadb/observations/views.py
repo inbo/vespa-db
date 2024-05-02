@@ -4,8 +4,6 @@ import csv
 import json
 import logging
 from typing import TYPE_CHECKING, Any
-from django.utils.decorators import method_decorator
-from django_ratelimit.decorators import ratelimit
 
 from django.contrib.gis.db.models.functions import Transform
 from django.contrib.gis.geos import GEOSGeometry
@@ -14,8 +12,10 @@ from django.core.exceptions import ValidationError
 from django.db.models import CharField, OuterRef, Q, QuerySet, Subquery, Value
 from django.db.models.functions import Coalesce
 from django.http import HttpResponse, JsonResponse
+from django.utils.decorators import method_decorator
 from django.utils.timezone import now
 from django_filters.rest_framework import DjangoFilterBackend
+from django_ratelimit.decorators import ratelimit
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import filters, status
@@ -237,7 +237,7 @@ class ObservationsViewSet(ModelViewSet):
             "results": data,
         })
 
-    @method_decorator(ratelimit(key='ip', rate='15/m', method='GET', block=True))
+    @method_decorator(ratelimit(key="ip", rate="15/m", method="GET", block=True))
     def list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """
         Handle requests for the list of observations with pagination.
@@ -264,7 +264,7 @@ class ObservationsViewSet(ModelViewSet):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
-    @method_decorator(ratelimit(key='ip', rate='15/m', method='GET', block=True))
+    @method_decorator(ratelimit(key="ip", rate="15/m", method="GET", block=True))
     @action(detail=False, methods=["get"], url_path="dynamic-geojson")
     def geojson(self, request: Request) -> HttpResponse:
         """Return GeoJSON data based on the request parameters."""
@@ -341,7 +341,7 @@ class ObservationsViewSet(ModelViewSet):
             ),
         ],
     )
-    @method_decorator(ratelimit(key='ip', rate='15/m', method='GET', block=True))
+    @method_decorator(ratelimit(key="ip", rate="15/m", method="GET", block=True))
     @action(detail=False, methods=["get"], permission_classes=[AllowAny])
     def export(self, request: Request) -> Response:
         """Export observations data in the specified format."""

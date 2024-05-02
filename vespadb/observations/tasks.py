@@ -9,7 +9,7 @@ import requests
 from celery import Task, shared_task
 from django.conf import settings
 from django.db import models, transaction
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.utils import timezone
 from django.utils.timezone import now
 from dotenv import load_dotenv
@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 from vespadb.observations.models import Municipality, Observation, Province
 from vespadb.observations.observation_mapper import map_external_data_to_observation_model
 from vespadb.permissions import SYSTEM_USER_OBSERVATION_FIELDS_TO_UPDATE as FIELDS_TO_UPDATE
-from vespadb.users.models import UserType
+from vespadb.users.models import UserType, VespaUser
 from vespadb.users.utils import get_system_user
 
 load_dotenv()
@@ -195,6 +195,15 @@ def fetch_and_update_observations(self: Task) -> None:
 
 
 @shared_task
+def free_expired_reservations_and_audit_reservation_count(self: Task) -> None:
+    """Free expired reservations and audit the reservation count for each observation."""
+    logger.info("start freeing expired reservations")
+    cleanup_expired_reservations()
+    logger.info("start auditing reservation count")
+    audit_user_reservations()
+    logger.info("finished freeing expired reservations and auditing reservation count")
+
+
 def cleanup_expired_reservations() -> None:
     """
     Cleanup reservations that are older than 5 days.
@@ -230,3 +239,42 @@ def cleanup_expired_reservations() -> None:
         observation.save()
 
     logger.info("Cleaned up reservation data for %s observations", len(observations_to_update))
+
+
+def audit_user_reservations() -> None:
+    """
+    Audit task to verify if the reservation counts of users match the actual reservations in the database.
+
+    This task counts the number of observations reserved by each user, excluding those where eradication has occurred,
+    and updates the reservation count if discrepancies are found.
+    """
+    logger.info("Starting audit of user reservations")
+
+    # Get all users with their actual reservation count from Observation table,
+    # excluding observations where eradication_datetime is set
+    actual_counts = (
+        Observation.objects.filter(
+            eradication_datetime__isnull=True  # Only include active reservations
+        )
+        .values("reserved_by")
+        .annotate(actual_count=Count("id"))
+        .order_by()
+    )
+
+    # Update users where the actual reservation count does not match the recorded count
+    for count_data in actual_counts:
+        user_id = count_data["reserved_by"]
+        if user_id is None:
+            continue  # Skip entries where reserved_by is None
+        actual_count = count_data["actual_count"]
+        user = VespaUser.objects.get(id=user_id)  # Retrieve user by ID
+
+        # Check if the current stored reservation count matches the actual count
+        if user.reservation_count != actual_count:
+            logger.info(
+                f"Updating reservation count for user {user.username}: {user.reservation_count} -> {actual_count}"
+            )
+            user.reservation_count = actual_count
+            user.save()
+
+    logger.info("Audit of user reservations completed")

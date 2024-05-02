@@ -5,7 +5,8 @@
             <button class="btn-filter-toggle" @click="toggleFilterPane">
                 <i class="fas fa-sliders-h"></i> Filters
             </button>
-            <div class="filter-panel" :class="{ 'panel-active': isFilterPaneOpen }">
+            <div class="filter-panel" 
+     :class="{'d-none': !isFilterPaneOpen, 'd-block': isFilterPaneOpen, 'col-12': true, 'col-md-6': true, 'col-lg-4': true}">
                 <FilterComponent />
             </div>
             <div class="container mt-4">
@@ -19,16 +20,22 @@
                         <table class="table table-hover table-sm">
                             <thead class="table-light">
                                 <tr>
-                                    <th scope="col" v-for="(header, index) in tableHeaders" :key="index">
-                                        {{ header }}
+                                    <th scope="col" v-for="header in tableHeaders" :key="header.value" @click="toggleSort(header.value)">
+                                        {{ header.text }}
+                                        <span v-if="sortBy === header.value">
+                                            <i class="fas" :class="{'fa-sort-up': sortOrder === 'asc', 'fa-sort-down': sortOrder === 'desc'}"></i>
+                                        </span>
                                     </th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr v-for="observation in table_observations" :key="observation.id">
                                     <td>{{ observation.id }}</td>
-                                    <td>{{ observation.location }}</td>
-                                    <td>{{ observation.municipality }}</td>
+                                    <td>{{ observation.municipality_name }}</td>
+                                    <td>{{ formatDate(observation.created_datetime) }}</td>
+                                    <td>{{ formatDate(observation.observation_datetime) }}</td>
+                                    <td>{{ formatDate(observation.eradication_datetime, 'Onbestreden') }}</td>
+                                    <td>{{ observation.species }}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -46,7 +53,6 @@
         </div>
     </div>
 </template>
-
 <script>
 import { useVespaStore } from '@/stores/vespaStore';
 import { computed, onMounted, ref, watch } from 'vue';
@@ -62,14 +68,49 @@ export default {
         const vespaStore = useVespaStore();
         const isFilterPaneOpen = ref(false);
         const loading = computed(() => vespaStore.loadingObservations);
-        const table_observations = computed(() => vespaStore.table_observations);
         const totalObservations = computed(() => vespaStore.totalObservations);
         const nextPage = computed(() => vespaStore.nextPage);
         const previousPage = computed(() => vespaStore.previousPage);
-        const tableHeaders = ref(['ID', 'Location', 'Municipality']);
+        const table_observations = computed(() => vespaStore.table_observations);
+        const tableHeaders = ref([
+            { text: 'ID', value: 'id' },
+            { text: 'Gemeente', value: 'municipality_name' },
+            { text: 'Aangemaakt', value: 'created_datetime' },
+            { text: 'Observatie tijdstip', value: 'observation_datetime'},
+            { text: 'Bestreden tijdstip', value: 'eradication_datetime'},
+            { text: 'Soorten', value: 'species'}
+        ]);
+        const sortBy = ref(null);
+        const sortOrder = ref('asc');
+
+        const formatDate = (isoString, defaultValue = "") => {
+            if (!isoString) {
+                return defaultValue;
+            }
+            const date = new Date(isoString);
+            if (isNaN(date.getTime())) {
+                return defaultValue;
+            }
+            return new Intl.DateTimeFormat('nl-NL', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            }).format(date);
+        };
 
         const toggleFilterPane = () => {
             isFilterPaneOpen.value = !isFilterPaneOpen.value;
+        };
+        const toggleSort = (field) => {
+            if (sortBy.value === field) {
+                sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortBy.value = field;
+                sortOrder.value = 'asc';
+            }
+            vespaStore.getObservations(1, 25, sortBy.value, sortOrder.value);
         };
 
         const fetchPage = (direction) => {
@@ -92,9 +133,8 @@ export default {
         onMounted(() => {
             vespaStore.getObservations();
         });
-        return { table_observations, loading, fetchPage, nextPage, previousPage, totalObservations, tableHeaders, toggleFilterPane, isFilterPaneOpen, };
 
+        return { table_observations, loading, fetchPage, nextPage, previousPage, totalObservations, tableHeaders, toggleSort, toggleFilterPane, isFilterPaneOpen, sortBy, sortOrder, formatDate };
     }
 };
 </script>
-  

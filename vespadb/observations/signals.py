@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from django.db.models import Model
+from django.db.models import F, Model
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.utils import timezone
@@ -39,14 +39,11 @@ def handle_reservation_change(sender: type[Model], instance: Observation, **kwar
 @receiver(post_save, sender=Observation)
 def update_reserved_datetime(sender: type[Model], instance: Observation, created: bool, **kwargs: Any) -> None:
     """
-    Update reserved_datetime for an Observation after it has been saved.
+    Update reserved_datetime and handle reservation count on eradication update for an Observation after it has been saved.
 
-    Signal to set the reserved_datetime to the current time when a reservation is made,
-    if it was not already set. This ensures that every reservation has a datetime
-    marking when it was reserved.
-
-    This is triggered after the Observation instance has been saved, to ensure
-    that the reserved_by field has been properly updated and committed.
+    This signal sets the reserved_datetime to the current time when a reservation is made, if it was not already set.
+    Also, if eradication_datetime was not previously filled but is updated now, and if reserved_by was set,
+    it decrements the reservation count for the user that reserved the observation.
 
     Parameters
     ----------
@@ -58,3 +55,10 @@ def update_reserved_datetime(sender: type[Model], instance: Observation, created
     if instance.reserved_by and not instance.reserved_datetime:
         instance.reserved_datetime = timezone.now()
         instance.save(update_fields=["reserved_datetime"])
+
+    if not created:
+        old_instance = sender.objects.get(pk=instance.pk)
+        # Check if eradication_datetime was updated and reserved by is set
+        if not old_instance.eradication_datetime and instance.eradication_datetime and instance.reserved_by:
+            instance.reserved_by.reservation_count = F("reservation_count") - 1
+            instance.reserved_by.save(update_fields=["reservation_count"])

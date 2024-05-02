@@ -3,17 +3,18 @@
 import logging
 from typing import TYPE_CHECKING, Any
 
+from django.conf import settings
 from django.contrib.gis.geos import Point
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.request import Request
 
 from vespadb.observations.models import Municipality, Observation
+from vespadb.users.models import VespaUser
 
 if TYPE_CHECKING:
     from rest_framework.request import Request
-
-    from vespadb.users.models import VespaUser
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,7 @@ public_read_fields = [
     "province",
     "images",
     "public_domain",
+    "municipality_name",
 ]
 
 # Define the fields that authenticated users can read
@@ -79,6 +81,7 @@ user_read_fields = [
     "province",
     "anb",
     "public_domain",
+    "municipality_name",
 ]
 
 # Define the conditional fields for authenticated users with specific permissions
@@ -95,11 +98,27 @@ conditional_fields = [
 class ObservationSerializer(serializers.ModelSerializer):
     """Serializer for the full details of a Observation model instance."""
 
+    municipality_name = serializers.SerializerMethodField()
+
     class Meta:
         """Meta class for the ObservationSerializer."""
 
         model = Observation
         fields = "__all__"
+
+    def get_municipality_name(self, obj: Observation) -> str | None:
+        """
+        Retrieve the name of the municipality associated with the observation, if any.
+
+        Parameters
+        ----------
+        obj (Observation): The Observation instance.
+
+        Returns
+        -------
+        Optional[str]: The name of the municipality or None if not available.
+        """
+        return obj.municipality.name if obj.municipality else None
 
     def to_representation(self, instance: Observation) -> dict[str, Any]:
         """
@@ -110,6 +129,7 @@ class ObservationSerializer(serializers.ModelSerializer):
         """
         data: dict[str, Any] = super().to_representation(instance)
         request: Request = self.context.get("request")
+        data["municipality_name"] = self.get_municipality_name(instance)
         if request and request.user.is_authenticated:
             if not request.user.is_staff:
                 # Filter fields for non-staff users based on their permissions
@@ -183,6 +203,25 @@ class ObservationPatchSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [field for field in "__all__" if field not in user_read_fields]
 
+    def validate_reserved_by(self, value: VespaUser) -> VespaUser:
+        """
+        Validate that the user does not exceed the maximum number of allowed reservations.
+
+        :param value: The user instance to be set as reserved_by.
+        :return: The validated user instance.
+        :raises ValidationError: If the user exceeds the maximum number of reservations.
+        """
+        if value:
+            current_reservations_count = Observation.objects.filter(
+                reserved_by=value, eradication_datetime__isnull=True
+            ).count()
+            if current_reservations_count >= settings.MAX_RESERVATIONS:
+                logger.error(f"User {value.id} exceeded the reservation limit.")
+                raise ValidationError(
+                    f"This user has already reached the maximum number of reservations ({settings.MAX_RESERVATIONS})."
+                )
+        return value
+
     def update(self, instance: Observation, validated_data: dict[Any, Any]) -> Observation:
         """
         Update method to handle observation reservations.
@@ -209,7 +248,7 @@ class ObservationPatchSerializer(serializers.ModelSerializer):
 
         # Conditionally set `reserved_by` and `reserved_datetime` for all users
         if "reserved_by" in validated_data and instance.reserved_by is None:
-            validated_data["reserved_datetime"] = timezone.now()
+            validated_data["reserved_datetime"] = timezone.now() if validated_data["reserved_by"] else None
             instance.reserved_by = user
 
         # Prevent non-admin users from updating observations reserved by others

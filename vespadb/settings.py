@@ -35,14 +35,14 @@ if os.getenv("DJANGO_ENV") == "development":
         "POSTGRES_PORT": os.getenv("POSTGRES_PORT"),
         "REDIS_LOCATION": os.getenv("REDIS_LOCATION", "redis://redis:6379/1"),
         "CELERY_BROKER_URL": os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0"),
-        "REDIS_CACHE_EXPIRATION": os.getenv("REDIS_CACHE_EXPIRATION", "86400"),
         "REDIS_REFRESH_RATE_MIN": os.getenv("REDIS_REFRESH_RATE_MIN", "15"),
-        "SESSION_COOKIE_AGE": os.getenv("SESSION_COOKIE_AGE", "3600"),
         "DJANGO_DEBUG": os.getenv("DJANGO_DEBUG", "False"),
     }
 else:
     secrets = get_secret("vespadb-secrets")  # type: ignore[assignment]
 
+MAX_RESERVATIONS = 50
+RESERVATION_DURATION_DAYS = 5
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -108,11 +108,10 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 25,
 }
 
-SESSION_COOKIE_AGE = secrets["SESSION_COOKIE_AGE"]  # 1 hour
+SESSION_COOKIE_AGE = 3600
 SESSION_SAVE_EVERY_REQUEST = True
 SESSION_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_SECURE = False
-REDIS_CACHE_EXPIRATION = secrets["REDIS_CACHE_EXPIRATION"]  # 24 hours
 REDIS_REFRESH_RATE_MIN = secrets["REDIS_REFRESH_RATE_MIN"]  # default to 15 minutes
 
 DATABASES = {

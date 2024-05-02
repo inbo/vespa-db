@@ -16,11 +16,10 @@
 .filter-panel {
     position: absolute;
     top: 0;
-    right: -300px;
-    width: 300px;
+    right: 0;
     bottom: 0;
     background: #fff;
-    transition: right 0.3s;
+    transition: right 0.3s, width 0.3s ease-in-out;
     overflow-y: auto;
     z-index: 1040;
     padding: 1rem;
@@ -42,4 +41,9 @@
 
 .navbar {
     z-index: 1051;
+}
+
+.container-fluid {
+    position: relative;
+    /* Zorgt voor correcte relatieve positionering binnen de container */
 }

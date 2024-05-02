@@ -27,10 +27,11 @@ export const useVespaStore = defineStore('vespaStore', {
         viewMode: 'map',
         filters: {
             municipalities: [],
-            years: [],
             anbAreasActief: null,
             nestType: null,
             nestStatus: null,
+            min_observation_date: null,
+            max_observation_date: null,
         },
         isDetailsPaneOpen: false,
         user: {},
@@ -42,11 +43,12 @@ export const useVespaStore = defineStore('vespaStore', {
         },
     },
     actions: {
-        async getObservations(page = 1, page_size = 25) {
+        async getObservations(page = 1, page_size = 25, sortBy = null, sortOrder = 'asc') {
             this.loadingObservations = true;
+            const orderQuery = sortBy ? `&ordering=${sortOrder === 'asc' ? '' : '-'}${sortBy}` : '';
             const filterQuery = this.createFilterQuery();
             try {
-                const response = await ApiService.get(`/observations?${filterQuery}&page=${page}&page_size=${page_size}`);
+                const response = await ApiService.get(`/observations?${filterQuery}${orderQuery}&page=${page}&page_size=${page_size}`);
                 if (response.status === 200) {
                     this.table_observations = response.data.results;  // Updating observations instead
                     this.totalObservations = response.data.total;
@@ -87,10 +89,6 @@ export const useVespaStore = defineStore('vespaStore', {
                 filterQuery += `municipality_id=${this.filters.municipalities.join(',')}&`;
             }
 
-            if (this.filters.years.length > 0) {
-                filterQuery += `year_range=${this.filters.years.join(',')}&`;
-            }
-
             if (this.filters.anbAreasActief !== null && this.filters.anbAreasActief !== undefined) {
                 filterQuery += `anb=${this.filters.anbAreasActief}&`;
             }
@@ -102,15 +100,18 @@ export const useVespaStore = defineStore('vespaStore', {
             if (this.filters.nestStatus) {
                 filterQuery += `nest_status=${this.filters.nestStatus}&`;
             }
+            if (this.filters.min_observation_date) {
+                filterQuery += `min_observation_datetime=${this.filters.min_observation_date}&`;
+            }
+
+            if (this.filters.max_observation_date) {
+                filterQuery += `max_observation_datetime=${this.filters.max_observation_date}&`;
+            }
 
             return filterQuery.endsWith('&') ? filterQuery.slice(0, -1) : filterQuery;
         },
         async applyFilters(filters) {
-            this.filters.municipalities = filters.municipalities;
-            this.filters.years = filters.years;
-            this.filters.anbAreasActief = filters.anbAreasActief;
-            this.filters.nestType = filters.nestType;
-            this.filters.nestStatus = filters.nestStatus;
+            this.filters = { ...this.filters, ...filters };
         },
         async fetchMunicipalities() {
             try {
@@ -136,19 +137,19 @@ export const useVespaStore = defineStore('vespaStore', {
             return L.circleMarker(latlng, markerOptions).bindPopup(`Observatie ID: ${feature.properties.id}`);
         },
         async reserveObservation(observation) {
-            try {
-                const reservedObservation = {
-                    ...observation,
+            if (this.user.reservation_count < 50) {
+                const response = await ApiService.patch(`/observations/${observation.id}/`, {
                     reserved_by: this.user.id
-                };
-                const response = await ApiService.patch(`/observations/${observation.id}/`, reservedObservation);
+                });
                 if (response.status === 200) {
                     this.selectedObservation = { ...this.selectedObservation, ...response.data };
+                    // Perform authCheck to update reservation_count
+                    await this.authCheck();
                 } else {
                     throw new Error('Failed to reserve the observation');
                 }
-            } catch (error) {
-                console.error('Error reserving the observation:', error);
+            } else {
+                alert('You have reached the maximum number of reservations.');
             }
         },
         async cancelReservation(observation) {
@@ -259,7 +260,6 @@ export const useVespaStore = defineStore('vespaStore', {
                 .then((response) => {
                     const data = response.data;
                     if (data.isAuthenticated && data.user) {
-                        console.log(data.user)
                         this.user = data.user;
                         this.userMunicipalities = data.user.municipalities;
                         this.error = "";

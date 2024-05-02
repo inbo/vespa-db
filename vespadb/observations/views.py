@@ -8,7 +8,9 @@ from typing import TYPE_CHECKING, Any
 from django.contrib.gis.db.models.functions import Transform
 from django.contrib.gis.geos import GEOSGeometry
 from django.core.cache import cache
-from django.db.models import Q, QuerySet
+from django.core.exceptions import ValidationError
+from django.db.models import CharField, OuterRef, Q, QuerySet, Subquery, Value
+from django.db.models.functions import Coalesce
 from django.http import HttpResponse, JsonResponse
 from django.utils.timezone import now
 from django_filters.rest_framework import DjangoFilterBackend
@@ -33,10 +35,10 @@ from vespadb.observations.serializers import (
 
 if TYPE_CHECKING:
     from vespadb.users.models import VespaUser
-from django.conf import settings
 
 logger = logging.getLogger(__name__)
 BBOX_LENGTH = 4
+REDIS_CACHE_EXPIRATION = 86400
 
 
 class ObservationsViewSet(ModelViewSet):
@@ -49,9 +51,9 @@ class ObservationsViewSet(ModelViewSet):
         filters.OrderingFilter,
         DistanceToPointFilter,
     ]
+    ordering_fields = ["id", "municipality_name", "created_datetime", "modified_datetime"]
     filterset_fields = ["location", "created_datetime", "modified_datetime"]
     filterset_class = ObservationFilter
-    ordering_fields = ["created_datetime", "modified_datetime"]
     distance_filter_field = "location"
     distance_filter_convert_meters = True
 
@@ -103,7 +105,18 @@ class ObservationsViewSet(ModelViewSet):
         Admin users can see all observations. Authenticated users see their reservations and unreserved observations.
         Unauthenticated users see only unreserved observations.
         """
-        base_queryset: QuerySet = super().get_queryset()
+        base_queryset = super().get_queryset()
+        order_params = self.request.query_params.get("ordering", "")
+
+        if "municipality_name" in order_params:
+            base_queryset = base_queryset.annotate(
+                municipality_name=Coalesce(
+                    Subquery(Municipality.objects.filter(id=OuterRef("municipality_id")).values("name")[:1]),
+                    Value("Onbekend"),
+                    output_field=CharField(),
+                )
+            )
+
         user = self.request.user
 
         # Check if the user is an admin; if true, return all observations
@@ -142,7 +155,10 @@ class ObservationsViewSet(ModelViewSet):
         -------
         - Response: The HTTP response with the partial update result.
         """
-        return self.update(request, *args, partial=True, **kwargs)
+        try:
+            return super().partial_update(request, *args, **kwargs)
+        except ValidationError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     def perform_create(self, serializer: BaseSerializer) -> None:
         """
@@ -295,7 +311,7 @@ class ObservationsViewSet(ModelViewSet):
             for obs in queryset
         ]
         geojson_response = {"type": "FeatureCollection", "features": features}
-        cache.set(cache_key, geojson_response, settings.REDIS_CACHE_EXPIRATION)  # 24 hours
+        cache.set(cache_key, geojson_response, REDIS_CACHE_EXPIRATION)  # 24 hours
         return JsonResponse(geojson_response)
 
     @action(detail=False, methods=["post"], permission_classes=[IsAdminUser])

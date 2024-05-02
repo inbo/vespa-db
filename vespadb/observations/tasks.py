@@ -7,6 +7,7 @@ from typing import Any
 
 import requests
 from celery import Task, shared_task
+from django.conf import settings
 from django.db import models, transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -196,25 +197,27 @@ def fetch_and_update_observations(self: Task) -> None:
 @shared_task
 def cleanup_expired_reservations() -> None:
     """
-    Cleanup reservations that are older than 2 weeks.
+    Cleanup reservations that are older than 5 days.
 
-    Check for all observations If the reserved datetime is older than 2 weeks.
+    Check for all observations If the reserved datetime is older than 5 days.
     It will set both reserved_by and reserved_datetime to null.
     If an observation has reserved_datetime but no reserved_by, or vice versa, it will also set reserved_datetime/reserved_by to null.
 
     This task is intended to be run as a cron job to regularly clean up outdated reservation data.
     """
-    two_weeks_ago = (timezone.now() - timedelta(weeks=2)).replace(hour=0, minute=0, second=0, microsecond=0)
+    five_days_ago = (timezone.now() - timedelta(days=settings.RESERVATION_DURATION_DAYS)).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
     observations_to_update = Observation.objects.filter(
-        Q(reserved_datetime__lte=two_weeks_ago, reserved_by__isnull=False)
+        Q(reserved_datetime__lte=five_days_ago, reserved_by__isnull=False)
         | Q(reserved_datetime__isnull=False, reserved_by__isnull=True)
         | Q(reserved_datetime__isnull=True, reserved_by__isnull=False)
     )
 
     for observation in observations_to_update:
         if observation.reserved_datetime and observation.reserved_by:
-            # reservation is expired if reserved_datetime is older than two weeks
-            if observation.reserved_datetime <= two_weeks_ago:
+            # reservation is expired if reserved_datetime is older than 5 days
+            if observation.reserved_datetime <= five_days_ago:
                 observation.reserved_by = None
                 observation.reserved_datetime = None
         elif observation.reserved_datetime and not observation.reserved_by:

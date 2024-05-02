@@ -6,10 +6,12 @@
                 <i class="fas fa-sliders-h"></i> Filters
             </button>
             <div id="map" class="h-100"></div>
-            <div class="filter-panel" :class="{ 'panel-active': isFilterPaneOpen }">
+            <div class="filter-panel" 
+     :class="{'d-none': !isFilterPaneOpen, 'd-block': isFilterPaneOpen, 'col-12': true, 'col-md-6': true, 'col-lg-4': true}">
                 <FilterComponent />
             </div>
-            <div class="details-panel" :class="{ 'panel-active': isDetailsPaneOpen }">
+            <div class="details-panel" 
+     :class="{'d-none': !isDetailsPaneOpen, 'd-block': isDetailsPaneOpen, 'col-12': true, 'col-md-6': true, 'col-lg-4': true}">
                 <div class="d-flex justify-content-between align-items-center">
                     <h3>Observatie details</h3>
                     <button type="button" class="btn-close" aria-label="Close" @click="toggleDetailsPane"></button>
@@ -39,7 +41,7 @@ export default {
         const selectedObservation = computed(() => vespaStore.selectedObservation);
         const isEditing = computed(() => vespaStore.isEditing);
         const map = computed(() => vespaStore.map);
-        const markerClusterGroup = L.markerClusterGroup({ spiderfyOnMaxZoom: false, showCoverageOnHover: true, zoomToBoundsOnClick: true });
+        const markerClusterGroup = L.markerClusterGroup({ spiderfyOnMaxZoom: false, showCoverageOnHover: true, zoomToBoundsOnClick: true, disableClusteringAtZoom: 16 });
         const isLoggedIn = computed(() => vespaStore.isLoggedIn);
         const isDetailsPaneOpen = computed(() => vespaStore.isDetailsPaneOpen);
         const isFilterPaneOpen = ref(false);
@@ -99,6 +101,7 @@ export default {
             vespaStore.map = L.map('map', {
                 center: [50.8503, 4.3517],
                 zoom: 8,
+                maxZoom: 20,
                 layers: [
                     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                         attribution: 'Map data © OpenStreetMap contributors'

@@ -6,6 +6,7 @@ from difflib import get_close_matches
 from typing import Any, cast
 
 import pytz
+from django.conf import settings
 from django.contrib.gis.geos import Point
 from django.db.models import TextChoices
 
@@ -34,8 +35,6 @@ ENUMS_MAPPING: dict[str, type[TextChoices]] = {
     "Methode": EradicationMethodEnum,
     "Product": EradicationProductEnum,
 }
-
-ERADICATION_KEYWORD_LIST = ["BESTREDEN"]
 
 
 def map_attribute_to_enum(value: str, enum: type[TextChoices]) -> TextChoices | None:
@@ -177,7 +176,7 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
     if (
         "notes" in external_data
         and external_data["notes"]
-        and any(keyword in external_data["notes"].upper() for keyword in ERADICATION_KEYWORD_LIST)
+        and any(keyword in external_data["notes"].upper() for keyword in settings.ERADICATION_KEYWORD_LIST)
     ):
         mapped_data["eradication_datetime"] = observation_datetime_utc
         mapped_data["eradicator_name"] = "Gemeld als bestreden"

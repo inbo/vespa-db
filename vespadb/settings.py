@@ -43,6 +43,8 @@ else:
 
 MAX_RESERVATIONS = 50
 RESERVATION_DURATION_DAYS = 5
+ERADICATION_KEYWORD_LIST = ["BESTREDEN"]
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 

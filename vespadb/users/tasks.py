@@ -23,11 +23,14 @@ def audit_user_reservations() -> None:
 
     # Get all users with their actual reservation count from Observation table,
     # excluding observations where eradication_datetime is set
-    actual_counts = Observation.objects.filter(
-        eradication_datetime__isnull=True  # Only include active reservations
-    ).values("reserved_by").annotate(
-        actual_count=Count("id")
-    ).order_by()
+    actual_counts = (
+        Observation.objects.filter(
+            eradication_datetime__isnull=True  # Only include active reservations
+        )
+        .values("reserved_by")
+        .annotate(actual_count=Count("id"))
+        .order_by()
+    )
 
     # Update users where the actual reservation count does not match the recorded count
     for count_data in actual_counts:

@@ -7,12 +7,12 @@ from typing import Any
 
 import requests
 from celery import Task, shared_task
+from django.conf import settings
 from django.db import models, transaction
 from django.db.models import Q
 from django.utils import timezone
 from django.utils.timezone import now
 from dotenv import load_dotenv
-from django.conf import settings
 
 from vespadb.observations.models import Municipality, Observation, Province
 from vespadb.observations.observation_mapper import map_external_data_to_observation_model
@@ -205,7 +205,9 @@ def cleanup_expired_reservations() -> None:
 
     This task is intended to be run as a cron job to regularly clean up outdated reservation data.
     """
-    five_days_ago = (timezone.now() - timedelta(days=settings.RESERVATION_DURATION_DAYS)).replace(hour=0, minute=0, second=0, microsecond=0)
+    five_days_ago = (timezone.now() - timedelta(days=settings.RESERVATION_DURATION_DAYS)).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
     observations_to_update = Observation.objects.filter(
         Q(reserved_datetime__lte=five_days_ago, reserved_by__isnull=False)
         | Q(reserved_datetime__isnull=False, reserved_by__isnull=True)

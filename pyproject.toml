@@ -40,6 +40,7 @@ types-requests = "^2.31.0.20240406"
 types-pytz = "^2024.1.0.20240203"
 requests = "^2.31.0"
 boto3 = "^1.34.92"
+django-ratelimit = "^4.1.0"
 
 [tool.poetry.group.dev.dependencies]  # https://python-poetry.org/docs/master/managing-dependencies/
 coverage = { extras = ["toml"], version = ">=7.4.1" }

@@ -27,7 +27,6 @@ SYSTEM_USER_OBSERVATION_FIELDS_TO_UPDATE = [
     "observer_phone_number",
     "observer_email",
     "observer_name",
-    "observer_allows_contact",
     "observation_datetime",
     "wn_cluster_id",
     "wn_modified_datetime",

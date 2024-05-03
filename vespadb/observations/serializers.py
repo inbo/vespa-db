@@ -89,7 +89,6 @@ conditional_fields = [
     "observer_phone_number",
     "observer_email",
     "observer_name",
-    "observer_allows_contact",
     "observation_datetime",
 ]
 

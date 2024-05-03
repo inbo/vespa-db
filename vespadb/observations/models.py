@@ -215,7 +215,6 @@ class Observation(models.Model):
     observer_phone_number = models.CharField(max_length=20, blank=True, null=True)
     observer_email = models.EmailField(blank=True, null=True)
     observer_name = models.CharField(max_length=255, blank=True, null=True)
-    observer_allows_contact = models.BooleanField(default=False)
     observation_datetime = models.DateTimeField()
 
     wn_cluster_id = models.IntegerField(blank=True, null=True)

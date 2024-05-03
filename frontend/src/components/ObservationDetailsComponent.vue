@@ -88,7 +88,6 @@ export default {
             "notes",
             "modified_by",
             "created_by",
-            "duplicate",
             "reserved_by",
             "reserved_datetime",
             "eradication_datetime",

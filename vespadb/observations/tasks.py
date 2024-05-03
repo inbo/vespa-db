@@ -1,10 +1,8 @@
 """Fetch and update observations from waarnemingen API."""
-
 import logging
 import os
-from datetime import timedelta
-from typing import Any
-
+from datetime import timedelta, datetime
+from typing import Any, Set
 import requests
 from celery import Task, shared_task
 from django.conf import settings
@@ -108,7 +106,66 @@ def update_observations(observations_to_update: list[Observation], wn_ids_to_upd
     logger.info("Updating %s observations", len(existing_observations_to_update))
     Observation.objects.bulk_update(existing_observations_to_update, FIELDS_TO_UPDATE, batch_size=BATCH_SIZE)
 
+def fetch_nest_observations(token: str, cluster_id: int) -> list[int]:
+    """Fetch all observation IDs associated with a specific nest cluster."""
+    headers = {"Authorization": f"Bearer {token}"}
+    try:
+        response = requests.get(f"https://waarnemingen.be/api/v1/inbo/vespa-watch/nests/{cluster_id}", headers=headers, timeout=10)
+        response.raise_for_status()
+        nest_data = response.json()
+        return list(nest_data.get("observation_ids", []))
+    except Exception as e:
+        logger.exception(f"Error fetching nest observations: {e}")
+        return []
+    
+def update_observation_visibility(observations: list[Observation], observation_ids_to_hide: Set[int]) -> None:
+    """Update visibility of observations based on their registration dates."""
+    for observation in observations:
+        if observation.id in observation_ids_to_hide:
+            observation.visible = False
+    Observation.objects.bulk_update(observations, ["visible"], batch_size=BATCH_SIZE)
 
+def fetch_clusters(token: str, created_after: datetime) -> list[dict[str, Any]]:
+    """Fetch all clusters created after a specified date."""
+    # Format datetime to string without timezone information
+    created_after_str = created_after.strftime('%Y-%m-%dT%H:%M:%S')  # ISO 8601 format without timezone
+    url = f"https://waarnemingen.be/api/inbo/vespa-watch/nests/?created_after={created_after_str}"
+    headers = {"Authorization": f"Bearer {token}"}
+    clusters = []
+    while url:
+        try:
+            response = requests.get(url, headers=headers, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            clusters.extend(data['results'])
+            url = data.get('next')  # Handling pagination
+        except requests.RequestException as e:
+            logger.exception("Failed to fetch clusters: %s", e)
+            break
+    return clusters
+
+
+def manage_observations_visibility(token: str) -> None:
+    """Manage visibility of observations for a specific cluster based on their registration dates."""
+    two_weeks_ago = now() - timedelta(weeks=2)
+    created_after = two_weeks_ago.replace(microsecond=0)
+    clusters = fetch_clusters(token, created_after)
+    for cluster in clusters:
+        observation_ids = cluster.get("observation_ids", [])
+        if not observation_ids:
+            continue
+
+        observations = list(Observation.objects.filter(id__in=observation_ids))
+        observation_dates = {obs.id: obs.observation_datetime for obs in observations}
+
+        # Determine observations to hide
+        latest_date = max(observation_dates.values(), default=None)
+        if latest_date:
+            observation_ids_to_hide = {id for id, date in observation_dates.items() if date < latest_date}
+            update_observation_visibility(observations, observation_ids_to_hide)
+            logger.info(f"Updated visibility for {len(observation_ids_to_hide)} observations in cluster {cluster['id']}.")
+
+        
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def fetch_and_update_observations(self: Task) -> None:
     """Fetch observations from the waarnemingen API and update the database.
@@ -186,13 +243,16 @@ def fetch_and_update_observations(self: Task) -> None:
     with transaction.atomic():  # Ensure that all operations are atomic
         create_observations(observations_to_create)
         update_observations(observations_to_update, wn_ids_to_update)
-
+    
     logger.info(
         "Finished processing observations. Created: %s, Updated: %s",
         len(observations_to_create),
         len(observations_to_update),
     )
-
+    logger.info("start managing observations visibility")
+    manage_observations_visibility(modified_since)
+    logger.info("finished managing observations visibility")
+        
 
 @shared_task
 def free_expired_reservations_and_audit_reservation_count(self: Task) -> None:

@@ -107,6 +107,7 @@ def parse_datetime_with_timezone(
     return datetime_obj.astimezone(pytz.utc)
 
 
+
 def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dict[str, Any] | None:
     """
     Map external API data to a Django observation model fields, returning None if the data is incomplete or improperly formatted.
@@ -127,6 +128,7 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
         if observation_time is None:
             observation_time = "00:00:00"
         observation_datetime_utc = parse_datetime_with_timezone(external_data["date"], observation_time)
+        
         created_datetime = (
             datetime.fromisoformat(external_data["created"])
             .replace(tzinfo=pytz.timezone("Europe/Paris"))
@@ -148,7 +150,8 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
 
     mapped_enums = map_attributes_to_enums(external_data.get("attributes", []))
     validation_status = map_validation_status_to_enum(external_data.get("validation_status", "O"))
-
+    cluster_id = external_data.get("nest", {}).get("id")
+    
     mapped_data = {
         "wn_id": external_data["id"],
         "location": location,
@@ -160,6 +163,7 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
         "municipality": municipality,
         "province": municipality.province if municipality else None,
         "wn_validation_status": validation_status,
+        "wn_cluster_id": cluster_id,
         **mapped_enums,
     }
 
@@ -182,3 +186,6 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
         mapped_data["eradicator_name"] = "Gemeld als bestreden"
 
     return mapped_data
+
+
+# {"id": 307528981, "date": "2024-05-02", "time": "18:00:00", "point": {"type": "Point", "coordinates": [4.201448678577435, 51.09277954142448]}, "accuracy": 15, "species": 8807, "activity": 95, "life_stage": 1060, "method": 738, "validation_status": "O", "notes": "Selectieve val IVKB", "admin_notes": "", "created": "2024-05-03T11:31:40.177482", "modified": "2024-05-03T11:31:40.544976", "attributes": [], "nest": null, "photos": ["https://waarnemingen.be/media/photo/89176644.jpg"], "source": "Site", "user": {"id": 841779, "name": "Elke De Decker", "email": null, "phone_number": null}}

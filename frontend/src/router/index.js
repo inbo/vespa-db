@@ -16,6 +16,7 @@ const routes = [
     name: 'MapPage',
     component: MapPage
   },
+  { path: '/map/observation/:id', component: MapPage },
   {
     path: '/table',
     name: 'TableView',

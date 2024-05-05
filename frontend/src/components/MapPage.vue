@@ -21,11 +21,11 @@
         </div>
     </div>
 </template>
-
 <script>
 import { useVespaStore } from '@/stores/vespaStore';
 import 'leaflet/dist/leaflet.css';
 import { computed, onMounted, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import FilterComponent from './FilterComponent.vue';
 import NavbarComponent from './NavbarComponent.vue';
 import ObservationDetailsComponent from './ObservationDetailsComponent.vue';
@@ -38,6 +38,7 @@ export default {
     },
     setup() {
         const vespaStore = useVespaStore();
+        const router = useRouter();
         const selectedObservation = computed(() => vespaStore.selectedObservation);
         const isEditing = computed(() => vespaStore.isEditing);
         const map = computed(() => vespaStore.map);
@@ -59,6 +60,9 @@ export default {
         };
         const toggleDetailsPane = () => {
             vespaStore.isDetailsPaneOpen = !vespaStore.isDetailsPaneOpen;
+            if (!vespaStore.isDetailsPaneOpen) {
+                router.push({ path: '/map' });
+            }
         };
         const toggleFilterPanel = () => {
             isFilterPaneOpen.value = !isFilterPaneOpen.value;
@@ -66,7 +70,8 @@ export default {
         const openObservationDetails = async (properties) => {
             try {
                 await vespaStore.fetchObservationDetails(properties.id);
-                toggleDetailsPane();
+                vespaStore.isDetailsPaneOpen = true;
+                router.push({ path: `/map/observation/${properties.id}` });
             } catch (error) {
                 console.error("Failed to fetch observation details:", error);
             }

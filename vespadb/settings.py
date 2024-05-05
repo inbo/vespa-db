@@ -239,11 +239,11 @@ CELERY_RESULT_SERIALIZER = "json"
 
 CELERY_BEAT_SCHEDULE = {
     "fetch_and_update_observations": {
-        "task": "vespadb.observations.tasks.fetch_and_update_observations",
+        "task": "vespadb.observations.tasks.observation_sync.fetch_and_update_observations",
         "schedule": crontab(hour=4, minute=0),  # Runs every day at 04 AM
     },
     "remove_expired_reservations": {
-        "task": "vespadb.observations.tasks.free_expired_reservations_and_audit_reservation_count",
+        "task": "vespadb.observations.tasks.reservation_cleanup.free_expired_reservations_and_audit_reservation_count",
         "schedule": crontab(hour=7, minute=0),  # Runs every day at 05 AM
     },
 }

@@ -1,21 +1,20 @@
 """Fetch and update observations from waarnemingen API."""
 import logging
 import os
-from datetime import timedelta, datetime
-from typing import Any, Set
+from datetime import timedelta
+from typing import Any
+
 import requests
 from celery import Task, shared_task
-from django.conf import settings
 from django.db import models, transaction
-from django.db.models import Count, Q
 from django.utils import timezone
 from django.utils.timezone import now
 from dotenv import load_dotenv
 
 from vespadb.observations.models import Municipality, Observation, Province
-from vespadb.observations.observation_mapper import map_external_data_to_observation_model
+from vespadb.observations.tasks.observation_mapper import map_external_data_to_observation_model
 from vespadb.permissions import SYSTEM_USER_OBSERVATION_FIELDS_TO_UPDATE as FIELDS_TO_UPDATE
-from vespadb.users.models import UserType, VespaUser
+from vespadb.users.models import UserType
 from vespadb.users.utils import get_system_user
 
 load_dotenv()
@@ -23,7 +22,6 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 BATCH_SIZE = 500
-
 
 def get_oauth_token() -> str | None:
     """Authenticate with the waarnemingen API to obtain an OAuth2 token."""
@@ -47,7 +45,6 @@ def get_oauth_token() -> str | None:
     except requests.RequestException:
         logger.exception("Error obtaining OAuth2 token")
     return None
-
 
 def fetch_observations_page(token: str, modified_since: str, offset: int = 0) -> dict[str, Any]:
     """Fetch a page of observations."""
@@ -106,6 +103,7 @@ def update_observations(observations_to_update: list[Observation], wn_ids_to_upd
     logger.info("Updating %s observations", len(existing_observations_to_update))
     Observation.objects.bulk_update(existing_observations_to_update, FIELDS_TO_UPDATE, batch_size=BATCH_SIZE)
 
+
 def fetch_nest_observations(token: str, cluster_id: int) -> list[int]:
     """Fetch all observation IDs associated with a specific nest cluster."""
     headers = {"Authorization": f"Bearer {token}"}
@@ -117,45 +115,56 @@ def fetch_nest_observations(token: str, cluster_id: int) -> list[int]:
     except Exception as e:
         logger.exception(f"Error fetching nest observations: {e}")
         return []
-    
-def update_observation_visibility(observations: list[Observation], observation_ids_to_hide: Set[int]) -> None:
+
+
+def update_observation_visibility(observations: list[Observation], observation_ids_to_hide: set[int]) -> None:
     """Update visibility of observations based on their registration dates."""
     for observation in observations:
         if observation.id in observation_ids_to_hide:
             observation.visible = False
+        else:
+            observation.visible = True
     Observation.objects.bulk_update(observations, ["visible"], batch_size=BATCH_SIZE)
 
-def fetch_clusters(token: str, created_after: datetime) -> list[dict[str, Any]]:
-    """Fetch all clusters created after a specified date."""
-    # Format datetime to string without timezone information
-    created_after_str = created_after.strftime('%Y-%m-%dT%H:%M:%S')  # ISO 8601 format without timezone
-    url = f"https://waarnemingen.be/api/inbo/vespa-watch/nests/?created_after={created_after_str}"
+
+def fetch_clusters(token: str, limit: int = 100) -> list[dict[str, Any]]:
+    """Fetch all clusters from the waarnemingen API with pagination support."""
+    url = "https://waarnemingen.be/api/v1/inbo/vespa-watch/nests/"
     headers = {"Authorization": f"Bearer {token}"}
     clusters = []
+    offset = 0
+
     while url:
+        params = {
+            "limit": limit,
+            "offset": offset
+        }
         try:
-            response = requests.get(url, headers=headers, timeout=10)
+            response = requests.get(url, headers=headers, params=params, timeout=10)
             response.raise_for_status()
             data = response.json()
-            clusters.extend(data['results'])
+            clusters.extend(data.get('results', []))
             url = data.get('next')  # Handling pagination
+            offset += limit
         except requests.RequestException as e:
             logger.exception("Failed to fetch clusters: %s", e)
             break
+
     return clusters
 
 
 def manage_observations_visibility(token: str) -> None:
     """Manage visibility of observations for a specific cluster based on their registration dates."""
-    two_weeks_ago = now() - timedelta(weeks=2)
-    created_after = two_weeks_ago.replace(microsecond=0)
-    clusters = fetch_clusters(token, created_after)
+    clusters = fetch_clusters(token)
     for cluster in clusters:
         observation_ids = cluster.get("observation_ids", [])
         if not observation_ids:
             continue
 
-        observations = list(Observation.objects.filter(id__in=observation_ids))
+        observations = list(Observation.objects.filter(wn_id__in=observation_ids))
+        if len(observations) != len(observation_ids):
+            logger.info(f"Failed to fetch all observations for cluster {cluster['id']}.")
+
         observation_dates = {obs.id: obs.observation_datetime for obs in observations}
 
         # Determine observations to hide
@@ -163,9 +172,9 @@ def manage_observations_visibility(token: str) -> None:
         if latest_date:
             observation_ids_to_hide = {id for id, date in observation_dates.items() if date < latest_date}
             update_observation_visibility(observations, observation_ids_to_hide)
-            logger.info(f"Updated visibility for {len(observation_ids_to_hide)} observations in cluster {cluster['id']}.")
+            logger.info(f"Updated visibility for {len(observations)} observations in cluster {cluster['id']}.")
 
-        
+
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def fetch_and_update_observations(self: Task) -> None:
     """Fetch observations from the waarnemingen API and update the database.
@@ -243,98 +252,12 @@ def fetch_and_update_observations(self: Task) -> None:
     with transaction.atomic():  # Ensure that all operations are atomic
         create_observations(observations_to_create)
         update_observations(observations_to_update, wn_ids_to_update)
-    
+
     logger.info(
         "Finished processing observations. Created: %s, Updated: %s",
         len(observations_to_create),
         len(observations_to_update),
     )
     logger.info("start managing observations visibility")
-    manage_observations_visibility(modified_since)
+    manage_observations_visibility(token)
     logger.info("finished managing observations visibility")
-        
-
-@shared_task
-def free_expired_reservations_and_audit_reservation_count(self: Task) -> None:
-    """Free expired reservations and audit the reservation count for each observation."""
-    logger.info("start freeing expired reservations")
-    cleanup_expired_reservations()
-    logger.info("start auditing reservation count")
-    audit_user_reservations()
-    logger.info("finished freeing expired reservations and auditing reservation count")
-
-
-def cleanup_expired_reservations() -> None:
-    """
-    Cleanup reservations that are older than 5 days.
-
-    Check for all observations If the reserved datetime is older than 5 days.
-    It will set both reserved_by and reserved_datetime to null.
-    If an observation has reserved_datetime but no reserved_by, or vice versa, it will also set reserved_datetime/reserved_by to null.
-
-    This task is intended to be run as a cron job to regularly clean up outdated reservation data.
-    """
-    five_days_ago = (timezone.now() - timedelta(days=settings.RESERVATION_DURATION_DAYS)).replace(
-        hour=0, minute=0, second=0, microsecond=0
-    )
-    observations_to_update = Observation.objects.filter(
-        Q(reserved_datetime__lte=five_days_ago, reserved_by__isnull=False)
-        | Q(reserved_datetime__isnull=False, reserved_by__isnull=True)
-        | Q(reserved_datetime__isnull=True, reserved_by__isnull=False)
-    )
-
-    for observation in observations_to_update:
-        if observation.reserved_datetime and observation.reserved_by:
-            # reservation is expired if reserved_datetime is older than 5 days
-            if observation.reserved_datetime <= five_days_ago:
-                observation.reserved_by = None
-                observation.reserved_datetime = None
-        elif observation.reserved_datetime and not observation.reserved_by:
-            # safety check: if reserved_datetime is set but reserved_by is not, set both to None
-            observation.reserved_datetime = None
-        elif not observation.reserved_datetime and observation.reserved_by:
-            # safety check: if reserved_by is set but reserved_datetime is not, set both to None
-            observation.reserved_by = None
-
-        observation.save()
-
-    logger.info("Cleaned up reservation data for %s observations", len(observations_to_update))
-
-
-def audit_user_reservations() -> None:
-    """
-    Audit task to verify if the reservation counts of users match the actual reservations in the database.
-
-    This task counts the number of observations reserved by each user, excluding those where eradication has occurred,
-    and updates the reservation count if discrepancies are found.
-    """
-    logger.info("Starting audit of user reservations")
-
-    # Get all users with their actual reservation count from Observation table,
-    # excluding observations where eradication_datetime is set
-    actual_counts = (
-        Observation.objects.filter(
-            eradication_datetime__isnull=True  # Only include active reservations
-        )
-        .values("reserved_by")
-        .annotate(actual_count=Count("id"))
-        .order_by()
-    )
-
-    # Update users where the actual reservation count does not match the recorded count
-    for count_data in actual_counts:
-        user_id = count_data["reserved_by"]
-        if user_id is None:
-            continue  # Skip entries where reserved_by is None
-        actual_count = count_data["actual_count"]
-        user = VespaUser.objects.get(id=user_id)  # Retrieve user by ID
-
-        # Check if the current stored reservation count matches the actual count
-        if user.reservation_count != actual_count:
-            logger.info(
-                f"Updating reservation count for user {user.username}: {user.reservation_count} -> {actual_count}"
-            )
-            user.reservation_count = actual_count
-            user.save()
-
-    logger.info("Audit of user reservations completed")

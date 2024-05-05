@@ -5,8 +5,8 @@
             <button class="btn-filter-toggle" @click="toggleFilterPane">
                 <i class="fas fa-sliders-h"></i> Filters
             </button>
-            <div class="filter-panel" 
-     :class="{'d-none': !isFilterPaneOpen, 'd-block': isFilterPaneOpen, 'col-12': true, 'col-md-6': true, 'col-lg-4': true}">
+            <div class="filter-panel"
+                :class="{'d-none': !isFilterPaneOpen, 'd-block': isFilterPaneOpen, 'col-12': true, 'col-md-6': true, 'col-lg-4': true}">
                 <FilterComponent />
             </div>
             <div class="container mt-4">
@@ -29,7 +29,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr v-for="observation in table_observations" :key="observation.id">
+                                <tr v-for="observation in table_observations" :key="observation.id" @click="openObservationDetails(observation)">
                                     <td>{{ observation.id }}</td>
                                     <td>{{ observation.municipality_name }}</td>
                                     <td>{{ formatDate(observation.created_datetime) }}</td>
@@ -49,23 +49,36 @@
                         </button>
                     </div>
                 </div>
+                <div class="details-panel mt-4"
+                    :class="{ 'd-none': !isDetailsPaneOpen, 'd-block': isDetailsPaneOpen, 'col-12': true, 'col-md-6': true, 'col-lg-4': true }">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h3>Observatie details</h3>
+                        <button type="button" class="btn-close" aria-label="Close" @click="toggleDetailsPane"></button>
+                    </div>
+                    <ObservationDetailsComponent />
+                </div>
             </div>
         </div>
     </div>
 </template>
+
 <script>
 import { useVespaStore } from '@/stores/vespaStore';
 import { computed, onMounted, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import FilterComponent from './FilterComponent.vue';
 import NavbarComponent from './NavbarComponent.vue';
+import ObservationDetailsComponent from './ObservationDetailsComponent.vue';
 
 export default {
     components: {
         NavbarComponent,
         FilterComponent,
+        ObservationDetailsComponent,
     },
     setup() {
         const vespaStore = useVespaStore();
+        const router = useRouter();
         const isFilterPaneOpen = ref(false);
         const loading = computed(() => vespaStore.loadingObservations);
         const totalObservations = computed(() => vespaStore.totalObservations);
@@ -76,12 +89,13 @@ export default {
             { text: 'ID', value: 'id' },
             { text: 'Gemeente', value: 'municipality_name' },
             { text: 'Aangemaakt', value: 'created_datetime' },
-            { text: 'Observatie tijdstip', value: 'observation_datetime'},
-            { text: 'Bestreden tijdstip', value: 'eradication_datetime'},
-            { text: 'Soorten', value: 'species'}
+            { text: 'Observatie tijdstip', value: 'observation_datetime' },
+            { text: 'Bestreden tijdstip', value: 'eradication_datetime' },
+            { text: 'Soorten', value: 'species' }
         ]);
         const sortBy = ref(null);
         const sortOrder = ref('asc');
+        const isDetailsPaneOpen = computed(() => vespaStore.isDetailsPaneOpen);
 
         const formatDate = (isoString, defaultValue = "") => {
             if (!isoString) {
@@ -103,6 +117,7 @@ export default {
         const toggleFilterPane = () => {
             isFilterPaneOpen.value = !isFilterPaneOpen.value;
         };
+
         const toggleSort = (field) => {
             if (sortBy.value === field) {
                 sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc';
@@ -126,6 +141,23 @@ export default {
             }
         };
 
+        const openObservationDetails = async (observation) => {
+            try {
+                await vespaStore.fetchObservationDetails(observation.id);
+                vespaStore.isDetailsPaneOpen = true;
+                router.push({ path: `/table/observation/${observation.id}` });
+            } catch (error) {
+                console.error("Failed to fetch observation details:", error);
+            }
+        };
+
+        const toggleDetailsPane = () => {
+            vespaStore.isDetailsPaneOpen = !vespaStore.isDetailsPaneOpen;
+            if (!vespaStore.isDetailsPaneOpen) {
+                router.push({ path: '/table' });
+            }
+        };
+
         watch(() => vespaStore.filters, (newFilters) => {
             vespaStore.getObservations();
         }, { deep: true });
@@ -134,7 +166,24 @@ export default {
             vespaStore.getObservations();
         });
 
-        return { table_observations, loading, fetchPage, nextPage, previousPage, totalObservations, tableHeaders, toggleSort, toggleFilterPane, isFilterPaneOpen, sortBy, sortOrder, formatDate };
+        return {
+            table_observations,
+            loading,
+            fetchPage,
+            nextPage,
+            previousPage,
+            totalObservations,
+            tableHeaders,
+            toggleSort,
+            toggleFilterPane,
+            isFilterPaneOpen,
+            sortBy,
+            sortOrder,
+            formatDate,
+            openObservationDetails,
+            isDetailsPaneOpen,
+            toggleDetailsPane
+        };
     }
 };
 </script>

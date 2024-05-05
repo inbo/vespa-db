@@ -108,34 +108,40 @@ export default {
       name: municipality.name,
       id: municipality.id
     })));
+    
     const emitFilterUpdate = () => {
       const minDateCET = minDate.value ? DateTime.fromJSDate(minDate.value).setZone('Europe/Paris').toFormat('yyyy-MM-dd\'T\'HH:mm:ss') : null;
       const maxDateCET = maxDate.value ? DateTime.fromJSDate(maxDate.value).setZone('Europe/Paris').toFormat('yyyy-MM-dd\'T\'HH:mm:ss') : null;
 
       vespaStore.applyFilters({
-        municipalities: selectedMunicipalities.value,
-        provinces: selectedProvinces.value,
+        municipalities: selectedMunicipalities.value.length > 0 ? selectedMunicipalities.value : [],
+        provinces: selectedProvinces.value.length > 0 ? selectedProvinces.value : [],
         anbAreasActief: anbAreasActief.value,
-        nestType: selectedNestType.value,
-        nestStatus: selectedNestStatus.value,
+        nestType: selectedNestType.value.length > 0 ? selectedNestType.value : null,
+        nestStatus: selectedNestStatus.value.length > 0 ? selectedNestStatus.value : null,
         min_observation_date: minDateCET,
         max_observation_date: maxDateCET
       });
     };
+
     const toggleMenu1 = () => {
       menu1.value = !menu1.value;
     };
+
     const closeMenu1 = () => {
       menu1.value = false;
       emitFilterUpdate();
     };
+
     const toggleMenu2 = () => {
       menu2.value = !menu2.value;
     };
+
     const closeMenu2 = () => {
       menu2.value = false;
       emitFilterUpdate();
     };
+
     watch([minDate, maxDate], emitFilterUpdate, { immediate: true });
 
     watch([selectedMunicipalities, selectedProvinces, selectedNestType, selectedNestStatus, anbAreasActief, selectedObservationStart, selectedObservationEnd], () => {
@@ -146,6 +152,7 @@ export default {
       vespaStore.fetchMunicipalities();
       vespaStore.fetchProvinces();
     });
+
     return {
       municipalities,
       provinces,
@@ -172,7 +179,6 @@ export default {
       toggleMenu2,
       closeMenu2
     };
-
   }
 };
 </script>

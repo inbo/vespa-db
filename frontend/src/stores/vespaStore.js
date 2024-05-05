@@ -52,7 +52,7 @@ export const useVespaStore = defineStore('vespaStore', {
             try {
                 const response = await ApiService.get(`/observations?${filterQuery}${orderQuery}&page=${page}&page_size=${page_size}`);
                 if (response.status === 200) {
-                    this.table_observations = response.data.results;  // Updating observations instead
+                    this.table_observations = response.data.results;
                     this.totalObservations = response.data.total;
                     this.nextPage = response.data.next;
                     this.previousPage = response.data.previous;
@@ -86,36 +86,37 @@ export const useVespaStore = defineStore('vespaStore', {
             }
         },
         createFilterQuery() {
-            let filterQuery = '';
+            const params = [];
 
             if (this.filters.municipalities.length > 0) {
-                filterQuery += `municipality_id=${this.filters.municipalities.join(',')}&`;
+                params.push(`municipality_id=${this.filters.municipalities.join(',')}`);
             }
 
             if (this.filters.provinces.length > 0) {
-                filterQuery += `province_id=${this.filters.provinces.join(',')}&`;
+                params.push(`province_id=${this.filters.provinces.join(',')}`);
             }
 
-            if (this.filters.anbAreasActief !== null && this.filters.anbAreasActief !== undefined) {
-                filterQuery += `anb=${this.filters.anbAreasActief}&`;
+            if (this.filters.anbAreasActief !== null) {
+                params.push(`anb=${this.filters.anbAreasActief}`);
             }
 
             if (this.filters.nestType) {
-                filterQuery += `nest_type=${this.filters.nestType}&`;
+                params.push(`nest_type=${this.filters.nestType}`);
             }
 
             if (this.filters.nestStatus) {
-                filterQuery += `nest_status=${this.filters.nestStatus}&`;
+                params.push(`nest_status=${this.filters.nestStatus}`);
             }
+
             if (this.filters.min_observation_date) {
-                filterQuery += `min_observation_datetime=${this.filters.min_observation_date}&`;
+                params.push(`min_observation_datetime=${this.filters.min_observation_date}`);
             }
 
             if (this.filters.max_observation_date) {
-                filterQuery += `max_observation_datetime=${this.filters.max_observation_date}&`;
+                params.push(`max_observation_datetime=${this.filters.max_observation_date}`);
             }
 
-            return filterQuery.endsWith('&') ? filterQuery.slice(0, -1) : filterQuery;
+            return params.length > 0 ? params.join('&') : '';
         },
         async applyFilters(filters) {
             this.filters = { ...this.filters, ...filters };

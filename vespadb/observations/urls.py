@@ -3,7 +3,7 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from vespadb.observations.views import MunicipalityViewSet, ObservationsViewSet
+from vespadb.observations.views import MunicipalityViewSet, ObservationsViewSet, ProvinceViewSet
 
 app_name = "observations"
 
@@ -11,6 +11,7 @@ app_name = "observations"
 router = DefaultRouter()
 router.register(r"observations", ObservationsViewSet)
 router.register(r"municipalities", MunicipalityViewSet)
+router.register(r"provinces", ProvinceViewSet)
 
 # The API URLs are now determined automatically by the router.
 urlpatterns = [

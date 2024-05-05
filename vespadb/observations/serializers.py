@@ -290,3 +290,12 @@ class MunicipalitySerializer(serializers.ModelSerializer):
 
         model = Municipality
         fields = ["id", "name"]
+
+class ProvinceSerializer(serializers.ModelSerializer):
+    """Serializer for the Province model."""
+
+    class Meta:
+        """Meta class for the ProvinceSerializer."""
+
+        model = Municipality
+        fields = ["id", "name"]

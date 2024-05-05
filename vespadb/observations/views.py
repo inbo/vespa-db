@@ -28,10 +28,11 @@ from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_gis.filters import DistanceToPointFilter
 
 from vespadb.observations.filters import ObservationFilter
-from vespadb.observations.models import Municipality, Observation
+from vespadb.observations.models import Municipality, Observation, Province
 from vespadb.observations.serializers import (
     MunicipalitySerializer,
     ObservationPatchSerializer,
+    ProvinceSerializer,
     ObservationSerializer,
 )
 
@@ -385,6 +386,19 @@ class MunicipalityViewSet(ReadOnlyModelViewSet):
 
     queryset = Municipality.objects.all().order_by("name")
     serializer_class = MunicipalitySerializer
+    pagination_class = None
+
+    def get_permissions(self) -> list[BasePermission]:
+        """Determine the set of permissions that apply to the current action."""
+        if self.request.method == "GET":
+            return [AllowAny()]
+        return [IsAdminUser()]
+
+class ProvinceViewSet(ReadOnlyModelViewSet):
+    """ViewSet for the Province model."""
+
+    queryset = Province.objects.all().order_by("name")
+    serializer_class = ProvinceSerializer
     pagination_class = None
 
     def get_permissions(self) -> list[BasePermission]:

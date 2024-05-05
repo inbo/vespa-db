@@ -12,6 +12,7 @@ export const useVespaStore = defineStore('vespaStore', {
         loading: false,
         error: null,
         municipalities: [],
+        provinces: [],
         selectedMunicipalities: [],
         observations: [],
         table_observations: [],
@@ -27,6 +28,7 @@ export const useVespaStore = defineStore('vespaStore', {
         viewMode: 'map',
         filters: {
             municipalities: [],
+            provinces: [],
             anbAreasActief: null,
             nestType: null,
             nestStatus: null,
@@ -90,6 +92,10 @@ export const useVespaStore = defineStore('vespaStore', {
                 filterQuery += `municipality_id=${this.filters.municipalities.join(',')}&`;
             }
 
+            if (this.filters.provinces.length > 0) {
+                filterQuery += `province_id=${this.filters.provinces.join(',')}&`;
+            }
+
             if (this.filters.anbAreasActief !== null && this.filters.anbAreasActief !== undefined) {
                 filterQuery += `anb=${this.filters.anbAreasActief}&`;
             }
@@ -113,6 +119,18 @@ export const useVespaStore = defineStore('vespaStore', {
         },
         async applyFilters(filters) {
             this.filters = { ...this.filters, ...filters };
+        },
+        async fetchProvinces() {
+            try {
+                const response = await ApiService.get('/provinces/');
+                if (response.status === 200) {
+                    this.provinces = response.data;
+                } else {
+                    console.error('Failed to fetch provinces: Status Code', response.status);
+                }
+            } catch (error) {
+                console.error('Error fetching provinces:', error);
+            }
         },
         async fetchMunicipalities() {
             try {

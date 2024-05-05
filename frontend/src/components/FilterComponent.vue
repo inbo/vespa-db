@@ -5,6 +5,14 @@
         <div class="col-12">
           <h3>Filters</h3>
         </div>
+        <div class="col-12">
+          <v-autocomplete v-model="selectedProvinces" :items="provinces.length ? provinces.map(province => ({
+            title: province.name,
+            value: province.id
+          })) : []" item-text="title" item-value="value" label="provincie(s)" multiple chips dense solo
+            @change="emitFilterUpdate">
+          </v-autocomplete>
+        </div>
         <div class="col-12" v-if="formattedMunicipalities.length > 0">
           <v-autocomplete v-model="selectedMunicipalities" :items="municipalities.length ? municipalities.map(municipality => ({
             title: municipality.name,
@@ -67,7 +75,9 @@ export default {
 
     const loading = computed(() => vespaStore.loadingObservations);
     const municipalities = computed(() => vespaStore.municipalities);
+    const provinces = computed(() => vespaStore.provinces);
     const selectedMunicipalities = ref([]);
+    const selectedProvinces = ref([]);
     const selectedNestType = ref([]);
     const selectedNestStatus = ref([]);
     const anbAreasActief = ref(null);
@@ -104,6 +114,7 @@ export default {
 
       vespaStore.applyFilters({
         municipalities: selectedMunicipalities.value,
+        provinces: selectedProvinces.value,
         anbAreasActief: anbAreasActief.value,
         nestType: selectedNestType.value,
         nestStatus: selectedNestStatus.value,
@@ -127,14 +138,40 @@ export default {
     };
     watch([minDate, maxDate], emitFilterUpdate, { immediate: true });
 
-    watch([selectedMunicipalities, selectedNestType, selectedNestStatus, anbAreasActief, selectedObservationStart, selectedObservationEnd], () => {
+    watch([selectedMunicipalities, selectedProvinces, selectedNestType, selectedNestStatus, anbAreasActief, selectedObservationStart, selectedObservationEnd], () => {
       emitFilterUpdate();
     }, { deep: true });
 
     onMounted(() => {
       vespaStore.fetchMunicipalities();
+      vespaStore.fetchProvinces();
     });
-    return { municipalities, loading, formattedMunicipalities, nestType, minDate, selectedObservationStart, selectedObservationEnd, nestStatus, anbAreaOptions, selectedMunicipalities, selectedNestType, selectedNestStatus, anbAreasActief, emitFilterUpdate, minDate, maxDate, menu1, menu2, toggleMenu1, closeMenu1, toggleMenu2, closeMenu2 };
+    return {
+      municipalities,
+      provinces,
+      loading,
+      formattedMunicipalities,
+      nestType,
+      minDate,
+      selectedObservationStart,
+      selectedObservationEnd,
+      nestStatus,
+      anbAreaOptions,
+      selectedMunicipalities,
+      selectedProvinces,
+      selectedNestType,
+      selectedNestStatus,
+      anbAreasActief,
+      emitFilterUpdate,
+      minDate,
+      maxDate,
+      menu1,
+      menu2,
+      toggleMenu1,
+      closeMenu1,
+      toggleMenu2,
+      closeMenu2
+    };
 
   }
 };

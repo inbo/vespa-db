@@ -188,6 +188,38 @@ export const useVespaStore = defineStore('vespaStore', {
                 console.error('Error canceling the reservation:', error);
             }
         },
+        async markObservationAsEradicated(observationId) {
+            try {
+                const response = await ApiService.patch(`/observations/${observationId}/`, {
+                    eradication_datetime: new Date().toISOString()
+                });
+                if (response.status === 200) {
+                    this.selectedObservation = response.data;
+                    return response.data;
+                } else {
+                    throw new Error('Failed to mark observation as eradicated');
+                }
+            } catch (error) {
+                console.error('Error marking observation as eradicated:', error);
+                throw error;
+            }
+        },
+        async markObservationAsNotEradicated(observationId) {
+            try {
+                const response = await ApiService.patch(`/observations/${observationId}/`, {
+                    eradication_datetime: null
+                });
+                if (response.status === 200) {
+                    this.selectedObservation = response.data;
+                    return response.data;
+                } else {
+                    throw new Error('Failed to mark observation as not eradicated');
+                }
+            } catch (error) {
+                console.error('Error marking observation as not eradicated:', error);
+                throw error;
+            }
+        },
         async fetchObservationDetails(observationId) {
             try {
                 const response = await ApiService.get(`/observations/${observationId}`);

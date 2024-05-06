@@ -87,17 +87,23 @@
                     </div>
                 </dl>
 
-                <div>
-                    <button v-if="isLoggedIn && canEdit && !isEditing" class="btn btn-success me-2"
-                        @click="startEdit">Wijzig</button>
-                    <button v-if="isLoggedIn && canEdit && !isEditing && !selectedObservation.reserved_by && canReserve"
-                        class="btn btn-success me-2" @click="reserveObservation">Reserveren</button>
+                <div v-if="isLoggedIn && canEdit && !isEditing">
+                    <button class="btn btn-success me-2" @click="startEdit">Wijzig</button>
+                    <button v-if="!selectedObservation.reserved_by && canReserve" class="btn btn-success me-2"
+                        @click="reserveObservation">Reserveren</button>
                     <button v-if="isUserReserver" class="btn btn-danger me-2" @click="cancelReservation">Reservatie
                         annuleren</button>
                     <button v-if="isEditing && canEdit" class="btn btn-success me-2"
                         @click="confirmUpdate">Bevestig</button>
                     <button v-if="isEditing && canEdit" class="btn btn-secondary" @click="cancelEdit">Annuleer</button>
+                    <button v-if="isLoggedIn && canEdit && !isEditing && !selectedObservation.eradication_datetime"
+                        class="btn btn-success me-2" @click="markObservationAsEradicated">Nest markeren als
+                        bestreden</button>
+                    <button v-if="isLoggedIn && canEdit && !isEditing && selectedObservation.eradication_datetime"
+                        class="btn btn-danger me-2" @click="markObservationAsNotEradicated">Nest markeren als
+                        onbestreden</button>
                 </div>
+
             </div>
         </div>
     </div>
@@ -216,6 +222,19 @@ export default {
                 return null; // Niet gereserveerd
             }
         });
+        const markObservationAsEradicated = () => {
+            if (selectedObservation.value) {
+                vespaStore.markObservationAsEradicated(selectedObservation.value.id);
+            }
+        };
+        const markObservationAsNotEradicated = () => {
+            if (selectedObservation.value) {
+                vespaStore.markObservationAsNotEradicated(selectedObservation.value.id);
+            }
+        };
+        const canMarkAsEradicated = computed(() => {
+            return vespaStore.isLoggedIn && vespaStore.canEditObservation(selectedObservation.value);
+        });
         const closeDetails = () => {
             emit('closeDetails');
             vespaStore.isDetailsPaneOpen = false;
@@ -302,7 +321,10 @@ export default {
             nestLocationEnum,
             nestTypeEnum,
             getEnumLabel,
-            reservationStatus
+            reservationStatus,
+            canMarkAsEradicated,
+            markObservationAsEradicated,
+            markObservationAsNotEradicated
         };
     },
 };

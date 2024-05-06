@@ -200,14 +200,22 @@ export const useVespaStore = defineStore('vespaStore', {
                 console.error('Error fetching observation details:', error);
             }
         },
-        async updateObservation() {
+        formatToISO8601(datetime) {
+            if (!datetime) return null;
+            const date = new Date(datetime);
+            return date.toISOString();
+        },
+        async updateObservation(observation) {
+            observation.observation_datetime = this.formatToISO8601(observation.observation_datetime);
+            observation.eradication_datetime = this.formatToISO8601(observation.eradication_datetime);
+
             try {
-                const response = await ApiService.patch(`/observations/${this.selectedObservation.id}/`, this.selectedObservation);
-                if (response.status !== 200) {
+                const response = await ApiService.patch(`/observations/${observation.id}/`, observation);
+                if (response.status === 200) {
+                    this.selectedObservation = response.data;
+                } else {
                     throw new Error('Network response was not ok');
                 }
-                const data = await response.json();
-                this.isEditing = false;
             } catch (error) {
                 console.error('Error when updating the observation:', error);
             }

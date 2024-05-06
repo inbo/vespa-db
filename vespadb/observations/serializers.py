@@ -2,6 +2,7 @@
 
 import logging
 from typing import TYPE_CHECKING, Any
+import datetime
 
 from django.conf import settings
 from django.contrib.gis.geos import Point
@@ -11,6 +12,7 @@ from rest_framework import serializers
 from rest_framework.request import Request
 
 from vespadb.observations.models import Municipality, Observation
+from vespadb.observations.helpers import parse_and_convert_to_utc, parse_and_convert_to_cet
 from vespadb.users.models import VespaUser
 
 if TYPE_CHECKING:
@@ -126,6 +128,15 @@ class ObservationSerializer(serializers.ModelSerializer):
         :return: A dictionary representation of the observation instance with filtered fields.
         """
         data: dict[str, Any] = super().to_representation(instance)
+        # Convert datetime fields to CET for outgoing representation
+        datetime_fields = [
+            "created_datetime", "modified_datetime", "wn_modified_datetime", "wn_created_datetime",
+            "reserved_datetime", "observation_datetime", "eradication_datetime"
+        ]
+        for field in datetime_fields:
+            if data.get(field):
+                data[field] = parse_and_convert_to_cet(data[field]).isoformat()
+
         request: Request = self.context.get("request")
         data["municipality_name"] = self.get_municipality_name(instance)
         if request and request.user.is_authenticated:
@@ -200,6 +211,48 @@ class ObservationPatchSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [field for field in "__all__" if field not in user_read_fields]
 
+    def to_representation(self, instance: Observation) -> dict[str, Any]:
+        data = super().to_representation(instance)
+
+        # Convert datetime fields to CET for outgoing representation
+        datetime_fields = [
+            "created_datetime", "modified_datetime", "wn_modified_datetime", "wn_created_datetime",
+            "reserved_datetime", "observation_datetime", "eradication_datetime"
+        ]
+        for field in datetime_fields:
+            if data.get(field):
+                data[field] = parse_and_convert_to_cet(data[field]).isoformat()
+        return data #type: ignore[no-any-return]
+
+
+    def to_internal_value(self, data: dict[str, Any]) -> dict[str, Any]:
+        """
+        Convert the incoming data to a Python native representation.
+
+        Args:
+            data (dict): The incoming data.
+
+        Returns:
+            dict: The Python native representation.
+        """
+        internal_data = super().to_internal_value(data)
+
+        # Convert datetime fields to UTC
+        datetime_fields = ["created_datetime", "modified_datetime", "wn_modified_datetime", "wn_created_datetime", "reserved_datetime","observation_datetime", "eradication_datetime"]
+        for field in datetime_fields:
+            if field in data:
+                value = data[field]
+                if value in ("", None):
+                    internal_data[field] = None
+                else:
+                    try:
+                        logger.info("Parsing and converting datetime field %s", field)
+                        logger.info("value: %s", value)
+                        internal_data[field] = parse_and_convert_to_utc(value)
+                    except (ValueError, TypeError):
+                        raise serializers.ValidationError({field: [f"Invalid datetime format for {field}."]})
+        return internal_data # type: ignore[no-any-return]
+    
     def validate_reserved_by(self, value: VespaUser) -> VespaUser:
         """
         Validate that the user does not exceed the maximum number of allowed reservations.

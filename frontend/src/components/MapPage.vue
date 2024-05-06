@@ -58,15 +58,18 @@ export default {
         const cancelEdit = () => {
             isEditing.value = false;
         };
+
         const toggleDetailsPane = () => {
             vespaStore.isDetailsPaneOpen = !vespaStore.isDetailsPaneOpen;
             if (!vespaStore.isDetailsPaneOpen) {
                 router.push({ path: '/map' });
             }
         };
+
         const toggleFilterPanel = () => {
             isFilterPaneOpen.value = !isFilterPaneOpen.value;
         };
+
         const openObservationDetails = async (properties) => {
             try {
                 await vespaStore.fetchObservationDetails(properties.id);
@@ -86,11 +89,11 @@ export default {
                         return marker;
                     }
                 });
-
                 markerClusterGroup.addLayer(geoJsonLayer);
                 vespaStore.map.addLayer(markerClusterGroup);
             });
         };
+
         const clearAndupdateMarkers = () => {
             markerClusterGroup.clearLayers();
             vespaStore.observations = [];
@@ -101,19 +104,40 @@ export default {
             clearAndupdateMarkers();
         }, { deep: true });
 
-        onMounted(() => {
+        onMounted(async () => {
             vespaStore.fetchMunicipalities();
-            vespaStore.map = L.map('map', {
-                center: [50.8503, 4.3517],
-                zoom: 9,
-                maxZoom: 20,
-                layers: [
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                        attribution: 'Map data © OpenStreetMap contributors'
-                    }),
-                ]
-            });
-            if (vespaStore.observations.length === 0) {
+            // Check if there is an observation id in the URL
+            const observationId = router.currentRoute.value.params.id;
+            if (observationId) {
+                await vespaStore.fetchObservationDetails(observationId);
+                const location = selectedObservation.value.location;
+                const [longitude, latitude] = location
+                    .slice(location.indexOf("(") + 1, location.indexOf(")"))
+                    .split(" ")
+                    .map(parseFloat);
+
+                vespaStore.map = L.map('map', {
+                    center: [latitude, longitude],
+                    zoom: 16,
+                    maxZoom: 20,
+                    layers: [
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            attribution: 'Map data © OpenStreetMap contributors'
+                        }),
+                    ]
+                });
+                updateMarkers();
+            } else {
+                vespaStore.map = L.map('map', {
+                    center: [50.8503, 4.3517],
+                    zoom: 9,
+                    maxZoom: 20,
+                    layers: [
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            attribution: 'Map data © OpenStreetMap contributors'
+                        }),
+                    ]
+                });
                 updateMarkers();
             }
         });

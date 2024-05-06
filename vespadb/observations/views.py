@@ -117,19 +117,7 @@ class ObservationsViewSet(ModelViewSet):
                     output_field=CharField(),
                 )
             )
-
-        user = self.request.user
-
-        # Check if the user is an admin; if true, return all observations
-        if user.is_staff:
-            return base_queryset
-
-        # For authenticated users, filter by their reservations or non-reserved observations
-        if user.is_authenticated:
-            return base_queryset.filter(Q(reserved_by=None) | Q(reserved_by=user))
-
-        # Unauthenticated users see only non-reserved observations
-        return base_queryset.filter(reserved_by=None)
+        return base_queryset
 
     def perform_update(self, serializer: BaseSerializer) -> None:
         """

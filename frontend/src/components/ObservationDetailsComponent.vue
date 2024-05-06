@@ -20,9 +20,11 @@
 
                     <dt class="col-sm-6">Nest Hoogte</dt>
                     <dd class="col-sm-9">
-                        <span v-if="!isEditing">{{ getEnumLabel(nestHeightEnum, selectedObservation.nest_height) }}</span>
+                        <span v-if="!isEditing">{{ getEnumLabel(nestHeightEnum, selectedObservation.nest_height)
+                            }}</span>
                         <select v-else v-model="editableObservation.nest_height" class="form-control">
-                            <option v-for="(label, value) in nestHeightEnum" :key="value" :value="value">{{ label }}</option>
+                            <option v-for="(label, value) in nestHeightEnum" :key="value" :value="value">{{ label }}
+                            </option>
                         </select>
                     </dd>
 
@@ -30,15 +32,18 @@
                     <dd class="col-sm-9">
                         <span v-if="!isEditing">{{ getEnumLabel(nestSizeEnum, selectedObservation.nest_size) }}</span>
                         <select v-else v-model="editableObservation.nest_size" class="form-control">
-                            <option v-for="(label, value) in nestSizeEnum" :key="value" :value="value">{{ label }}</option>
+                            <option v-for="(label, value) in nestSizeEnum" :key="value" :value="value">{{ label }}
+                            </option>
                         </select>
                     </dd>
 
                     <dt class="col-sm-6">Nest Locatie</dt>
                     <dd class="col-sm-9">
-                        <span v-if="!isEditing">{{ getEnumLabel(nestLocationEnum, selectedObservation.nest_location) }}</span>
+                        <span v-if="!isEditing">{{ getEnumLabel(nestLocationEnum, selectedObservation.nest_location)
+                            }}</span>
                         <select v-else v-model="editableObservation.nest_location" class="form-control">
-                            <option v-for="(label, value) in nestLocationEnum" :key="value" :value="value">{{ label }}</option>
+                            <option v-for="(label, value) in nestLocationEnum" :key="value" :value="value">{{ label }}
+                            </option>
                         </select>
                     </dd>
 
@@ -46,14 +51,16 @@
                     <dd class="col-sm-9">
                         <span v-if="!isEditing">{{ getEnumLabel(nestTypeEnum, selectedObservation.nest_type) }}</span>
                         <select v-else v-model="editableObservation.nest_type" class="form-control">
-                            <option v-for="(label, value) in nestTypeEnum" :key="value" :value="value">{{ label }}</option>
+                            <option v-for="(label, value) in nestTypeEnum" :key="value" :value="value">{{ label }}
+                            </option>
                         </select>
                     </dd>
 
                     <dt class="col-sm-6">Observatie Datum</dt>
                     <dd class="col-sm-9">
                         <span v-if="!isEditing">{{ formatDate(selectedObservation.observation_datetime) }}</span>
-                        <input v-else v-model="editableObservation.observation_datetime" type="datetime-local" class="form-control" />
+                        <input v-else v-model="editableObservation.observation_datetime" type="datetime-local"
+                            class="form-control" />
                     </dd>
 
                     <dt class="col-sm-6">Cluster ID</dt>
@@ -67,8 +74,10 @@
 
                     <dt class="col-sm-6">Bestreden op</dt>
                     <dd class="col-sm-9">
-                        <span v-if="!isEditing">{{ formatDate(selectedObservation.eradication_datetime, 'Onbestreden') }}</span>
-                        <input v-else v-model="editableObservation.eradication_datetime" type="datetime-local" class="form-control" />
+                        <span v-if="!isEditing">{{ formatDate(selectedObservation.eradication_datetime, 'Onbestreden')
+                            }}</span>
+                        <input v-else v-model="editableObservation.eradication_datetime" type="datetime-local"
+                            class="form-control" />
                     </dd>
 
                     <dt class="col-sm-6">Gemeente</dt>
@@ -76,10 +85,14 @@
                 </dl>
 
                 <div>
-                    <button v-if="isLoggedIn && canEdit && !isEditing" class="btn btn-success me-2" @click="startEdit">Wijzig</button>
-                    <button v-if="isLoggedIn && canEdit && !isEditing && !selectedObservation.reserved_by && canReserve" class="btn btn-success me-2" @click="reserveObservation">Reserveren</button>
-                    <button v-if="isUserReserver" class="btn btn-danger me-2" @click="cancelReservation">Reservatie annuleren</button>
-                    <button v-if="isEditing && canEdit" class="btn btn-success me-2" @click="confirmUpdate">Bevestig</button>
+                    <button v-if="isLoggedIn && canEdit && !isEditing" class="btn btn-success me-2"
+                        @click="startEdit">Wijzig</button>
+                    <button v-if="isLoggedIn && canEdit && !isEditing && !selectedObservation.reserved_by && canReserve"
+                        class="btn btn-success me-2" @click="reserveObservation">Reserveren</button>
+                    <button v-if="isUserReserver" class="btn btn-danger me-2" @click="cancelReservation">Reservatie
+                        annuleren</button>
+                    <button v-if="isEditing && canEdit" class="btn btn-success me-2"
+                        @click="confirmUpdate">Bevestig</button>
                     <button v-if="isEditing && canEdit" class="btn btn-secondary" @click="cancelEdit">Annuleer</button>
                 </div>
             </div>
@@ -131,7 +144,6 @@ export default {
         };
 
         const editableFields = [
-            "species",
             "nest_height",
             "nest_size",
             "nest_location",
@@ -180,7 +192,6 @@ export default {
                 editableObservation.value.eradication_datetime = formatToDatetimeLocal(selectedObservation.value.eradication_datetime);
             }
         };
-
         const confirmUpdate = async () => {
             const updatedObservation = {};
 
@@ -188,11 +199,20 @@ export default {
                 updatedObservation[field] = editableObservation.value[field];
             });
 
-            await vespaStore.updateObservation({
-                id: selectedObservation.value.id,
-                ...updatedObservation
-            });
-            vespaStore.isEditing = false;
+            let patch_response;
+            try {
+                patch_response = await vespaStore.updateObservation({
+                    id: selectedObservation.value.id,
+                    ...updatedObservation
+                });
+
+                if (patch_response && patch_response.data) {
+                    vespaStore.selectedObservation = patch_response.data;
+                    vespaStore.isEditing = false;
+                }
+            } catch (error) {
+                console.error('Fout bij het bijwerken van de observatie:', error);
+            }
         };
 
         const cancelEdit = () => {

@@ -213,11 +213,13 @@ export const useVespaStore = defineStore('vespaStore', {
                 const response = await ApiService.patch(`/observations/${observation.id}/`, observation);
                 if (response.status === 200) {
                     this.selectedObservation = response.data;
+                    return response.data;
                 } else {
                     throw new Error('Network response was not ok');
                 }
             } catch (error) {
                 console.error('Error when updating the observation:', error);
+                return null;
             }
         },
         async fetchMunicipalities() {
@@ -238,6 +240,7 @@ export const useVespaStore = defineStore('vespaStore', {
                 if (response.status !== 200) {
                     throw new Error('Network response was not ok');
                 }
+                return response
             } catch (error) {
                 console.error('Error when updating the observation:', error);
             }

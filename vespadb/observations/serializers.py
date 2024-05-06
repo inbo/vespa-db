@@ -160,99 +160,6 @@ class ObservationSerializer(serializers.ModelSerializer):
         # For unauthenticated or public access, restrict to public_read_fields
         return {field: data[field] for field in public_read_fields if field in data}
 
-    def validate_location(self, value: dict[str, float]) -> Point:
-        """Validate the input location data. Override this method to implement custom validation logic as needed.
-
-        Parameters
-        ----------
-        - value (Dict[str, float]): The location data to validate, expected to be a dictionary
-          with 'latitude' and 'longitude' keys.
-
-        Returns
-        -------
-        - Point: The validated location data.
-
-        """
-        latitude = value.get("latitude")
-        longitude = value.get("longitude")
-
-        if latitude is None or longitude is None:
-            raise serializers.ValidationError("Missing or invalid location data")
-
-        return Point(longitude, latitude)
-
-
-class ObservationPatchSerializer(serializers.ModelSerializer):
-    """Serializer for patching observations with limited fields accessible by exterminators or other specific roles. This serializer allows updating a subset of the Observation model's fields, ensuring that users can only modify fields they are authorized to."""
-
-    class Meta:
-        """Meta class for the ObservationPatchSerializer."""
-
-        model = Observation
-        fields = [
-            "nest_height",
-            "nest_size",
-            "nest_location",
-            "nest_type",
-            "notes",
-            "modified_by",
-            "created_by",
-            "reserved_by",
-            "eradication_datetime",
-            "eradicator_name",
-            "eradication_duration",
-            "eradication_persons",
-            "eradication_result",
-            "eradication_product",
-            "eradication_method",
-            "eradication_aftercare",
-            "eradication_problems",
-            "eradication_notes",
-        ]
-        read_only_fields = [field for field in "__all__" if field not in user_read_fields]
-
-    def to_representation(self, instance: Observation) -> dict[str, Any]:
-        data = super().to_representation(instance)
-
-        # Convert datetime fields to CET for outgoing representation
-        datetime_fields = [
-            "created_datetime", "modified_datetime", "wn_modified_datetime", "wn_created_datetime",
-            "reserved_datetime", "observation_datetime", "eradication_datetime"
-        ]
-        for field in datetime_fields:
-            if data.get(field):
-                data[field] = parse_and_convert_to_cet(data[field]).isoformat()
-        return data #type: ignore[no-any-return]
-
-
-    def to_internal_value(self, data: dict[str, Any]) -> dict[str, Any]:
-        """
-        Convert the incoming data to a Python native representation.
-
-        Args:
-            data (dict): The incoming data.
-
-        Returns:
-            dict: The Python native representation.
-        """
-        internal_data = super().to_internal_value(data)
-
-        # Convert datetime fields to UTC
-        datetime_fields = ["created_datetime", "modified_datetime", "wn_modified_datetime", "wn_created_datetime", "reserved_datetime","observation_datetime", "eradication_datetime"]
-        for field in datetime_fields:
-            if field in data:
-                value = data[field]
-                if value in ("", None):
-                    internal_data[field] = None
-                else:
-                    try:
-                        logger.info("Parsing and converting datetime field %s", field)
-                        logger.info("value: %s", value)
-                        internal_data[field] = parse_and_convert_to_utc(value)
-                    except (ValueError, TypeError):
-                        raise serializers.ValidationError({field: [f"Invalid datetime format for {field}."]})
-        return internal_data # type: ignore[no-any-return]
-    
     def validate_reserved_by(self, value: VespaUser) -> VespaUser:
         """
         Validate that the user does not exceed the maximum number of allowed reservations.
@@ -332,7 +239,56 @@ class ObservationPatchSerializer(serializers.ModelSerializer):
 
         instance = super().update(instance, validated_data)
         return instance
+    
+    def to_internal_value(self, data: dict[str, Any]) -> dict[str, Any]:
+        """
+        Convert the incoming data to a Python native representation.
 
+        Args:
+            data (dict): The incoming data.
+
+        Returns:
+            dict: The Python native representation.
+        """
+        internal_data = super().to_internal_value(data)
+
+        # Convert datetime fields to UTC
+        datetime_fields = ["created_datetime", "modified_datetime", "wn_modified_datetime", "wn_created_datetime", "reserved_datetime","observation_datetime", "eradication_datetime"]
+        for field in datetime_fields:
+            if field in data:
+                value = data[field]
+                if value in ("", None):
+                    internal_data[field] = None
+                else:
+                    try:
+                        logger.info("Parsing and converting datetime field %s", field)
+                        logger.info("value: %s", value)
+                        internal_data[field] = parse_and_convert_to_utc(value)
+                    except (ValueError, TypeError):
+                        raise serializers.ValidationError({field: [f"Invalid datetime format for {field}."]})
+        return internal_data # type: ignore[no-any-return]
+    
+    
+    def validate_location(self, value: dict[str, float]) -> Point:
+        """Validate the input location data. Override this method to implement custom validation logic as needed.
+
+        Parameters
+        ----------
+        - value (Dict[str, float]): The location data to validate, expected to be a dictionary
+          with 'latitude' and 'longitude' keys.
+
+        Returns
+        -------
+        - Point: The validated location data.
+
+        """
+        latitude = value.get("latitude")
+        longitude = value.get("longitude")
+
+        if latitude is None or longitude is None:
+            raise serializers.ValidationError("Missing or invalid location data")
+
+        return Point(longitude, latitude)
 
 # Municipality serializers
 class MunicipalitySerializer(serializers.ModelSerializer):

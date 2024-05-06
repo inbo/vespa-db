@@ -32,7 +32,6 @@ from vespadb.observations.filters import ObservationFilter
 from vespadb.observations.models import Municipality, Observation, Province
 from vespadb.observations.serializers import (
     MunicipalitySerializer,
-    ObservationPatchSerializer,
     ProvinceSerializer,
     ObservationSerializer,
 )
@@ -79,8 +78,6 @@ class ObservationsViewSet(ModelViewSet):
 
         :return: Serializer class
         """
-        if self.request.method == "PATCH":
-            return ObservationPatchSerializer
         return super().get_serializer_class()
 
     def get_permissions(self) -> list[BasePermission]:

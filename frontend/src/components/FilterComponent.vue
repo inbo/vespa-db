@@ -55,11 +55,18 @@
             @change="emitFilterUpdate">
           </v-autocomplete>
         </div>
+        <div class="col-12">
+          <v-autocomplete v-model="visibleActief" :items="VisibleOptions.length ? VisibleOptions.map(visible => ({
+            title: visible.name,
+            value: visible.value
+          })) : []" item-text="title" item-value="value" label="Zichtbaarheid" multiple chips dense solo
+            @change="emitFilterUpdate">
+          </v-autocomplete>
+        </div>
       </div>
     </div>
   </div>
 </template>
-
 <script>
 import { useVespaStore } from '@/stores/vespaStore';
 import { DateTime } from 'luxon';
@@ -81,6 +88,7 @@ export default {
     const selectedNestType = ref([]);
     const selectedNestStatus = ref([]);
     const anbAreasActief = ref(null);
+    const visibleActief = ref(true);
     const nestType = ref([
       { name: 'actief embryonaal nest', value: 'actief_embryonaal_nest' },
       { name: 'actief primair nest', value: 'actief_primair_nest' },
@@ -97,6 +105,10 @@ export default {
       { name: 'Niet in ANB gebied', value: false },
       { name: 'Wel in ANB gebied', value: true }
     ]);
+    const VisibleOptions = ref([
+      { name: 'Zichtbaar', value: true },
+      { name: 'Niet zichtbaar', value: false }
+    ]);
     const minDate = ref(new Date(new Date().getFullYear(), 3, 1));
     const maxDate = ref(null);
     const selectedObservationStart = ref(false);
@@ -108,7 +120,7 @@ export default {
       name: municipality.name,
       id: municipality.id
     })));
-    
+
     const emitFilterUpdate = () => {
       const minDateCET = minDate.value ? DateTime.fromJSDate(minDate.value).setZone('Europe/Paris').toFormat('yyyy-MM-dd\'T\'HH:mm:ss') : null;
       const maxDateCET = maxDate.value ? DateTime.fromJSDate(maxDate.value).setZone('Europe/Paris').toFormat('yyyy-MM-dd\'T\'HH:mm:ss') : null;
@@ -120,7 +132,8 @@ export default {
         nestType: selectedNestType.value.length > 0 ? selectedNestType.value : null,
         nestStatus: selectedNestStatus.value.length > 0 ? selectedNestStatus.value : null,
         min_observation_date: minDateCET,
-        max_observation_date: maxDateCET
+        max_observation_date: maxDateCET,
+        visible: visibleActief.value
       });
     };
 
@@ -144,7 +157,7 @@ export default {
 
     watch([minDate, maxDate], emitFilterUpdate, { immediate: true });
 
-    watch([selectedMunicipalities, selectedProvinces, selectedNestType, selectedNestStatus, anbAreasActief, selectedObservationStart, selectedObservationEnd], () => {
+    watch([selectedMunicipalities, selectedProvinces, selectedNestType, selectedNestStatus, anbAreasActief, selectedObservationStart, selectedObservationEnd, visibleActief], () => {
       emitFilterUpdate();
     }, { deep: true });
 
@@ -177,7 +190,9 @@ export default {
       toggleMenu1,
       closeMenu1,
       toggleMenu2,
-      closeMenu2
+      closeMenu2,
+      VisibleOptions,
+      visibleActief
     };
   }
 };

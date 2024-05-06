@@ -34,6 +34,7 @@ export const useVespaStore = defineStore('vespaStore', {
             nestStatus: null,
             min_observation_date: null,
             max_observation_date: null,
+            visible: true,
         },
         isDetailsPaneOpen: false,
         user: {},
@@ -86,6 +87,7 @@ export const useVespaStore = defineStore('vespaStore', {
             }
         },
         createFilterQuery() {
+            console.log(this.filters.visible)
             const params = [];
 
             if (this.filters.municipalities.length > 0) {
@@ -98,6 +100,10 @@ export const useVespaStore = defineStore('vespaStore', {
 
             if (this.filters.anbAreasActief !== null) {
                 params.push(`anb=${this.filters.anbAreasActief}`);
+            }
+
+            if (this.filters.visible !== null) {
+                params.push(`visible=${this.filters.visible}`);
             }
 
             if (this.filters.nestType) {

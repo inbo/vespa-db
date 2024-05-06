@@ -34,6 +34,7 @@ class ObservationFilter(GeoFilterSet):
     anb = django_filters.BooleanFilter(field_name="anb")
     nest_type = MultiCharFilter(method="filter_nest_type")
     nest_status = MultiCharFilter(method="filter_nest_status")
+    visible = django_filters.BooleanFilter(field_name="visible")
 
     def filter_nest_status(self, queryset: QuerySet, name: str, value: str) -> QuerySet:
         """
@@ -102,6 +103,7 @@ class ObservationFilter(GeoFilterSet):
             "max_observation_datetime",
             "anb",
             "nest_type",
+            "visible",
         ]
         geo_filters = {
             "location": ["exact", "distance_lte", "dwithin"],

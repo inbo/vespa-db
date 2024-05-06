@@ -228,7 +228,7 @@ class Observation(models.Model):
     )
     wn_modified_datetime = models.DateTimeField(blank=True, null=True)
     wn_created_datetime = models.DateTimeField(blank=True, null=True)
-    visible = models.BooleanField(default=False)
+    visible = models.BooleanField(default=True)
     images = models.JSONField(default=list)
 
     reserved_by = models.ForeignKey(

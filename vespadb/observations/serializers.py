@@ -43,6 +43,7 @@ public_read_fields = [
     "images",
     "public_domain",
     "municipality_name",
+    "visible",
 ]
 
 # Define the fields that authenticated users can read
@@ -83,6 +84,7 @@ user_read_fields = [
     "anb",
     "public_domain",
     "municipality_name",
+    "visible",
 ]
 
 # Define the conditional fields for authenticated users with specific permissions

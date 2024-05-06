@@ -82,6 +82,9 @@
 
                     <dt class="col-sm-6">Gemeente</dt>
                     <dd class="col-sm-9">{{ selectedObservation.municipality_name }}</dd>
+                    <div v-if="reservationStatus" class="mt-3">
+                        <span class="text-danger">{{ reservationStatus }}</span>
+                    </div>
                 </dl>
 
                 <div>
@@ -99,7 +102,6 @@
         </div>
     </div>
 </template>
-
 <script>
 import { useVespaStore } from '@/stores/vespaStore';
 import { computed, ref, watch } from 'vue';
@@ -179,6 +181,41 @@ export default {
             return enumObject[value] || value;
         };
 
+        // Bereken de reserveringsstatus en de duur van de reservering
+        const reservationStatus = computed(() => {
+            const reservationDatetime = selectedObservation.value.reserved_datetime;
+            if (reservationDatetime) {
+                const reservationTime = new Date(reservationDatetime).getTime();
+                const currentTime = new Date().getTime();
+                const timeDiff = currentTime - reservationTime;
+                const daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+                const hoursDiff = Math.floor((timeDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+
+                if (daysDiff < 5) { // Als minder dan 5 dagen zijn verstreken
+                    let remainingDays = 5 - daysDiff;
+                    let remainingHours = 0;
+
+                    if (hoursDiff > 0) {
+                        remainingDays--; // Trek een dag af als er uren zijn
+                        remainingHours = 24 - hoursDiff;
+                    }
+
+                    if (remainingDays > 0 && remainingHours > 0) {
+                        return `Nog ${remainingDays}d ${remainingHours}h gereserveerd`;
+                    } else if (remainingDays > 0) {
+                        return `Nog ${remainingDays}d gereserveerd`;
+                    } else if (remainingHours > 0) {
+                        return `Nog ${remainingHours}h gereserveerd`;
+                    } else {
+                        return 'Reservering verlopen';
+                    }
+                } else {
+                    return 'Reservering verlopen';
+                }
+            } else {
+                return null; // Niet gereserveerd
+            }
+        });
         const closeDetails = () => {
             emit('closeDetails');
             vespaStore.isDetailsPaneOpen = false;
@@ -192,6 +229,7 @@ export default {
                 editableObservation.value.eradication_datetime = formatToDatetimeLocal(selectedObservation.value.eradication_datetime);
             }
         };
+
         const confirmUpdate = async () => {
             const updatedObservation = {};
 
@@ -263,7 +301,8 @@ export default {
             nestSizeEnum,
             nestLocationEnum,
             nestTypeEnum,
-            getEnumLabel
+            getEnumLabel,
+            reservationStatus
         };
     },
 };

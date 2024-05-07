@@ -23,7 +23,7 @@ from vespadb.observations.models import (
 )
 from vespadb.observations.utils import check_if_point_in_anb_area, get_municipality_from_coordinates
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("vespadb.observations.tasks")
 
 ENUMS_MAPPING: dict[str, type[TextChoices]] = {
     "Nesthoogte": NestHeightEnum,
@@ -35,7 +35,16 @@ ENUMS_MAPPING: dict[str, type[TextChoices]] = {
     "Methode": EradicationMethodEnum,
     "Product": EradicationProductEnum,
 }
-
+ENUM_FIELD_MAPPING: dict[str, str] = {
+    "Nesthoogte": "nest_height",
+    "Nestgrootte": "nest_size",
+    "Nestplaats": "nest_location",
+    "Nesttype": "nest_type",
+    "Resultaat": "eradication_result",
+    "Problemen": "eradication_problems",
+    "Methode": "eradication_method",
+    "Product": "eradication_product",
+}
 
 def map_attribute_to_enum(value: str, enum: type[TextChoices]) -> TextChoices | None:
     """
@@ -64,7 +73,7 @@ def map_attributes_to_enums(api_attributes: list[dict[str, str]]) -> dict[str, T
         if attr_name in ENUMS_MAPPING:
             mapped_enum = map_attribute_to_enum(value, ENUMS_MAPPING[attr_name])
             if mapped_enum:
-                mapped_values[attr_name] = mapped_enum
+                mapped_values[ENUM_FIELD_MAPPING[attr_name]] = mapped_enum
             else:
                 logger.warning(f"No enum match found for {attr_name}: {value}")
     return mapped_values
@@ -149,8 +158,11 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
 
     mapped_enums = map_attributes_to_enums(external_data.get("attributes", []))
     validation_status = map_validation_status_to_enum(external_data.get("validation_status", "O"))
-    cluster_id = external_data.get("nest", {}).get("id")
-
+    
+    nest = external_data.get("nest", {})
+    cluster_id = None
+    if nest:
+        cluster_id = nest.get("id")
     mapped_data = {
         "wn_id": external_data["id"],
         "location": location,

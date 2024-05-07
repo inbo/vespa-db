@@ -60,6 +60,8 @@ services:
     command: celery-worker
     volumes:
       - .:/workspaces/vespadb/
+    environment:
+      - TZ=UTC
     depends_on:
       - db
       - redis
@@ -69,6 +71,8 @@ services:
     command: celery-beat
     volumes:
       - .:/workspaces/vespadb/
+    environment:
+      - TZ=UTC
     depends_on:
       - db
       - redis

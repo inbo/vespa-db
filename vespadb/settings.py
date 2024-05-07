@@ -140,6 +140,12 @@ CACHES = {
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+        "formatters": {
+        "default": {
+            "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            "datefmt": "%Y-%m-%d %H:%M:%S",
+        },
+    },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
@@ -148,10 +154,10 @@ LOGGING = {
     "loggers": {
         "celery": {
             "handlers": ["console"],
-            "level": "DEBUG",
+            "level": "INFO",
             "propagate": True,
         },
-        "vespadb.observations": {
+        "vespadb.observations.tasks": {
             "handlers": ["console"],
             "level": "INFO",
             "propagate": False,
@@ -240,10 +246,16 @@ CELERY_RESULT_SERIALIZER = "json"
 CELERY_BEAT_SCHEDULE = {
     "fetch_and_update_observations": {
         "task": "vespadb.observations.tasks.observation_sync.fetch_and_update_observations",
-        "schedule": crontab(hour=4, minute=0),  # Runs every day at 04 AM
+        "schedule": crontab(hour=10, minute=33),  # Runs every day at X AM UTC.
     },
     "remove_expired_reservations": {
         "task": "vespadb.observations.tasks.reservation_cleanup.free_expired_reservations_and_audit_reservation_count",
-        "schedule": crontab(hour=7, minute=0),  # Runs every day at 05 AM
+        "schedule": crontab(hour=7, minute=0),  # Runs every day at X AM UTC
     },
 }
+
+TIME_ZONE = "UTC"
+USE_TZ = True
+
+CELERY_TIMEZONE = "UTC"
+CELERY_ENABLE_UTC = True

@@ -13,7 +13,7 @@ from vespadb.users.models import VespaUser
 
 load_dotenv()
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("vespadb.observations.tasks")
 
 @shared_task
 def free_expired_reservations_and_audit_reservation_count(self: Task) -> None:

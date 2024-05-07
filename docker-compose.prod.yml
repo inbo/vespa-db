@@ -61,6 +61,8 @@ services:
     command: celery-worker --loglevel=INFO
     volumes:
       - .:/workspaces/vespadb/
+    environment:
+      - TZ=UTC
     depends_on:
       - db
       - redis
@@ -70,6 +72,8 @@ services:
     command: celery-beat --loglevel=INFO
     volumes:
       - .:/workspaces/vespadb/
+    environment:
+      - TZ=UTC
     depends_on:
       - db
       - redis

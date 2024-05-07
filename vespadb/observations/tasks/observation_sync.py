@@ -19,7 +19,7 @@ from vespadb.users.utils import get_system_user
 
 load_dotenv()
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("vespadb.observations.tasks")
 
 BATCH_SIZE = 500
 
@@ -76,7 +76,9 @@ def cache_wn_ids() -> set[str]:
 def create_observations(observations_to_create: list[Observation]) -> None:
     """Bulk create observations."""
     if observations_to_create:
-        Observation.objects.bulk_create(observations_to_create, batch_size=BATCH_SIZE)
+        Observation.objects.bulk_create(
+            observations_to_create, batch_size=BATCH_SIZE, ignore_conflicts=True
+        )
 
 
 def update_observations(observations_to_update: list[Observation], wn_ids_to_update: list[str]) -> None:
@@ -197,8 +199,9 @@ def fetch_and_update_observations(self: Task) -> None:
         obs["wn_id"]: obs["modified_by"] for obs in Observation.objects.all().values("wn_id", "modified_by")
     }
     system_user = get_system_user(UserType.SYNC)
-    observations_to_create, wn_ids_to_update = [], []
+    wn_ids_to_update = []
     observations_to_update: list[Observation] = []
+    observations_to_create: list[Observation] = []
     offset = 0
     while True:
         data = fetch_observations_page(token, modified_since, offset)
@@ -226,17 +229,18 @@ def fetch_and_update_observations(self: Task) -> None:
                         )
                         logger.info("Observation with wn_id %s is ready to be updated.", wn_id)
                 else:
-                    observations_to_create.append(
-                        Observation(
-                            wn_id=wn_id,
-                            **mapped_data,
-                            created_by=system_user,
-                            modified_by=system_user,
-                            created_datetime=current_time,
-                            modified_datetime=current_time,
+                    if wn_id not in {obs.wn_id for obs in observations_to_create}:
+                        observations_to_create.append(
+                            Observation(
+                                wn_id=wn_id,
+                                **mapped_data,
+                                created_by=system_user,
+                                modified_by=system_user,
+                                created_datetime=current_time,
+                                modified_datetime=current_time,
+                            )
                         )
-                    )
-                    logger.info("Observation with wn_id %s is ready to be created.", wn_id)
+                        logger.info("Observation with wn_id %s is ready to be created.", wn_id)
 
             if not data.get("next"):
                 break

@@ -16,9 +16,11 @@ class Command(BaseCommand):
         """Assign a province to each municipality based on their polygons."""
         unassigned_municipalities = Municipality.objects.filter(province__isnull=True)
         if not unassigned_municipalities.exists():
-            self.stdout.write(self.style.SUCCESS("All municipalities already have a province assigned. No changes made."))
+            self.stdout.write(
+                self.style.SUCCESS("All municipalities already have a province assigned. No changes made.")
+            )
             return
-        
+
         for municipality in Municipality.objects.all():
             provinces = Province.objects.filter(polygon__intersects=municipality.polygon)
             if provinces.exists():

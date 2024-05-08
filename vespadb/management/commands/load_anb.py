@@ -38,7 +38,7 @@ class Command(BaseCommand):
         if ANB.objects.exists():
             self.stdout.write(self.style.SUCCESS("ANB data already exists in the database. No changes made."))
             return
-        
+
         shapefile_path: str = str((Path(__file__).parent / "data" / "anb" / "am_patdat.shp").resolve())
         lm = LayerMapping(ANB, shapefile_path, anb_mapping, transform=False, encoding="iso-8859-1")
         lm.save(strict=True, verbose=True)

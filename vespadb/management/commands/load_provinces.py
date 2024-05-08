@@ -38,7 +38,7 @@ class Command(BaseCommand):
         if Province.objects.exists():
             self.stdout.write(self.style.SUCCESS("Province data already exists in the database. No changes made."))
             return
-        
+
         shapefile_path: str = str((Path(__file__).parent / "data" / "provinces" / "Refprv.shp").resolve())
         lm = LayerMapping(Province, shapefile_path, provinces_mapping, transform=False, encoding="iso-8859-1")
         lm.save(strict=True, verbose=True)

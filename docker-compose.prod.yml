@@ -32,14 +32,22 @@ services:
       - PYTHONPATH=/workspaces/vespadb
       - debug=False
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
   db:
     image: postgis/postgis:latest
+    environment:
+      POSTGRES_DB: vespadb
+      POSTGRES_USER: vespauser
+      POSTGRES_PASSWORD: vespauserpassword
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    env_file:
-      - .env
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U vespauser -d vespadb" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   pgadmin:
     image: dpage/pgadmin4
@@ -58,7 +66,7 @@ services:
 
   celery_worker:
     build: .
-    command: celery-worker --loglevel=INFO
+    command: celery-worker
     volumes:
       - .:/workspaces/vespadb/
     environment:
@@ -69,7 +77,7 @@ services:
 
   celery_beat:
     build: .
-    command: celery-beat --loglevel=INFO
+    command: celery-beat
     volumes:
       - .:/workspaces/vespadb/
     environment:

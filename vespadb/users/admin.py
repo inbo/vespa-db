@@ -1,16 +1,18 @@
 """Vespawatch admin."""
 
+from collections.abc import Iterable
+from typing import Any
+
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from django.core.exceptions import ObjectDoesNotExist
 from django.http import HttpRequest, HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import path
 from django.utils.translation import gettext_lazy as _
-from typing import Any, Iterable, List
-from vespadb.observations.models import Province, Municipality
-from vespadb.users.models import VespaUser
+
+from vespadb.observations.models import Municipality
 from vespadb.users.forms import AssignProvinceForm
+from vespadb.users.models import VespaUser
 
 
 @admin.register(VespaUser)
@@ -45,7 +47,7 @@ class VespaUserAdmin(UserAdmin):
     )
     search_fields = ("username", "email", "first_name", "last_name")
 
-    def get_urls(self) -> List[str]:
+    def get_urls(self) -> list[str]:
         """Voeg aangepaste URL toe voor het toewijzen van gemeenten."""
         urls = super().get_urls()
         custom_urls = [
@@ -55,7 +57,7 @@ class VespaUserAdmin(UserAdmin):
                 name="assign_province",
             ),
         ]
-        return custom_urls + urls # type: ignore[no-any-return]
+        return custom_urls + urls  # type: ignore[no-any-return]
 
     def assign_province_view(self, request: HttpRequest) -> Any:
         """View om alle gemeenten van een provincie toe te wijzen aan geselecteerde gebruikers."""

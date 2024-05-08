@@ -1,4 +1,5 @@
 """Fetch and update observations from waarnemingen API."""
+
 import logging
 import os
 from datetime import timedelta
@@ -23,6 +24,7 @@ logger = logging.getLogger("vespadb.observations.tasks")
 
 BATCH_SIZE = 500
 
+
 def get_oauth_token() -> str | None:
     """Authenticate with the waarnemingen API to obtain an OAuth2 token."""
     data = {
@@ -45,6 +47,7 @@ def get_oauth_token() -> str | None:
     except requests.RequestException:
         logger.exception("Error obtaining OAuth2 token")
     return None
+
 
 def fetch_observations_page(token: str, modified_since: str, offset: int = 0) -> dict[str, Any]:
     """Fetch a page of observations."""
@@ -76,9 +79,7 @@ def cache_wn_ids() -> set[str]:
 def create_observations(observations_to_create: list[Observation]) -> None:
     """Bulk create observations."""
     if observations_to_create:
-        Observation.objects.bulk_create(
-            observations_to_create, batch_size=BATCH_SIZE, ignore_conflicts=True
-        )
+        Observation.objects.bulk_create(observations_to_create, batch_size=BATCH_SIZE, ignore_conflicts=True)
 
 
 def update_observations(observations_to_update: list[Observation], wn_ids_to_update: list[str]) -> None:
@@ -110,7 +111,9 @@ def fetch_nest_observations(token: str, cluster_id: int) -> list[int]:
     """Fetch all observation IDs associated with a specific nest cluster."""
     headers = {"Authorization": f"Bearer {token}"}
     try:
-        response = requests.get(f"https://waarnemingen.be/api/v1/inbo/vespa-watch/nests/{cluster_id}", headers=headers, timeout=10)
+        response = requests.get(
+            f"https://waarnemingen.be/api/v1/inbo/vespa-watch/nests/{cluster_id}", headers=headers, timeout=10
+        )
         response.raise_for_status()
         nest_data = response.json()
         return list(nest_data.get("observation_ids", []))
@@ -137,16 +140,13 @@ def fetch_clusters(token: str, limit: int = 100) -> list[dict[str, Any]]:
     offset = 0
 
     while url:
-        params = {
-            "limit": limit,
-            "offset": offset
-        }
+        params = {"limit": limit, "offset": offset}
         try:
             response = requests.get(url, headers=headers, params=params, timeout=10)
             response.raise_for_status()
             data = response.json()
-            clusters.extend(data.get('results', []))
-            url = data.get('next')  # Handling pagination
+            clusters.extend(data.get("results", []))
+            url = data.get("next")  # Handling pagination
             offset += limit
         except requests.RequestException as e:
             logger.exception("Failed to fetch clusters: %s", e)
@@ -172,7 +172,9 @@ def manage_observations_visibility(token: str) -> None:
         # Determine observations to hide
         latest_date = max(observation_dates.values(), default=None)
         if latest_date:
-            observation_ids_to_hide = {id for id, date in observation_dates.items() if date < latest_date}
+            observation_ids_to_hide = {
+                observation_id for observation_id, date in observation_dates.items() if date < latest_date
+            }
             update_observation_visibility(observations, observation_ids_to_hide)
             logger.info(f"Updated visibility for {len(observations)} observations in cluster {cluster['id']}.")
 
@@ -228,19 +230,18 @@ def fetch_and_update_observations(self: Task) -> None:
                             )
                         )
                         logger.info("Observation with wn_id %s is ready to be updated.", wn_id)
-                else:
-                    if wn_id not in {obs.wn_id for obs in observations_to_create}:
-                        observations_to_create.append(
-                            Observation(
-                                wn_id=wn_id,
-                                **mapped_data,
-                                created_by=system_user,
-                                modified_by=system_user,
-                                created_datetime=current_time,
-                                modified_datetime=current_time,
-                            )
+                elif wn_id not in {obs.wn_id for obs in observations_to_create}:
+                    observations_to_create.append(
+                        Observation(
+                            wn_id=wn_id,
+                            **mapped_data,
+                            created_by=system_user,
+                            modified_by=system_user,
+                            created_datetime=current_time,
+                            modified_datetime=current_time,
                         )
-                        logger.info("Observation with wn_id %s is ready to be created.", wn_id)
+                    )
+                    logger.info("Observation with wn_id %s is ready to be created.", wn_id)
 
             if not data.get("next"):
                 break

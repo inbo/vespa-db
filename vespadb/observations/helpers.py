@@ -1,8 +1,9 @@
 """Observation helpers."""
-from datetime import datetime
-from dateutil import parser
-import pytz
 
+from datetime import datetime
+
+import pytz
+from dateutil import parser
 
 # List of accepted datetime formats
 DATETIME_FORMATS = [
@@ -13,7 +14,7 @@ DATETIME_FORMATS = [
     "%Y-%m-%dT%H:%M",
     "%Y-%m-%d %H:%M:%S",
     "%Y-%m-%d %H:%M",
-    "%Y-%m-%d"
+    "%Y-%m-%d",
 ]
 
 
@@ -24,12 +25,13 @@ def parse_and_convert_to_utc(datetime_str: str) -> datetime:
     Args:
         datetime_str (str): The datetime string to convert.
 
-    Returns:
+    Returns
+    -------
         datetime: The converted UTC datetime.
     """
-    for fmt in DATETIME_FORMATS:
+    for _fmt in DATETIME_FORMATS:
         try:
-            parsed_datetime = datetime.strptime(datetime_str, fmt)
+            parsed_datetime = parser.parse(datetime_str)
             if parsed_datetime.tzinfo is None:
                 local_tz = pytz.timezone("Europe/Brussels")
                 parsed_datetime = local_tz.localize(parsed_datetime)
@@ -38,6 +40,7 @@ def parse_and_convert_to_utc(datetime_str: str) -> datetime:
             continue
     raise ValueError(f"Invalid datetime format: {datetime_str}")
 
+
 def parse_and_convert_to_cet(datetime_str: str) -> datetime:
     """
     Convert a UTC datetime to CET.
@@ -45,7 +48,8 @@ def parse_and_convert_to_cet(datetime_str: str) -> datetime:
     Args:
         dt (datetime): The UTC datetime to convert.
 
-    Returns:
+    Returns
+    -------
         datetime: The converted CET datetime.
     """
     cet_tz = pytz.timezone("Europe/Brussels")

@@ -2,7 +2,6 @@
 
 import logging
 from typing import TYPE_CHECKING, Any
-import datetime
 
 from django.conf import settings
 from django.contrib.gis.geos import Point
@@ -11,8 +10,8 @@ from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.request import Request
 
+from vespadb.observations.helpers import parse_and_convert_to_cet, parse_and_convert_to_utc
 from vespadb.observations.models import Municipality, Observation
-from vespadb.observations.helpers import parse_and_convert_to_utc, parse_and_convert_to_cet
 from vespadb.users.models import VespaUser
 
 if TYPE_CHECKING:
@@ -132,8 +131,13 @@ class ObservationSerializer(serializers.ModelSerializer):
         data: dict[str, Any] = super().to_representation(instance)
         # Convert datetime fields to CET for outgoing representation
         datetime_fields = [
-            "created_datetime", "modified_datetime", "wn_modified_datetime", "wn_created_datetime",
-            "reserved_datetime", "observation_datetime", "eradication_datetime"
+            "created_datetime",
+            "modified_datetime",
+            "wn_modified_datetime",
+            "wn_created_datetime",
+            "reserved_datetime",
+            "observation_datetime",
+            "eradication_datetime",
         ]
         for field in datetime_fields:
             if data.get(field):
@@ -241,7 +245,7 @@ class ObservationSerializer(serializers.ModelSerializer):
 
         instance = super().update(instance, validated_data)
         return instance
-    
+
     def to_internal_value(self, data: dict[str, Any]) -> dict[str, Any]:
         """
         Convert the incoming data to a Python native representation.
@@ -249,28 +253,38 @@ class ObservationSerializer(serializers.ModelSerializer):
         Args:
             data (dict): The incoming data.
 
-        Returns:
+        Returns
+        -------
             dict: The Python native representation.
         """
         internal_data = super().to_internal_value(data)
 
         # Convert datetime fields to UTC
-        datetime_fields = ["created_datetime", "modified_datetime", "wn_modified_datetime", "wn_created_datetime", "reserved_datetime","observation_datetime", "eradication_datetime"]
+        datetime_fields = [
+            "created_datetime",
+            "modified_datetime",
+            "wn_modified_datetime",
+            "wn_created_datetime",
+            "reserved_datetime",
+            "observation_datetime",
+            "eradication_datetime",
+        ]
         for field in datetime_fields:
             if field in data:
                 value = data[field]
-                if value in ("", None):
+                if value in {"", None}:
                     internal_data[field] = None
                 else:
                     try:
                         logger.info("Parsing and converting datetime field %s", field)
                         logger.info("value: %s", value)
                         internal_data[field] = parse_and_convert_to_utc(value)
-                    except (ValueError, TypeError):
-                        raise serializers.ValidationError({field: [f"Invalid datetime format for {field}."]})
-        return internal_data # type: ignore[no-any-return]
-    
-    
+                    except (ValueError, TypeError) as err:
+                        raise serializers.ValidationError({
+                            field: [f"Invalid datetime format for {field}."]
+                        }).with_traceback(err.__traceback__) from None
+        return internal_data  # type: ignore[no-any-return]
+
     def validate_location(self, value: dict[str, float]) -> Point:
         """Validate the input location data. Override this method to implement custom validation logic as needed.
 
@@ -292,6 +306,7 @@ class ObservationSerializer(serializers.ModelSerializer):
 
         return Point(longitude, latitude)
 
+
 # Municipality serializers
 class MunicipalitySerializer(serializers.ModelSerializer):
     """Serializer for the Municipality model."""
@@ -301,6 +316,7 @@ class MunicipalitySerializer(serializers.ModelSerializer):
 
         model = Municipality
         fields = ["id", "name"]
+
 
 class ProvinceSerializer(serializers.ModelSerializer):
     """Serializer for the Province model."""

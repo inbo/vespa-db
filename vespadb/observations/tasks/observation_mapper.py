@@ -46,6 +46,7 @@ ENUM_FIELD_MAPPING: dict[str, str] = {
     "Product": "eradication_product",
 }
 
+
 def map_attribute_to_enum(value: str, enum: type[TextChoices]) -> TextChoices | None:
     """
     Map a single attribute value to an enum using close match.
@@ -158,7 +159,7 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
 
     mapped_enums = map_attributes_to_enums(external_data.get("attributes", []))
     validation_status = map_validation_status_to_enum(external_data.get("validation_status", "O"))
-    
+
     nest = external_data.get("nest", {})
     cluster_id = None
     if nest:

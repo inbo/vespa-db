@@ -8,8 +8,7 @@ from typing import TYPE_CHECKING, Any
 from django.contrib.gis.db.models.functions import Transform
 from django.contrib.gis.geos import GEOSGeometry
 from django.core.cache import cache
-from django.core.exceptions import ValidationError
-from django.db.models import CharField, OuterRef, Q, QuerySet, Subquery, Value
+from django.db.models import CharField, OuterRef, QuerySet, Subquery, Value
 from django.db.models.functions import Coalesce
 from django.http import HttpResponse, JsonResponse
 from django.utils.decorators import method_decorator
@@ -26,14 +25,14 @@ from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_gis.filters import DistanceToPointFilter
-from vespadb.observations.helpers import parse_and_convert_to_utc
 
 from vespadb.observations.filters import ObservationFilter
+from vespadb.observations.helpers import parse_and_convert_to_utc
 from vespadb.observations.models import Municipality, Observation, Province
 from vespadb.observations.serializers import (
     MunicipalitySerializer,
-    ProvinceSerializer,
     ObservationSerializer,
+    ProvinceSerializer,
 )
 
 if TYPE_CHECKING:
@@ -134,22 +133,32 @@ class ObservationsViewSet(ModelViewSet):
         """
         Handle partial updates to an observation, especially for changes to 'reserved_by'.
 
-        Parameters:
+        Parameters
+        ----------
             request (Request): The incoming HTTP request.
             *args (Any): Additional positional arguments.
             **kwargs (Any): Additional keyword arguments.
 
-        Returns:
+        Returns
+        -------
             Response: The HTTP response with the partial update result.
         """
         data = request.data.copy()
 
         # Convert datetime fields to UTC if present
-        datetime_fields = ["created_datetime", "modified_datetime", "wn_modified_datetime", "wn_created_datetime", "reserved_datetime","observation_datetime", "eradication_datetime"]
+        datetime_fields = [
+            "created_datetime",
+            "modified_datetime",
+            "wn_modified_datetime",
+            "wn_created_datetime",
+            "reserved_datetime",
+            "observation_datetime",
+            "eradication_datetime",
+        ]
         for field in datetime_fields:
             if field in data:
                 value = data[field]
-                if value in ("", None):
+                if value in {"", None}:
                     data[field] = None
                 else:
                     try:
@@ -164,7 +173,7 @@ class ObservationsViewSet(ModelViewSet):
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
         return Response(serializer.data)
-    
+
     def perform_create(self, serializer: BaseSerializer) -> None:
         """
         Set created_by, modified_by to the current user and created_datetime, modified_datetime to the current UTC time upon creating an observation.
@@ -395,6 +404,7 @@ class MunicipalityViewSet(ReadOnlyModelViewSet):
         if self.request.method == "GET":
             return [AllowAny()]
         return [IsAdminUser()]
+
 
 class ProvinceViewSet(ReadOnlyModelViewSet):
     """ViewSet for the Province model."""

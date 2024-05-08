@@ -2,20 +2,10 @@
 
 from django.contrib import admin
 from django.contrib.gis import admin as gis_admin
+
 from vespadb.observations.models import (
     Observation,
-    EradicationResultEnum,
-    ValidationStatusEnum,
-    NestHeightEnum,
-    NestSizeEnum,
-    NestLocationEnum,
-    NestTypeEnum,
-    EradicationMethodEnum,
-    EradicationAfterCareEnum,
-    Municipality,
-    Province,
 )
-from vespadb.users.models import VespaUser
 
 
 class ObservationAdmin(gis_admin.GISModelAdmin):

@@ -12,6 +12,7 @@ export const useVespaStore = defineStore('vespaStore', {
         loading: false,
         error: null,
         municipalities: [],
+        provinces: [],
         selectedMunicipalities: [],
         observations: [],
         table_observations: [],
@@ -27,11 +28,13 @@ export const useVespaStore = defineStore('vespaStore', {
         viewMode: 'map',
         filters: {
             municipalities: [],
+            provinces: [],
             anbAreasActief: null,
             nestType: null,
             nestStatus: null,
             min_observation_date: null,
             max_observation_date: null,
+            visible: true,
         },
         isDetailsPaneOpen: false,
         user: {},
@@ -50,7 +53,7 @@ export const useVespaStore = defineStore('vespaStore', {
             try {
                 const response = await ApiService.get(`/observations?${filterQuery}${orderQuery}&page=${page}&page_size=${page_size}`);
                 if (response.status === 200) {
-                    this.table_observations = response.data.results;  // Updating observations instead
+                    this.table_observations = response.data.results;
                     this.totalObservations = response.data.total;
                     this.nextPage = response.data.next;
                     this.previousPage = response.data.previous;
@@ -67,11 +70,12 @@ export const useVespaStore = defineStore('vespaStore', {
         async getObservationsGeoJson() {
             this.loading = true;
             const filterQuery = this.createFilterQuery();
+            const additionalFilters = this.isLoggedIn ? '' : `&min_observation_datetime=${new Date('April 1, 2021').toISOString()}`;
+
             try {
-                const response = await ApiService.get(`/observations/dynamic-geojson?${filterQuery}`);
+                const response = await ApiService.get(`/observations/dynamic-geojson?${filterQuery}${additionalFilters}`);
                 if (response.status === 200) {
                     this.observations = response.data.features;
-
                 } else {
                     throw new Error(`Network response was not ok, status code: ${response.status}`);
                 }
@@ -83,35 +87,57 @@ export const useVespaStore = defineStore('vespaStore', {
             }
         },
         createFilterQuery() {
-            let filterQuery = '';
+            console.log(this.filters.visible)
+            const params = [];
 
             if (this.filters.municipalities.length > 0) {
-                filterQuery += `municipality_id=${this.filters.municipalities.join(',')}&`;
+                params.push(`municipality_id=${this.filters.municipalities.join(',')}`);
             }
 
-            if (this.filters.anbAreasActief !== null && this.filters.anbAreasActief !== undefined) {
-                filterQuery += `anb=${this.filters.anbAreasActief}&`;
+            if (this.filters.provinces.length > 0) {
+                params.push(`province_id=${this.filters.provinces.join(',')}`);
+            }
+
+            if (this.filters.anbAreasActief !== null) {
+                params.push(`anb=${this.filters.anbAreasActief}`);
+            }
+
+            if (this.filters.visible !== null) {
+                params.push(`visible=${this.filters.visible}`);
             }
 
             if (this.filters.nestType) {
-                filterQuery += `nest_type=${this.filters.nestType}&`;
+                params.push(`nest_type=${this.filters.nestType}`);
             }
 
             if (this.filters.nestStatus) {
-                filterQuery += `nest_status=${this.filters.nestStatus}&`;
+                params.push(`nest_status=${this.filters.nestStatus}`);
             }
+
             if (this.filters.min_observation_date) {
-                filterQuery += `min_observation_datetime=${this.filters.min_observation_date}&`;
+                params.push(`min_observation_datetime=${this.filters.min_observation_date}`);
             }
 
             if (this.filters.max_observation_date) {
-                filterQuery += `max_observation_datetime=${this.filters.max_observation_date}&`;
+                params.push(`max_observation_datetime=${this.filters.max_observation_date}`);
             }
 
-            return filterQuery.endsWith('&') ? filterQuery.slice(0, -1) : filterQuery;
+            return params.length > 0 ? params.join('&') : '';
         },
         async applyFilters(filters) {
             this.filters = { ...this.filters, ...filters };
+        },
+        async fetchProvinces() {
+            try {
+                const response = await ApiService.get('/provinces/');
+                if (response.status === 200) {
+                    this.provinces = response.data;
+                } else {
+                    console.error('Failed to fetch provinces: Status Code', response.status);
+                }
+            } catch (error) {
+                console.error('Error fetching provinces:', error);
+            }
         },
         async fetchMunicipalities() {
             try {
@@ -168,6 +194,38 @@ export const useVespaStore = defineStore('vespaStore', {
                 console.error('Error canceling the reservation:', error);
             }
         },
+        async markObservationAsEradicated(observationId) {
+            try {
+                const response = await ApiService.patch(`/observations/${observationId}/`, {
+                    eradication_datetime: new Date().toISOString()
+                });
+                if (response.status === 200) {
+                    this.selectedObservation = response.data;
+                    return response.data;
+                } else {
+                    throw new Error('Failed to mark observation as eradicated');
+                }
+            } catch (error) {
+                console.error('Error marking observation as eradicated:', error);
+                throw error;
+            }
+        },
+        async markObservationAsNotEradicated(observationId) {
+            try {
+                const response = await ApiService.patch(`/observations/${observationId}/`, {
+                    eradication_datetime: null
+                });
+                if (response.status === 200) {
+                    this.selectedObservation = response.data;
+                    return response.data;
+                } else {
+                    throw new Error('Failed to mark observation as not eradicated');
+                }
+            } catch (error) {
+                console.error('Error marking observation as not eradicated:', error);
+                throw error;
+            }
+        },
         async fetchObservationDetails(observationId) {
             try {
                 const response = await ApiService.get(`/observations/${observationId}`);
@@ -180,16 +238,26 @@ export const useVespaStore = defineStore('vespaStore', {
                 console.error('Error fetching observation details:', error);
             }
         },
-        async updateObservation() {
+        formatToISO8601(datetime) {
+            if (!datetime) return null;
+            const date = new Date(datetime);
+            return date.toISOString();
+        },
+        async updateObservation(observation) {
+            observation.observation_datetime = this.formatToISO8601(observation.observation_datetime);
+            observation.eradication_datetime = this.formatToISO8601(observation.eradication_datetime);
+
             try {
-                const response = await ApiService.patch(`/observations/${this.selectedObservation.id}/`, this.selectedObservation);
-                if (response.status !== 200) {
+                const response = await ApiService.patch(`/observations/${observation.id}/`, observation);
+                if (response.status === 200) {
+                    this.selectedObservation = response.data;
+                    return response.data;
+                } else {
                     throw new Error('Network response was not ok');
                 }
-                const data = await response.json();
-                this.isEditing = false;
             } catch (error) {
                 console.error('Error when updating the observation:', error);
+                return null;
             }
         },
         async fetchMunicipalities() {
@@ -210,6 +278,7 @@ export const useVespaStore = defineStore('vespaStore', {
                 if (response.status !== 200) {
                     throw new Error('Network response was not ok');
                 }
+                return response
             } catch (error) {
                 console.error('Error when updating the observation:', error);
             }

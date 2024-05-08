@@ -38,7 +38,10 @@ class Command(BaseCommand):
         :param args: Variable length argument list.
         :param options: Arbitrary keyword arguments.
         """
-        shapefile_path: str = str((Path(__file__).parent / "data" / "municipalities" / "Refgem.shp").resolve())
+        if Municipality.objects.exists():
+            self.stdout.write(self.style.SUCCESS("Municipality data already exists in the database. No changes made."))
+            return
 
+        shapefile_path: str = str((Path(__file__).parent / "data" / "municipalities" / "Refgem.shp").resolve())
         lm = LayerMapping(Municipality, shapefile_path, municipality_mapping, transform=False, encoding="iso-8859-1")
         lm.save(strict=True, verbose=True)

@@ -81,7 +81,7 @@ COPY poetry.lock* pyproject.toml /workspaces/vespadb/
 # Install the project dependencies - make sure to use the virtual environment
 RUN poetry install --no-root --no-interaction --no-ansi
 
-ENTRYPOINT ["/opt/vespadb-env/bin/poe"]
+ENTRYPOINT ["/workspaces/vespadb/entrypoint.sh"]
 CMD ["serve"]
 
 # Application stage setup
@@ -93,7 +93,12 @@ RUN --mount=type=cache,target=/root/.cache/pypoetry/ \
 
 COPY . .
 
-ENTRYPOINT ["/opt/vespadb-env/bin/poe"]
+# Add entrypoint script
+COPY entrypoint.sh /workspaces/vespadb/entrypoint.sh
+RUN chmod +x /workspaces/vespadb/entrypoint.sh
+
+# Use the entrypoint script
+ENTRYPOINT ["/workspaces/vespadb/entrypoint.sh"]
 CMD ["serve"]
 
 ARG BUILD_BRANCH

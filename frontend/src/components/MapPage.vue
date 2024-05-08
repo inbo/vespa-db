@@ -6,12 +6,12 @@
                 <i class="fas fa-sliders-h"></i> Filters
             </button>
             <div id="map" class="h-100"></div>
-            <div class="filter-panel" 
-     :class="{'d-none': !isFilterPaneOpen, 'd-block': isFilterPaneOpen, 'col-12': true, 'col-md-6': true, 'col-lg-4': true}">
+            <div class="filter-panel"
+                :class="{ 'd-none': !isFilterPaneOpen, 'd-block': isFilterPaneOpen, 'col-12': true, 'col-md-6': true, 'col-lg-4': true }">
                 <FilterComponent />
             </div>
-            <div class="details-panel" 
-     :class="{'d-none': !isDetailsPaneOpen, 'd-block': isDetailsPaneOpen, 'col-12': true, 'col-md-6': true, 'col-lg-4': true}">
+            <div class="details-panel"
+                :class="{ 'd-none': !isDetailsPaneOpen, 'd-block': isDetailsPaneOpen, 'col-12': true, 'col-md-6': true, 'col-lg-4': true }">
                 <div class="d-flex justify-content-between align-items-center">
                     <h3>Observatie details</h3>
                     <button type="button" class="btn-close" aria-label="Close" @click="toggleDetailsPane"></button>
@@ -21,11 +21,11 @@
         </div>
     </div>
 </template>
-  
 <script>
 import { useVespaStore } from '@/stores/vespaStore';
 import 'leaflet/dist/leaflet.css';
 import { computed, onMounted, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import FilterComponent from './FilterComponent.vue';
 import NavbarComponent from './NavbarComponent.vue';
 import ObservationDetailsComponent from './ObservationDetailsComponent.vue';
@@ -38,6 +38,7 @@ export default {
     },
     setup() {
         const vespaStore = useVespaStore();
+        const router = useRouter();
         const selectedObservation = computed(() => vespaStore.selectedObservation);
         const isEditing = computed(() => vespaStore.isEditing);
         const map = computed(() => vespaStore.map);
@@ -57,16 +58,23 @@ export default {
         const cancelEdit = () => {
             isEditing.value = false;
         };
+
         const toggleDetailsPane = () => {
             vespaStore.isDetailsPaneOpen = !vespaStore.isDetailsPaneOpen;
+            if (!vespaStore.isDetailsPaneOpen) {
+                router.push({ path: '/map' });
+            }
         };
+
         const toggleFilterPanel = () => {
             isFilterPaneOpen.value = !isFilterPaneOpen.value;
         };
+
         const openObservationDetails = async (properties) => {
             try {
                 await vespaStore.fetchObservationDetails(properties.id);
-                toggleDetailsPane();
+                vespaStore.isDetailsPaneOpen = true;
+                router.push({ path: `/map/observation/${properties.id}` });
             } catch (error) {
                 console.error("Failed to fetch observation details:", error);
             }
@@ -81,11 +89,11 @@ export default {
                         return marker;
                     }
                 });
-
                 markerClusterGroup.addLayer(geoJsonLayer);
                 vespaStore.map.addLayer(markerClusterGroup);
             });
         };
+
         const clearAndupdateMarkers = () => {
             markerClusterGroup.clearLayers();
             vespaStore.observations = [];
@@ -96,19 +104,40 @@ export default {
             clearAndupdateMarkers();
         }, { deep: true });
 
-        onMounted(() => {
+        onMounted(async () => {
             vespaStore.fetchMunicipalities();
-            vespaStore.map = L.map('map', {
-                center: [50.8503, 4.3517],
-                zoom: 8,
-                maxZoom: 20,
-                layers: [
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                        attribution: 'Map data © OpenStreetMap contributors'
-                    }),
-                ]
-            });
-            if (vespaStore.observations.length === 0) {
+            // Check if there is an observation id in the URL
+            const observationId = router.currentRoute.value.params.id;
+            if (observationId) {
+                await vespaStore.fetchObservationDetails(observationId);
+                const location = selectedObservation.value.location;
+                const [longitude, latitude] = location
+                    .slice(location.indexOf("(") + 1, location.indexOf(")"))
+                    .split(" ")
+                    .map(parseFloat);
+
+                vespaStore.map = L.map('map', {
+                    center: [latitude, longitude],
+                    zoom: 16,
+                    maxZoom: 20,
+                    layers: [
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            attribution: 'Map data © OpenStreetMap contributors'
+                        }),
+                    ]
+                });
+                updateMarkers();
+            } else {
+                vespaStore.map = L.map('map', {
+                    center: [50.8503, 4.3517],
+                    zoom: 9,
+                    maxZoom: 20,
+                    layers: [
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            attribution: 'Map data © OpenStreetMap contributors'
+                        }),
+                    ]
+                });
                 updateMarkers();
             }
         });
@@ -129,4 +158,3 @@ export default {
     },
 };
 </script>
-  

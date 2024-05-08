@@ -6,6 +6,7 @@ from difflib import get_close_matches
 from typing import Any, cast
 
 import pytz
+from django.conf import settings
 from django.contrib.gis.geos import Point
 from django.db.models import TextChoices
 
@@ -22,7 +23,7 @@ from vespadb.observations.models import (
 )
 from vespadb.observations.utils import check_if_point_in_anb_area, get_municipality_from_coordinates
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("vespadb.observations.tasks")
 
 ENUMS_MAPPING: dict[str, type[TextChoices]] = {
     "Nesthoogte": NestHeightEnum,
@@ -34,8 +35,16 @@ ENUMS_MAPPING: dict[str, type[TextChoices]] = {
     "Methode": EradicationMethodEnum,
     "Product": EradicationProductEnum,
 }
-
-ERADICATION_KEYWORD_LIST = ["BESTREDEN"]
+ENUM_FIELD_MAPPING: dict[str, str] = {
+    "Nesthoogte": "nest_height",
+    "Nestgrootte": "nest_size",
+    "Nestplaats": "nest_location",
+    "Nesttype": "nest_type",
+    "Resultaat": "eradication_result",
+    "Problemen": "eradication_problems",
+    "Methode": "eradication_method",
+    "Product": "eradication_product",
+}
 
 
 def map_attribute_to_enum(value: str, enum: type[TextChoices]) -> TextChoices | None:
@@ -65,7 +74,7 @@ def map_attributes_to_enums(api_attributes: list[dict[str, str]]) -> dict[str, T
         if attr_name in ENUMS_MAPPING:
             mapped_enum = map_attribute_to_enum(value, ENUMS_MAPPING[attr_name])
             if mapped_enum:
-                mapped_values[attr_name] = mapped_enum
+                mapped_values[ENUM_FIELD_MAPPING[attr_name]] = mapped_enum
             else:
                 logger.warning(f"No enum match found for {attr_name}: {value}")
     return mapped_values
@@ -128,6 +137,7 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
         if observation_time is None:
             observation_time = "00:00:00"
         observation_datetime_utc = parse_datetime_with_timezone(external_data["date"], observation_time)
+
         created_datetime = (
             datetime.fromisoformat(external_data["created"])
             .replace(tzinfo=pytz.timezone("Europe/Paris"))
@@ -150,6 +160,10 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
     mapped_enums = map_attributes_to_enums(external_data.get("attributes", []))
     validation_status = map_validation_status_to_enum(external_data.get("validation_status", "O"))
 
+    nest = external_data.get("nest", {})
+    cluster_id = None
+    if nest:
+        cluster_id = nest.get("id")
     mapped_data = {
         "wn_id": external_data["id"],
         "location": location,
@@ -161,6 +175,7 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
         "municipality": municipality,
         "province": municipality.province if municipality else None,
         "wn_validation_status": validation_status,
+        "wn_cluster_id": cluster_id,
         **mapped_enums,
     }
 
@@ -177,7 +192,7 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
     if (
         "notes" in external_data
         and external_data["notes"]
-        and any(keyword in external_data["notes"].upper() for keyword in ERADICATION_KEYWORD_LIST)
+        and any(keyword in external_data["notes"].upper() for keyword in settings.ERADICATION_KEYWORD_LIST)
     ):
         mapped_data["eradication_datetime"] = observation_datetime_utc
         mapped_data["eradicator_name"] = "Gemeld als bestreden"

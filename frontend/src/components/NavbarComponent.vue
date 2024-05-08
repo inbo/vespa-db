@@ -5,12 +5,13 @@
       <div class="d-flex align-items-center">
         <!-- View Mode Toggle -->
         <div class="btn-group me-2" role="group">
-          <router-link to="/map" class="btn btn-outline-light" active-class="active" aria-current="page">Map</router-link>
+          <router-link to="/map" class="btn btn-outline-light" active-class="active"
+            aria-current="page">Map</router-link>
           <router-link to="/table" class="btn btn-outline-light" active-class="active">Tabel</router-link>
         </div>
 
-        <!-- Export Toggle -->
-        <div class="btn-group me-2">
+        <!-- Export Toggle (Hidden on Small Devices) -->
+        <div class="btn-group me-2 d-none d-lg-inline-flex">
           <button type="button" class="btn btn-outline-light dropdown-toggle" data-bs-toggle="dropdown"
             aria-expanded="false">
             Export
@@ -52,23 +53,21 @@ export default {
     const vespaStore = useVespaStore();
     const isLoggedIn = computed(() => vespaStore.isLoggedIn);
     const username = computed(() => vespaStore.user.username);
-    const viewMode = computed(() => vespaStore.viewMode);
 
-    const setViewMode = (mode) => {
-      vespaStore.viewMode = mode;
-    };
     const logout = async () => {
       await vespaStore.logout();
       router.push('/login');
     };
+
     const navigateToChangePassword = () => {
       router.push({ name: 'ChangePassword' });
     };
+
     const exportData = (format) => {
       vespaStore.exportData(format);
     };
 
-    return { isLoggedIn, username, logout, navigateToChangePassword, setViewMode, viewMode, exportData };
+    return { isLoggedIn, username, logout, navigateToChangePassword, exportData };
   },
   mounted() {
     var dropdownElementList = [].slice.call(document.querySelectorAll('.dropdown-toggle'))

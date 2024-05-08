@@ -4,18 +4,17 @@ import csv
 import json
 import logging
 from typing import TYPE_CHECKING, Any
-from django.utils.decorators import method_decorator
-from django_ratelimit.decorators import ratelimit
 
 from django.contrib.gis.db.models.functions import Transform
 from django.contrib.gis.geos import GEOSGeometry
 from django.core.cache import cache
-from django.core.exceptions import ValidationError
-from django.db.models import CharField, OuterRef, Q, QuerySet, Subquery, Value
+from django.db.models import CharField, OuterRef, QuerySet, Subquery, Value
 from django.db.models.functions import Coalesce
 from django.http import HttpResponse, JsonResponse
+from django.utils.decorators import method_decorator
 from django.utils.timezone import now
 from django_filters.rest_framework import DjangoFilterBackend
+from django_ratelimit.decorators import ratelimit
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import filters, status
@@ -28,11 +27,12 @@ from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_gis.filters import DistanceToPointFilter
 
 from vespadb.observations.filters import ObservationFilter
-from vespadb.observations.models import Municipality, Observation
+from vespadb.observations.helpers import parse_and_convert_to_utc
+from vespadb.observations.models import Municipality, Observation, Province
 from vespadb.observations.serializers import (
     MunicipalitySerializer,
-    ObservationPatchSerializer,
     ObservationSerializer,
+    ProvinceSerializer,
 )
 
 if TYPE_CHECKING:
@@ -77,8 +77,6 @@ class ObservationsViewSet(ModelViewSet):
 
         :return: Serializer class
         """
-        if self.request.method == "PATCH":
-            return ObservationPatchSerializer
         return super().get_serializer_class()
 
     def get_permissions(self) -> list[BasePermission]:
@@ -118,19 +116,7 @@ class ObservationsViewSet(ModelViewSet):
                     output_field=CharField(),
                 )
             )
-
-        user = self.request.user
-
-        # Check if the user is an admin; if true, return all observations
-        if user.is_staff:
-            return base_queryset
-
-        # For authenticated users, filter by their reservations or non-reserved observations
-        if user.is_authenticated:
-            return base_queryset.filter(Q(reserved_by=None) | Q(reserved_by=user))
-
-        # Unauthenticated users see only non-reserved observations
-        return base_queryset.filter(reserved_by=None)
+        return base_queryset
 
     def perform_update(self, serializer: BaseSerializer) -> None:
         """
@@ -149,18 +135,44 @@ class ObservationsViewSet(ModelViewSet):
 
         Parameters
         ----------
-        - request (Request): The incoming HTTP request.
-        - *args (Any): Additional positional arguments.
-        - **kwargs (Any): Additional keyword arguments.
+            request (Request): The incoming HTTP request.
+            *args (Any): Additional positional arguments.
+            **kwargs (Any): Additional keyword arguments.
 
         Returns
         -------
-        - Response: The HTTP response with the partial update result.
+            Response: The HTTP response with the partial update result.
         """
-        try:
-            return super().partial_update(request, *args, **kwargs)
-        except ValidationError as e:
-            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        data = request.data.copy()
+
+        # Convert datetime fields to UTC if present
+        datetime_fields = [
+            "created_datetime",
+            "modified_datetime",
+            "wn_modified_datetime",
+            "wn_created_datetime",
+            "reserved_datetime",
+            "observation_datetime",
+            "eradication_datetime",
+        ]
+        for field in datetime_fields:
+            if field in data:
+                value = data[field]
+                if value in {"", None}:
+                    data[field] = None
+                else:
+                    try:
+                        data[field] = parse_and_convert_to_utc(value).isoformat()
+                    except (ValueError, TypeError):
+                        return Response(
+                            {field: [f"Invalid datetime format for {field}."]},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
+
+        serializer = self.get_serializer(instance=self.get_object(), data=data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
 
     def perform_create(self, serializer: BaseSerializer) -> None:
         """
@@ -237,7 +249,7 @@ class ObservationsViewSet(ModelViewSet):
             "results": data,
         })
 
-    @method_decorator(ratelimit(key='ip', rate='15/m', method='GET', block=True))
+    @method_decorator(ratelimit(key="ip", rate="15/m", method="GET", block=True))
     def list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """
         Handle requests for the list of observations with pagination.
@@ -264,7 +276,7 @@ class ObservationsViewSet(ModelViewSet):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
-    @method_decorator(ratelimit(key='ip', rate='15/m', method='GET', block=True))
+    @method_decorator(ratelimit(key="ip", rate="15/m", method="GET", block=True))
     @action(detail=False, methods=["get"], url_path="dynamic-geojson")
     def geojson(self, request: Request) -> HttpResponse:
         """Return GeoJSON data based on the request parameters."""
@@ -341,7 +353,7 @@ class ObservationsViewSet(ModelViewSet):
             ),
         ],
     )
-    @method_decorator(ratelimit(key='ip', rate='15/m', method='GET', block=True))
+    @method_decorator(ratelimit(key="ip", rate="15/m", method="GET", block=True))
     @action(detail=False, methods=["get"], permission_classes=[AllowAny])
     def export(self, request: Request) -> Response:
         """Export observations data in the specified format."""
@@ -385,6 +397,20 @@ class MunicipalityViewSet(ReadOnlyModelViewSet):
 
     queryset = Municipality.objects.all().order_by("name")
     serializer_class = MunicipalitySerializer
+    pagination_class = None
+
+    def get_permissions(self) -> list[BasePermission]:
+        """Determine the set of permissions that apply to the current action."""
+        if self.request.method == "GET":
+            return [AllowAny()]
+        return [IsAdminUser()]
+
+
+class ProvinceViewSet(ReadOnlyModelViewSet):
+    """ViewSet for the Province model."""
+
+    queryset = Province.objects.all().order_by("name")
+    serializer_class = ProvinceSerializer
     pagination_class = None
 
     def get_permissions(self) -> list[BasePermission]:

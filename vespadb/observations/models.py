@@ -215,7 +215,6 @@ class Observation(models.Model):
     observer_phone_number = models.CharField(max_length=20, blank=True, null=True)
     observer_email = models.EmailField(blank=True, null=True)
     observer_name = models.CharField(max_length=255, blank=True, null=True)
-    observer_allows_contact = models.BooleanField(default=False)
     observation_datetime = models.DateTimeField()
 
     wn_cluster_id = models.IntegerField(blank=True, null=True)
@@ -229,7 +228,7 @@ class Observation(models.Model):
     )
     wn_modified_datetime = models.DateTimeField(blank=True, null=True)
     wn_created_datetime = models.DateTimeField(blank=True, null=True)
-    duplicate = models.BooleanField(default=False)
+    visible = models.BooleanField(default=True)
     images = models.JSONField(default=list)
 
     reserved_by = models.ForeignKey(

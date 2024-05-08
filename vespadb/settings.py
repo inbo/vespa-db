@@ -43,6 +43,8 @@ else:
 
 MAX_RESERVATIONS = 50
 RESERVATION_DURATION_DAYS = 5
+ERADICATION_KEYWORD_LIST = ["BESTREDEN"]
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -138,6 +140,12 @@ CACHES = {
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "formatters": {
+        "default": {
+            "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            "datefmt": "%Y-%m-%d %H:%M:%S",
+        },
+    },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
@@ -146,10 +154,10 @@ LOGGING = {
     "loggers": {
         "celery": {
             "handlers": ["console"],
-            "level": "DEBUG",
+            "level": "INFO",
             "propagate": True,
         },
-        "vespadb.observations": {
+        "vespadb.observations.tasks": {
             "handlers": ["console"],
             "level": "INFO",
             "propagate": False,
@@ -237,15 +245,17 @@ CELERY_RESULT_SERIALIZER = "json"
 
 CELERY_BEAT_SCHEDULE = {
     "fetch_and_update_observations": {
-        "task": "vespadb.observations.tasks.fetch_and_update_observations",
-        "schedule": crontab(hour=4, minute=0),  # Runs every day at 04 AM
-    },
-    "audit_user_reservations": {
-        "task": "vespadb.users.tasks.audit_user_reservations",
-        "schedule": crontab(day_of_week="sunday", hour=3, minute=0),  # Runs every Sunday at 03 AM
+        "task": "vespadb.observations.tasks.observation_sync.fetch_and_update_observations",
+        "schedule": crontab(hour=10, minute=33),  # Runs every day at X AM UTC.
     },
     "remove_expired_reservations": {
-        "task": "vespadb.observations.tasks.cleanup_expired_reservations",
-        "schedule": crontab(day_of_week="monday", hour=5, minute=0),  # Runs every Monday at 05 AM
+        "task": "vespadb.observations.tasks.reservation_cleanup.free_expired_reservations_and_audit_reservation_count",
+        "schedule": crontab(hour=7, minute=0),  # Runs every day at X AM UTC
     },
 }
+
+TIME_ZONE = "UTC"
+USE_TZ = True
+
+CELERY_TIMEZONE = "UTC"
+CELERY_ENABLE_UTC = True

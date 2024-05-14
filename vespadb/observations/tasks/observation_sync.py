@@ -180,7 +180,7 @@ def manage_observations_visibility(token: str) -> None:
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
-def fetch_and_update_observations(self: Task) -> None:
+def fetch_and_update_observations(self: Task, since_week: int = 2) -> None:
     """Fetch observations from the waarnemingen API and update the database.
 
     Observations are fetched in batches and processed in bulk to minimize query overhead.
@@ -193,7 +193,7 @@ def fetch_and_update_observations(self: Task) -> None:
         raise self.retry(exc=Exception("Failed to obtain OAuth2 token"))
 
     modified_since = (
-        (timezone.now() - timedelta(weeks=2)).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        (timezone.now() - timedelta(weeks=since_week)).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
     )
 
     # Pre-fetch existing observations to minimize query overhead

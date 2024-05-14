@@ -34,10 +34,14 @@ This command imports ANB aread into the database
 
 This command imports provinces into the database
 
-
 #### assign_provinces_to_municipalities Command
 
 Fills in the province field for each municipality
+
+#### load_waarnemingen_observations
+
+This command is a helper command to load in observations from waarnemingen. 
+It will ask for the total of weeks back you want to import the observations.
 
 ## Cronjobs
 

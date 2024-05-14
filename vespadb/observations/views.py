@@ -25,6 +25,8 @@ from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_gis.filters import DistanceToPointFilter
+from rest_framework.parsers import JSONParser
+from django.db import transaction
 
 from vespadb.observations.filters import ObservationFilter
 from vespadb.observations.helpers import parse_and_convert_to_utc
@@ -332,13 +334,52 @@ class ObservationsViewSet(ModelViewSet):
 
     @action(detail=False, methods=["post"], permission_classes=[IsAdminUser])
     def bulk_import(self, request: Request) -> Response:
-        """Allow bulk import of observations for admin users only.
-
-        :param request: The request object.
-        :return: HTTP Response indicating the status of the operation.
         """
-        # Placeholder for bulk import logic.
-        return Response(status=status.HTTP_501_NOT_IMPLEMENTED)
+        Bulk import observations.
+
+        Accepts a JSON list of observation objects, validates them, and inserts them into the database if they are valid. Each object should conform to the following structure:
+
+        ```json
+        {
+            "wn_id": 101,
+            "location": {"latitude": 50.8503, "longitude": 4.3517},
+            ...
+        }
+        ```
+
+        Required fields include wn_id, location, species, and other fields depending on your specific validation rules.
+        """
+        # Parse the incoming JSON data
+        data = JSONParser().parse(request)
+
+        if not isinstance(data, list):
+            return Response({"error": "Expected a list of observation data"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # This will store all valid observations to be bulk created
+        valid_observations = []
+        errors = []
+
+        # Validate each observation data using the ObservationSerializer
+        for item in data:
+            serializer = ObservationSerializer(data=item)
+            if serializer.is_valid():
+                valid_observations.append(serializer.validated_data)
+            else:
+                errors.append(serializer.errors)
+
+        if errors:
+            # If there are errors, return them with a 400 Bad Request
+            return Response({"errors": errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Use Django's transaction to ensure atomicity of the bulk create operation
+        with transaction.atomic():
+            # Create all validated observations at once
+            Observation.objects.bulk_create([Observation(**data) for data in valid_observations])
+
+        return Response(
+            {"message": f"Successfully imported {len(valid_observations)} observations."},
+            status=status.HTTP_201_CREATED,
+        )
 
     @swagger_auto_schema(
         method="get",

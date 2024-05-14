@@ -1,12 +1,12 @@
 """Views for the observations app."""
 
 import csv
-import json
+import io
 import logging
 from typing import TYPE_CHECKING, Any
+
 from django.core.files.uploadedfile import InMemoryUploadedFile
-import io
-from django.core.cache import cache
+from django.db import transaction
 from django.db.models import CharField, OuterRef, QuerySet, Subquery, Value
 from django.db.models.functions import Coalesce
 from django.http import HttpResponse, JsonResponse
@@ -18,15 +18,13 @@ from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import filters, status
 from rest_framework.decorators import action
+from rest_framework.parsers import JSONParser
 from rest_framework.permissions import AllowAny, BasePermission, IsAdminUser, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_gis.filters import DistanceToPointFilter
-from rest_framework.parsers import JSONParser
-from django.db import transaction
-from typing import List, Dict
 
 from vespadb.observations.filters import ObservationFilter
 from vespadb.observations.helpers import parse_and_convert_to_utc
@@ -252,7 +250,7 @@ class ObservationsViewSet(ModelViewSet):
         })
 
     @method_decorator(ratelimit(key="ip", rate="15/m", method="GET", block=True))
-    def list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+    def retrieve_list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """
         Handle requests for the list of observations with pagination.
 
@@ -299,13 +297,12 @@ class ObservationsViewSet(ModelViewSet):
 
         Required fields include wn_id, location, species, and other fields depending on your specific validation rules.
         """
-
         # Check content type to parse data accordingly
         content_type = request.content_type
-        if content_type == 'application/json':
+        if content_type == "application/json":
             data = JSONParser().parse(request)
-        elif content_type == 'text/csv':
-            file = request.FILES.get('file')
+        elif content_type == "text/csv":
+            file = request.FILES.get("file")
             if not file:
                 return Response({"error": "CSV file is required."}, status=status.HTTP_400_BAD_REQUEST)
             data = self.parse_csv(file)
@@ -335,13 +332,13 @@ class ObservationsViewSet(ModelViewSet):
 
         return Response(
             {"message": f"Successfully imported {len(valid_observations)} observations."},
-            status=status.HTTP_201_CREATED
+            status=status.HTTP_201_CREATED,
         )
-    
-    def parse_csv(self, file: InMemoryUploadedFile)-> List[Dict[str, Any]]:
+
+    def parse_csv(self, file: InMemoryUploadedFile) -> list[dict[str, Any]]:
         """
         Parse a CSV file to a list of dictionaries.
-        
+
         Each row in the CSV is converted to a dictionary with keys corresponding to the CSV column headers.
         Assumes CSV contains headers that match the observation model fields directly and includes specific handling
         for geographic coordinates which are converted to a 'location' dictionary suitable for use with serializers.
@@ -351,15 +348,15 @@ class ObservationsViewSet(ModelViewSet):
         """
         file.seek(0)
         # Read and decode the file, ensuring compatibility with various CSV formatting
-        reader = csv.DictReader(io.StringIO(file.read().decode('utf-8')))
+        reader = csv.DictReader(io.StringIO(file.read().decode("utf-8")))
         result: list[dict[str, Any]] = []
         for row in reader:
             # Convert string latitude and longitude to float and combine into a 'location' dictionary
-            if 'latitude' in row and 'longitude' in row:
+            if "latitude" in row and "longitude" in row:
                 try:
-                    latitude = float(row['latitude'])
-                    longitude = float(row['longitude'])
-                    row['location'] = {'latitude': latitude, 'longitude': longitude}
+                    latitude = float(row["latitude"])
+                    longitude = float(row["longitude"])
+                    row["location"] = {"latitude": latitude, "longitude": longitude}
                 except ValueError:
                     continue  # Optionally handle or log errors for invalid data
             # Add the modified row dictionary to the result list

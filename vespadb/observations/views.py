@@ -2,9 +2,13 @@
 
 import csv
 import io
+import json
 import logging
 from typing import TYPE_CHECKING, Any
 
+from django.contrib.gis.db.models.functions import Transform
+from django.contrib.gis.geos import GEOSGeometry
+from django.core.cache import cache
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.db import transaction
 from django.db.models import CharField, OuterRef, QuerySet, Subquery, Value
@@ -279,6 +283,59 @@ class ObservationsViewSet(ModelViewSet):
     @method_decorator(ratelimit(key="ip", rate="15/m", method="GET", block=True))
     @action(detail=False, methods=["get"], url_path="dynamic-geojson")
     def geojson(self, request: Request) -> HttpResponse:
+        """Return GeoJSON data based on the request parameters."""
+        # Create a modified query dictionary excluding 'bbox'
+        query_params = request.GET.copy()
+        bbox_str = query_params.pop("bbox", None)
+
+        # Sort parameters and create a cache key without 'bbox'
+        sorted_params = "&".join(sorted(f"{key}={value}" for key, value in query_params.items()))
+        cache_key = f"vespadb::{request.path}::{sorted_params}"
+        logger.info(f"Checking cache for {cache_key}")
+
+        # Attempt to get cached data
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            logger.info("Cache hit - Returning cached response")
+            return JsonResponse(cached_data, safe=False)
+
+        bbox_str = request.GET.get("bbox")
+        if bbox_str:
+            try:
+                bbox_coords = list(map(float, bbox_str.split(",")))
+                if len(bbox_coords) == BBOX_LENGTH:
+                    xmin, ymin, xmax, ymax = bbox_coords
+                    bbox_wkt = f"POLYGON(({xmin} {ymin}, {xmin} {ymax}, {xmax} {ymax}, {xmax} {ymin}, {xmin} {ymin}))"
+                    bbox = GEOSGeometry(bbox_wkt, srid=4326)
+                else:
+                    return HttpResponse("Invalid bbox format", status=status.HTTP_400_BAD_REQUEST)
+            except ValueError:
+                return HttpResponse("Invalid bbox values", status=status.HTTP_400_BAD_REQUEST)
+        else:
+            bbox = None
+
+        # Apply filters
+        queryset = self.filter_queryset(self.get_queryset())
+
+        if bbox:
+            queryset = queryset.filter(location__within=bbox)
+
+        queryset = queryset.annotate(point=Transform("location", 4326))
+
+        features = [
+            {
+                "type": "Feature",
+                "properties": {"id": obs.id},
+                "geometry": json.loads(obs.point.geojson) if obs.point else None,
+            }
+            for obs in queryset
+        ]
+        geojson_response = {"type": "FeatureCollection", "features": features}
+        cache.set(cache_key, geojson_response, REDIS_CACHE_EXPIRATION)  # 24 hours
+        return JsonResponse(geojson_response)
+
+    @action(detail=False, methods=["post"], permission_classes=[IsAdminUser])
+    def bulk_import(self, request: Request) -> Response:
         """
         Bulk import observations.
 
@@ -362,55 +419,6 @@ class ObservationsViewSet(ModelViewSet):
             # Add the modified row dictionary to the result list
             result.append(row)
         return result
-
-    @action(detail=False, methods=["post"], permission_classes=[IsAdminUser])
-    def bulk_import(self, request: Request) -> Response:
-        """
-        Bulk import observations.
-
-        Accepts a JSON list of observation objects, validates them, and inserts them into the database if they are valid. Each object should conform to the following structure:
-
-        ```json
-        {
-            "wn_id": 101,
-            "location": {"latitude": 50.8503, "longitude": 4.3517},
-            ...
-        }
-        ```
-
-        Required fields include wn_id, location, species, and other fields depending on your specific validation rules.
-        """
-        # Parse the incoming JSON data
-        data = JSONParser().parse(request)
-
-        if not isinstance(data, list):
-            return Response({"error": "Expected a list of observation data"}, status=status.HTTP_400_BAD_REQUEST)
-
-        # This will store all valid observations to be bulk created
-        valid_observations = []
-        errors = []
-
-        # Validate each observation data using the ObservationSerializer
-        for item in data:
-            serializer = ObservationSerializer(data=item)
-            if serializer.is_valid():
-                valid_observations.append(serializer.validated_data)
-            else:
-                errors.append(serializer.errors)
-
-        if errors:
-            # If there are errors, return them with a 400 Bad Request
-            return Response({"errors": errors}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Use Django's transaction to ensure atomicity of the bulk create operation
-        with transaction.atomic():
-            # Create all validated observations at once
-            Observation.objects.bulk_create([Observation(**data) for data in valid_observations])
-
-        return Response(
-            {"message": f"Successfully imported {len(valid_observations)} observations."},
-            status=status.HTTP_201_CREATED,
-        )
 
     @swagger_auto_schema(
         method="get",

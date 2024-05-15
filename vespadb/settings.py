@@ -41,26 +41,17 @@ if os.getenv("DJANGO_ENV") == "development":
 else:
     secrets = get_secret("vespadb-secrets")  # type: ignore[assignment]
 
-MAX_RESERVATIONS = 50
-RESERVATION_DURATION_DAYS = 5
-ERADICATION_KEYWORD_LIST = ["BESTREDEN"]
-
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
-
-AUTH_USER_MODEL = "users.VespaUser"
+# Ensure secrets are available
 if secrets is None:
     raise Exception("Secrets not found")  # noqa: TRY002
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
+# Core settings
+BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = secrets["DJANGO_SECRET_KEY"]
 ALLOWED_HOSTS = secrets["DJANGO_ALLOWED_HOSTS"]
+DEBUG = secrets["DJANGO_DEBUG"] == "True"
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = secrets["DJANGO_DEBUG"]
-
-# Application definition
+# Application definition and middleware
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -93,13 +84,61 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-# list of origins authorized to make requests
+# CORS and CSRF settings
 CORS_ALLOWED_ORIGINS = secrets["CORS_ALLOWED_ORIGINS"]
 CSRF_TRUSTED_ORIGINS = secrets["CSRF_TRUSTED_ORIGINS"]
 SESSION_COOKIE_DOMAIN = secrets["SESSION_COOKIE_DOMAIN"]
 CSRF_COOKIE_DOMAIN = secrets["CSRF_COOKIE_DOMAIN"]
-# whether the server allows cookies in the cross-site HTTP requests.
 CORS_ALLOW_CREDENTIALS = True
+
+# Database configuration
+DATABASES = {
+    "default": {
+        "ENGINE": "django.contrib.gis.db.backends.postgis",
+        "NAME": secrets["POSTGRES_DB"],
+        "USER": secrets["POSTGRES_USER"],
+        "PASSWORD": secrets["POSTGRES_PASSWORD"],
+        "HOST": secrets["POSTGRES_HOST"],
+        "PORT": secrets["POSTGRES_PORT"],
+    }
+}
+
+# Cache and session settings
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": secrets["REDIS_LOCATION"],
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        },
+        "KEY_PREFIX": "vespadb",
+    }
+}
+
+# Celery configuration
+CELERY_BROKER_URL = secrets["CELERY_BROKER_URL"]
+CELERY_RESULT_BACKEND = "django-db"
+CELERY_ACCEPT_CONTENT = ["application/json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_BEAT_SCHEDULE = {
+    "fetch_and_update_observations": {
+        "task": "vespadb.observations.tasks.observation_sync.fetch_and_update_observations",
+        "schedule": crontab(hour=10, minute=33),  # Runs every day at X AM UTC.
+    },
+    "remove_expired_reservations": {
+        "task": "vespadb.observations.tasks.reservation_cleanup.free_expired_reservations_and_audit_reservation_count",
+        "schedule": crontab(hour=7, minute=0),  # Runs every day at X AM UTC
+    },
+}
+
+
+
+MAX_RESERVATIONS = 50
+RESERVATION_DURATION_DAYS = 5
+ERADICATION_KEYWORD_LIST = ["BESTREDEN"]
+
+AUTH_USER_MODEL = "users.VespaUser"
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
@@ -115,28 +154,11 @@ SESSION_SAVE_EVERY_REQUEST = True
 SESSION_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_SECURE = False
 REDIS_REFRESH_RATE_MIN = secrets["REDIS_REFRESH_RATE_MIN"]  # default to 15 minutes
+CELERY_TIMEZONE = "UTC"
+CELERY_ENABLE_UTC = True
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.contrib.gis.db.backends.postgis",
-        "NAME": secrets["POSTGRES_DB"],
-        "USER": secrets["POSTGRES_USER"],
-        "PASSWORD": secrets["POSTGRES_PASSWORD"],
-        "HOST": secrets["POSTGRES_HOST"],
-        "PORT": secrets["POSTGRES_PORT"],
-    }
-}
-CACHES = {
-    "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": secrets["REDIS_LOCATION"],
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
-        },
-        "KEY_PREFIX": "vespadb",
-    }
-}
 
+# Logging configuration
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -169,8 +191,24 @@ LOGGING = {
     },
 }
 
+# Static and template settings
+STATIC_URL = "/static/"
+STATICFILES_DIRS = [
+    BASE_DIR / "static",
+]
+STATIC_ROOT = BASE_DIR / "collected_static"
 ROOT_URLCONF = "vespadb.urls"
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+LOGIN_URL = "/login/"
+WSGI_APPLICATION = "vespadb.wsgi.application"
+LANGUAGE_CODE = "en-us"
+TIME_ZONE = "UTC"
+USE_I18N = True
+USE_TZ = True
+TIME_ZONE = "UTC"
+USE_TZ = True
 
+# templates
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -187,12 +225,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = "vespadb.wsgi.application"
-
-
 # Password validation
-# https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
-
 AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
@@ -207,55 +240,3 @@ AUTH_PASSWORD_VALIDATORS = [
         "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
-
-
-# Internationalization
-# https://docs.djangoproject.com/en/5.0/topics/i18n/
-
-LANGUAGE_CODE = "en-us"
-
-TIME_ZONE = "UTC"
-
-USE_I18N = True
-
-USE_TZ = True
-
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.0/howto/static-files/
-STATIC_URL = "/static/"
-STATICFILES_DIRS = [
-    BASE_DIR / "static",
-]
-STATIC_ROOT = BASE_DIR / "collected_static"
-
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
-
-DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-LOGIN_URL = "/login/"
-
-
-# Celery specifications
-CELERY_BROKER_URL = secrets["CELERY_BROKER_URL"]
-CELERY_RESULT_BACKEND = "django-db"
-CELERY_ACCEPT_CONTENT = ["application/json"]
-CELERY_TASK_SERIALIZER = "json"
-CELERY_RESULT_SERIALIZER = "json"
-
-CELERY_BEAT_SCHEDULE = {
-    "fetch_and_update_observations": {
-        "task": "vespadb.observations.tasks.observation_sync.fetch_and_update_observations",
-        "schedule": crontab(hour=10, minute=33),  # Runs every day at X AM UTC.
-    },
-    "remove_expired_reservations": {
-        "task": "vespadb.observations.tasks.reservation_cleanup.free_expired_reservations_and_audit_reservation_count",
-        "schedule": crontab(hour=7, minute=0),  # Runs every day at X AM UTC
-    },
-}
-
-TIME_ZONE = "UTC"
-USE_TZ = True
-
-CELERY_TIMEZONE = "UTC"
-CELERY_ENABLE_UTC = True

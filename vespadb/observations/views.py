@@ -31,7 +31,6 @@ from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_gis.filters import DistanceToPointFilter
-from dateutil import parser as dateutil_parser
 
 from vespadb.observations.filters import ObservationFilter
 from vespadb.observations.helpers import parse_and_convert_to_utc
@@ -454,6 +453,7 @@ class ObservationsViewSet(ModelViewSet):
             return response
 
         return Response({"error": "Unsupported format specified."}, status=status.HTTP_400_BAD_REQUEST)
+
 
 class MunicipalityViewSet(ReadOnlyModelViewSet):
     """ViewSet for the Municipality model."""

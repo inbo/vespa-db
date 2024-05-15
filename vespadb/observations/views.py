@@ -13,6 +13,7 @@ from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.db import transaction
 from django.db.models import CharField, OuterRef, QuerySet, Subquery, Value
 from django.db.models.functions import Coalesce
+from django.db.utils import IntegrityError
 from django.http import HttpResponse, JsonResponse
 from django.utils.decorators import method_decorator
 from django.utils.timezone import now
@@ -223,15 +224,15 @@ class ObservationsViewSet(ModelViewSet):
         observation = self.get_object()
         reserved_by = observation.reserved_by
 
-        # Perform the standard delete operation
-        response = super().destroy(request, *args, **kwargs)
-
-        # If the observation was reserved, decrement the reservation count of the user
-        if reserved_by:
-            reserved_by.reservation_count -= 1
-            reserved_by.save(update_fields=["reservation_count"])
-
-        return response
+        try:
+            response = super().destroy(request, *args, **kwargs)
+            if reserved_by:
+                reserved_by.reservation_count -= 1
+                reserved_by.save(update_fields=["reservation_count"])
+            return response
+        except Exception as e:
+            logger.exception("Error during delete operation")
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def get_paginated_response(self, data: list[dict[str, Any]]) -> Response:
         """
@@ -394,13 +395,18 @@ class ObservationsViewSet(ModelViewSet):
             return Response({"errors": errors}, status=status.HTTP_400_BAD_REQUEST)
 
         # Use Django's transaction to ensure atomicity of the bulk create operation
-        with transaction.atomic():
-            Observation.objects.bulk_create([Observation(**data) for data in valid_observations])
-
-        return Response(
-            {"message": f"Successfully imported {len(valid_observations)} observations."},
-            status=status.HTTP_201_CREATED,
-        )
+        try:
+            with transaction.atomic():
+                Observation.objects.bulk_create([Observation(**data) for data in valid_observations])
+            return Response(
+                {"message": f"Successfully imported {len(valid_observations)} observations."},
+                status=status.HTTP_201_CREATED,
+            )
+        except IntegrityError as e:
+            logger.exception("Error during bulk import")
+            return Response(
+                {"error": f"An error occurred during bulk import: {e!s}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     def parse_csv(self, file: InMemoryUploadedFile) -> list[dict[str, Any]]:
         """

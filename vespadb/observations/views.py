@@ -4,8 +4,9 @@ import csv
 import io
 import json
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
+from dateutil import parser as dateutil_parser
 from django.contrib.gis.db.models.functions import Transform
 from django.contrib.gis.geos import GEOSGeometry
 from django.core.cache import cache
@@ -13,6 +14,7 @@ from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.db import transaction
 from django.db.models import CharField, OuterRef, QuerySet, Subquery, Value
 from django.db.models.functions import Coalesce
+from django.db.utils import IntegrityError
 from django.http import HttpResponse, JsonResponse
 from django.utils.decorators import method_decorator
 from django.utils.timezone import now
@@ -38,9 +40,6 @@ from vespadb.observations.serializers import (
     ObservationSerializer,
     ProvinceSerializer,
 )
-
-if TYPE_CHECKING:
-    from vespadb.users.models import VespaUser
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -223,15 +222,15 @@ class ObservationsViewSet(ModelViewSet):
         observation = self.get_object()
         reserved_by = observation.reserved_by
 
-        # Perform the standard delete operation
-        response = super().destroy(request, *args, **kwargs)
-
-        # If the observation was reserved, decrement the reservation count of the user
-        if reserved_by:
-            reserved_by.reservation_count -= 1
-            reserved_by.save(update_fields=["reservation_count"])
-
-        return response
+        try:
+            response = super().destroy(request, *args, **kwargs)
+            if reserved_by:
+                reserved_by.reservation_count -= 1
+                reserved_by.save(update_fields=["reservation_count"])
+            return response
+        except Exception as e:
+            logger.exception("Error during delete operation")
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def get_paginated_response(self, data: list[dict[str, Any]]) -> Response:
         """
@@ -346,89 +345,72 @@ class ObservationsViewSet(ModelViewSet):
 
     @action(detail=False, methods=["post"], permission_classes=[IsAdminUser])
     def bulk_import(self, request: Request) -> Response:
-        """
-        Bulk import observations.
+        """Bulk import observations from either JSON or CSV file."""
+        data = self.parse_request_data(request)
+        if isinstance(data, Response):  # If parse_request_data returned an error Response
+            return data
 
-        Accepts a JSON list of observation objects or a CSV file with equivalent data, validates them, and inserts them into the database if they are valid. The expected JSON structure and CSV headers must include:
+        processed_data, errors = self.process_data(data)
+        if errors:
+            return Response({"errors": errors}, status=status.HTTP_400_BAD_REQUEST)
 
-        JSON example:
-        ```json
-        [{
-            "wn_id": 101,
-            "location": {"latitude": 50.8503, "longitude": 4.3517},
-            ...
-        }]
-        ```
+        return self.save_observations(processed_data)
 
-        CSV headers must include: wn_id, latitude, longitude, etc.
-
-        Required fields include wn_id, location, species, and other fields depending on your specific validation rules.
-        """
-        # Check content type to parse data accordingly
+    def parse_request_data(self, request: Request) -> list[dict[str, Any]] | Response:
+        """Parse data from the request based on content type."""
         content_type = request.content_type
         if content_type == "application/json":
-            data = JSONParser().parse(request)
-        elif content_type == "text/csv":
+            return JSONParser().parse(request)
+        if content_type.startswith("multipart/form-data"):
             file = request.FILES.get("file")
             if not file:
                 return Response({"error": "CSV file is required."}, status=status.HTTP_400_BAD_REQUEST)
-            data = self.parse_csv(file)
-        else:
-            return Response({"error": "Unsupported content type."}, status=status.HTTP_400_BAD_REQUEST)
+            return self.parse_csv(file)
+        return Response({"error": "Unsupported content type."}, status=status.HTTP_400_BAD_REQUEST)
 
-        if not isinstance(data, list):
-            return Response({"error": "Expected a list of observation data"}, status=status.HTTP_400_BAD_REQUEST)
-
+    def process_data(self, data: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        """Process and validate data."""
         valid_observations = []
         errors = []
-
-        # Validate each observation data using the ObservationSerializer
-        for item in data:
-            serializer = ObservationSerializer(data=item)
+        for data_item in data:
+            cleaned_item = self.clean_data(data_item)
+            serializer = ObservationSerializer(data=cleaned_item)
             if serializer.is_valid():
                 valid_observations.append(serializer.validated_data)
             else:
                 errors.append(serializer.errors)
+        return valid_observations, errors
 
-        if errors:
-            return Response({"errors": errors}, status=status.HTTP_400_BAD_REQUEST)
+    def clean_data(self, data_dict: dict[str, Any]) -> dict[str, Any]:
+        """Remove unnecessary fields and clean data items."""
+        data_dict.pop("id", None)
+        eradication_datetime = data_dict.get("eradication_datetime")
+        if eradication_datetime:
+            try:
+                data_dict["eradication_datetime"] = dateutil_parser.isoparse(eradication_datetime)
+            except (ValueError, TypeError):
+                data_dict.pop("eradication_datetime", None)
+        return {k: v for k, v in data_dict.items() if v not in {None, ""}}
 
-        # Use Django's transaction to ensure atomicity of the bulk create operation
-        with transaction.atomic():
-            Observation.objects.bulk_create([Observation(**data) for data in valid_observations])
-
-        return Response(
-            {"message": f"Successfully imported {len(valid_observations)} observations."},
-            status=status.HTTP_201_CREATED,
-        )
+    def save_observations(self, valid_data: list[dict[str, Any]]) -> Response:
+        """Attempt to save valid observation data to the database."""
+        try:
+            with transaction.atomic():
+                Observation.objects.bulk_create([Observation(**data) for data in valid_data])
+            return Response(
+                {"message": f"Successfully imported {len(valid_data)} observations."}, status=status.HTTP_201_CREATED
+            )
+        except IntegrityError as e:
+            logger.exception("Error during bulk import")
+            return Response(
+                {"error": f"An error occurred during bulk import: {e!s}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     def parse_csv(self, file: InMemoryUploadedFile) -> list[dict[str, Any]]:
-        """
-        Parse a CSV file to a list of dictionaries.
-
-        Each row in the CSV is converted to a dictionary with keys corresponding to the CSV column headers.
-        Assumes CSV contains headers that match the observation model fields directly and includes specific handling
-        for geographic coordinates which are converted to a 'location' dictionary suitable for use with serializers.
-
-        :param file: In-memory file object containing CSV data.
-        :return: List of dictionaries representing each row.
-        """
+        """Parse a CSV file to a list of dictionaries."""
         file.seek(0)
-        # Read and decode the file, ensuring compatibility with various CSV formatting
         reader = csv.DictReader(io.StringIO(file.read().decode("utf-8")))
-        result: list[dict[str, Any]] = []
-        for row in reader:
-            # Convert string latitude and longitude to float and combine into a 'location' dictionary
-            if "latitude" in row and "longitude" in row:
-                try:
-                    latitude = float(row["latitude"])
-                    longitude = float(row["longitude"])
-                    row["location"] = {"latitude": latitude, "longitude": longitude}
-                except ValueError:
-                    continue  # Optionally handle or log errors for invalid data
-            # Add the modified row dictionary to the result list
-            result.append(row)
-        return result
+        return [self.clean_data(row) for row in reader if row]
 
     @swagger_auto_schema(
         method="get",
@@ -447,38 +429,29 @@ class ObservationsViewSet(ModelViewSet):
     @action(detail=False, methods=["get"], permission_classes=[AllowAny])
     def export(self, request: Request) -> Response:
         """Export observations data in the specified format."""
-        user: VespaUser = request.user
+        user = request.user
         export_format = request.query_params.get("export_format", "json").lower()
 
-        # Reuse the logic from `get_queryset` and `get_serializer_class`
         queryset = self.filter_queryset(self.get_queryset())
         serializer_class = self.get_serializer_class()
-
-        # Context may include request info, if necessary for serialization
         serializer_context = self.get_serializer_context()
         serializer = serializer_class(queryset, many=True, context=serializer_context)
 
-        # Serialize the data
         serialized_data = serializer.data
 
-        # Export to JSON
         if export_format == "json":
-            return JsonResponse(serialized_data, safe=False)
+            return JsonResponse(serialized_data, safe=False, json_dumps_params={"indent": 2})
 
-        # Export to CSV
         if export_format == "csv":
             response = HttpResponse(content_type="text/csv")
             response["Content-Disposition"] = f'attachment; filename="observations_export_{user.username}.csv"'
-
-            # Assuming `serialized_data` is a list of dictionaries
             if serialized_data:
-                headers = serialized_data[0].keys()  # CSV column headers
+                headers = serialized_data[0].keys()
                 writer = csv.DictWriter(response, fieldnames=headers)
                 writer.writeheader()
                 writer.writerows(serialized_data)
             return response
 
-        # Handle unsupported formats
         return Response({"error": "Unsupported format specified."}, status=status.HTTP_400_BAD_REQUEST)
 
 

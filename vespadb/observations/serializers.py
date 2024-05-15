@@ -97,15 +97,20 @@ conditional_fields = [
 
 # Observation serializers
 class ObservationSerializer(serializers.ModelSerializer):
-    """Serializer for the full details of a Observation model instance."""
+    """Serializer for the full details of an Observation model instance."""
 
     municipality_name = serializers.SerializerMethodField()
 
     class Meta:
         """Meta class for the ObservationSerializer."""
-
         model = Observation
         fields = "__all__"
+        extra_kwargs = {
+            'wn_id': {'required': False, 'allow_null': True},
+            'wn_cluster_id': {'required': False, 'allow_null': True},
+            'eradication_datetime': {'required': False, 'allow_null': True},
+            'id': {'read_only': True},
+        }
 
     def get_municipality_name(self, obj: Observation) -> str | None:
         """
@@ -305,8 +310,7 @@ class ObservationSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Missing or invalid location data")
 
         return Point(longitude, latitude)
-
-
+    
 # Municipality serializers
 class MunicipalitySerializer(serializers.ModelSerializer):
     """Serializer for the Municipality model."""

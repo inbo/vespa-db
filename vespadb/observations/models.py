@@ -196,7 +196,7 @@ class Observation(models.Model):
     """Model for the observation of a Vespa velutina nest."""
 
     id = models.AutoField(primary_key=True)
-    wn_id = models.IntegerField(unique=True)
+    wn_id = models.IntegerField(unique=True, blank=True, null=True)
     created_datetime = models.DateTimeField(auto_now_add=True)
     modified_datetime = models.DateTimeField(auto_now=True)
     location = gis_models.PointField()

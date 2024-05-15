@@ -4,9 +4,9 @@ import csv
 import io
 import json
 import logging
-from typing import TYPE_CHECKING, Any
-from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
+from typing import Any
 
+from dateutil import parser as dateutil_parser
 from django.contrib.gis.db.models.functions import Transform
 from django.contrib.gis.geos import GEOSGeometry
 from django.core.cache import cache
@@ -31,7 +31,6 @@ from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_gis.filters import DistanceToPointFilter
-from dateutil import parser as dateutil_parser
 
 from vespadb.observations.filters import ObservationFilter
 from vespadb.observations.helpers import parse_and_convert_to_utc
@@ -41,9 +40,6 @@ from vespadb.observations.serializers import (
     ObservationSerializer,
     ProvinceSerializer,
 )
-
-if TYPE_CHECKING:
-    from vespadb.users.models import VespaUser
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -349,58 +345,60 @@ class ObservationsViewSet(ModelViewSet):
 
     @action(detail=False, methods=["post"], permission_classes=[IsAdminUser])
     def bulk_import(self, request: Request) -> Response:
-        """
-        Bulk import observations.
-        Accepts a JSON list of observation objects or a CSV file with equivalent data,
-        validates them, and inserts them into the database if they are valid.
-        """
+        """Bulk import observations from either JSON or CSV file."""
+        data = self.parse_request_data(request)
+        if isinstance(data, Response):  # If parse_request_data returned an error Response
+            return data
+
+        processed_data, errors = self.process_data(data)
+        if errors:
+            return Response({"errors": errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        return self.save_observations(processed_data)
+
+    def parse_request_data(self, request: Request) -> list[dict[str, Any]] | Response:
+        """Parse data from the request based on content type."""
         content_type = request.content_type
         if content_type == "application/json":
-            data = JSONParser().parse(request)
-        elif content_type.startswith("multipart/form-data"):
+            return JSONParser().parse(request)
+        if content_type.startswith("multipart/form-data"):
             file = request.FILES.get("file")
             if not file:
                 return Response({"error": "CSV file is required."}, status=status.HTTP_400_BAD_REQUEST)
-            data = self.parse_csv(file)
-        else:
-            return Response({"error": "Unsupported content type."}, status=status.HTTP_400_BAD_REQUEST)
+            return self.parse_csv(file)
+        return Response({"error": "Unsupported content type."}, status=status.HTTP_400_BAD_REQUEST)
 
-        if not isinstance(data, list):
-            return Response({"error": "Expected a list of observation data"}, status=status.HTTP_400_BAD_REQUEST)
-
+    def process_data(self, data: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        """Process and validate data."""
         valid_observations = []
         errors = []
-
-        for item in data:
-            # Remove fields that should not be set when importing
-            item.pop("id", None)
-
-            # Handle eradication_datetime format
-            eradication_datetime = item.get("eradication_datetime")
-            if eradication_datetime:
-                try:
-                    item["eradication_datetime"] = dateutil_parser.isoparse(eradication_datetime)
-                except (ValueError, TypeError):
-                    item.pop("eradication_datetime", None)
-
-            # Filter out fields that have no value
-            cleaned_data = {k: v for k, v in item.items() if v not in [None, ""]}
-
-            serializer = ObservationSerializer(data=cleaned_data)
+        for data_item in data:
+            cleaned_item = self.clean_data(data_item)
+            serializer = ObservationSerializer(data=cleaned_item)
             if serializer.is_valid():
                 valid_observations.append(serializer.validated_data)
             else:
                 errors.append(serializer.errors)
+        return valid_observations, errors
 
-        if errors:
-            return Response({"errors": errors}, status=status.HTTP_400_BAD_REQUEST)
+    def clean_data(self, data_dict: dict[str, Any]) -> dict[str, Any]:
+        """Remove unnecessary fields and clean data items."""
+        data_dict.pop("id", None)
+        eradication_datetime = data_dict.get("eradication_datetime")
+        if eradication_datetime:
+            try:
+                data_dict["eradication_datetime"] = dateutil_parser.isoparse(eradication_datetime)
+            except (ValueError, TypeError):
+                data_dict.pop("eradication_datetime", None)
+        return {k: v for k, v in data_dict.items() if v not in {None, ""}}
 
+    def save_observations(self, valid_data: list[dict[str, Any]]) -> Response:
+        """Attempt to save valid observation data to the database."""
         try:
             with transaction.atomic():
-                Observation.objects.bulk_create([Observation(**data) for data in valid_observations])
+                Observation.objects.bulk_create([Observation(**data) for data in valid_data])
             return Response(
-                {"message": f"Successfully imported {len(valid_observations)} observations."},
-                status=status.HTTP_201_CREATED,
+                {"message": f"Successfully imported {len(valid_data)} observations."}, status=status.HTTP_201_CREATED
             )
         except IntegrityError as e:
             logger.exception("Error during bulk import")
@@ -409,49 +407,10 @@ class ObservationsViewSet(ModelViewSet):
             )
 
     def parse_csv(self, file: InMemoryUploadedFile) -> list[dict[str, Any]]:
-        """
-        Parse a CSV file to a list of dictionaries.
-        Each row in the CSV is converted to a dictionary with keys corresponding to the CSV column headers.
-        Assumes CSV contains headers that match the observation model fields directly and includes specific handling
-        for geographic coordinates which are converted to a 'location' dictionary suitable for use with serializers.
-
-        :param file: In-memory file object containing CSV data.
-        :return: List of dictionaries representing each row.
-        """
+        """Parse a CSV file to a list of dictionaries."""
         file.seek(0)
         reader = csv.DictReader(io.StringIO(file.read().decode("utf-8")))
-        result: list[dict[str, Any]] = []
-        for row in reader:
-            # Remove the id field if present
-            row.pop("id", None)
-
-            location_str = row.get("location")
-            if location_str and location_str.startswith("SRID=4326;POINT"):
-                try:
-                    # Parse WKT string to extract latitude and longitude
-                    coords = location_str.replace("SRID=4326;POINT (", "").replace(")", "").split()
-                    longitude = float(coords[0])
-                    latitude = float(coords[1])
-                    row["location"] = {"latitude": latitude, "longitude": longitude}
-                except (ValueError, IndexError):
-                    continue  # Skip rows with invalid location data
-
-            # Ensure optional fields are handled and remove `wn_id`, `wn_cluster_id`
-            row.pop("wn_id", None)
-            row.pop("wn_cluster_id", None)
-
-            # Handle eradication_datetime format
-            eradication_datetime = row.get("eradication_datetime")
-            if eradication_datetime:
-                try:
-                    row["eradication_datetime"] = dateutil_parser.isoparse(eradication_datetime)
-                except (ValueError, TypeError):
-                    row.pop("eradication_datetime", None)
-
-            # Filter out fields that have no value
-            cleaned_data = {k: v for k, v in row.items() if v not in [None, ""]}
-            result.append(cleaned_data)
-        return result
+        return [self.clean_data(row) for row in reader if row]
 
     @swagger_auto_schema(
         method="get",
@@ -481,7 +440,7 @@ class ObservationsViewSet(ModelViewSet):
         serialized_data = serializer.data
 
         if export_format == "json":
-            return JsonResponse(serialized_data, safe=False, json_dumps_params={'indent': 2})
+            return JsonResponse(serialized_data, safe=False, json_dumps_params={"indent": 2})
 
         if export_format == "csv":
             response = HttpResponse(content_type="text/csv")
@@ -494,6 +453,7 @@ class ObservationsViewSet(ModelViewSet):
             return response
 
         return Response({"error": "Unsupported format specified."}, status=status.HTTP_400_BAD_REQUEST)
+
 
 class MunicipalityViewSet(ReadOnlyModelViewSet):
     """ViewSet for the Municipality model."""

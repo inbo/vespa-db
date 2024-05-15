@@ -289,8 +289,14 @@ export const useVespaStore = defineStore('vespaStore', {
 
             try {
                 const response = await ApiService.get(url, { responseType: 'blob' });
-                const blob = new Blob([response.data], { type: format === 'json' ? 'application/json' : 'text/csv' });
-                const downloadUrl = window.URL.createObjectURL(blob);
+                let data = response.data;
+
+                // Convert to string if the format is JSON
+                if (format === 'json') {
+                    data = JSON.stringify(data, null, 2); // Convert object to JSON string with pretty print
+                }
+
+                const downloadUrl = window.URL.createObjectURL(new Blob([data], { type: 'application/json' }));
                 const link = document.createElement('a');
                 link.href = downloadUrl;
                 link.setAttribute('download', `export.${format}`);

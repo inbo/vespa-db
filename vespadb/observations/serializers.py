@@ -103,7 +103,6 @@ class ObservationSerializer(serializers.ModelSerializer):
 
     class Meta:
         """Meta class for the ObservationSerializer."""
-
         model = Observation
         fields = "__all__"
         extra_kwargs = {
@@ -311,8 +310,7 @@ class ObservationSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Missing or invalid location data")
 
         return Point(longitude, latitude)
-
-
+    
 # Municipality serializers
 class MunicipalitySerializer(serializers.ModelSerializer):
     """Serializer for the Municipality model."""

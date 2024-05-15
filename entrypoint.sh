@@ -23,4 +23,7 @@ python manage.py load_anb
 echo "Assign provinces to municipalities..."
 python manage.py assign_provinces_to_municipalities
 
+echo "Sync with waarnemingen.be..."
+python manage.py load_waarnemingen_observations
+
 exec /opt/vespadb-env/bin/poe "$@"

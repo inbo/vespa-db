@@ -75,7 +75,6 @@ INSTALLED_APPS = [
     "vespadb",
     "vespadb.observations",
     "vespadb.users",
-    "vespadb.app_auth",
 ]
 
 MIDDLEWARE = [

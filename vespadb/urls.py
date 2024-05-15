@@ -26,7 +26,6 @@ urlpatterns = [
     path("redoc/", schema_view.with_ui("redoc", cache_timeout=0), name="schema-redoc"),
     path("admin/", admin.site.urls),
     # User views
-    path("app_auth/", include("vespadb.app_auth.urls")),
     path("admin/", admin.site.urls),
     # Include the observations app URLs
     path("", include("vespadb.observations.urls", namespace="observations")),

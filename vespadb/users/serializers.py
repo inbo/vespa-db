@@ -1,37 +1,66 @@
 """Serializer for the users app."""
 
 import logging
-from typing import Any
+from typing import Any, Dict, List
 
-from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
 
 from vespadb.users.models import VespaUser as User
 
 logger = logging.getLogger(__name__)
 
-
 class UserSerializer(serializers.ModelSerializer):
     """User serializer."""
 
     municipalities = serializers.SlugRelatedField(slug_field="name", many=True, read_only=True)
+    permissions = serializers.SerializerMethodField()
 
     class Meta:
         """Meta class for the UserSerializer."""
 
         model = User
-        fields = ["id", "username", "email", "password", "date_joined", "municipalities", "personal_data_access"]
+        fields = [
+            "id",
+            "username",
+            "first_name",
+            "last_name",
+            "municipalities",
+            "date_joined",
+            "permissions",
+            "personal_data_access",
+            "reservation_count",
+        ]
         extra_kwargs = {
             "password": {"write_only": True, "required": False},
             "date_joined": {"read_only": True},
             "personal_data_access": {"required": False},
         }
 
-    def create(self, validated_data: dict[str, Any]) -> User:
-        """Create a new user, ensuring the password is validated and hashed."""
-        # Pop the password from validated_data to handle it separately
+    def get_permissions(self, obj: User) -> List[str]:
+        """
+        Retrieve all permissions for a given user.
+
+        Args:
+            obj (User): The user instance for which to retrieve permissions.
+
+        Returns:
+            List[str]: A list of permission strings associated with the user.
+        """
+        return list(obj.get_all_permissions())
+
+    def create(self, validated_data: Dict[str, Any]) -> User:
+        """
+        Create a new user, ensuring the password is validated and hashed.
+
+        Args:
+            validated_data (Dict[str, Any]): The validated data from the serializer.
+
+        Returns:
+            User: The created user instance.
+        """
         password = validated_data.pop("password", None)
 
         if password is not None:
@@ -47,11 +76,19 @@ class UserSerializer(serializers.ModelSerializer):
             user.save()
         return user
 
-    def update(self, instance: User, validated_data: dict[str, Any]) -> User:
-        """Update a user, ensuring the password is validated and hashed if provided."""
+    def update(self, instance: User, validated_data: Dict[str, Any]) -> User:
+        """
+        Update a user, ensuring the password is validated and hashed if provided.
+
+        Args:
+            instance (User): The existing user instance to update.
+            validated_data (Dict[str, Any]): The validated data from the serializer.
+
+        Returns:
+            User: The updated user instance.
+        """
         password = validated_data.pop("password", None)
 
-        # Update fields except for password
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
@@ -66,28 +103,56 @@ class UserSerializer(serializers.ModelSerializer):
         return instance
 
     def validate_password(self, value: str) -> str:
-        """Perform custom password validation."""
+        """
+        Perform custom password validation.
+
+        Args:
+            value (str): The password value to validate.
+
+        Returns:
+            str: The validated password value.
+
+        Raises:
+            ValidationError: If the password validation fails.
+        """
         if value is not None:
             try:
-                # Use Django's built-in validators
                 validate_password(value)
             except DjangoValidationError as exc:
                 raise serializers.ValidationError(str(exc)) from exc
         return value
 
-
 class LoginSerializer(serializers.Serializer):
-    """Login serializer."""
+    """
+    Serializer for handling user login.
 
-    username = serializers.CharField(required=True)
-    password = serializers.CharField(required=True, write_only=True)
+    Validates the user's credentials and returns the user instance if successful,
+    otherwise raises a ValidationError with an appropriate error message.
+    """
 
-    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
-        """Validate the user credentials."""
-        username = attrs.get("username")
-        password = attrs.get("password")
-        user = authenticate(request=self.context.get("request"), username=username, password=password)
-        if not user:
-            raise serializers.ValidationError("Invalid credentials")
-        attrs["user"] = user
-        return attrs
+    username = serializers.CharField()
+    password = serializers.CharField(write_only=True)
+
+    def validate(self, data: Dict[str, Any]) -> User:
+        """
+        Validate user credentials.
+
+        Args:
+            data (Dict[str, Any]): A dictionary containing 'username' and 'password' keys.
+
+        Returns:
+            User: The authenticated user object if credentials are valid.
+
+        Raises:
+            ValidationError: If the username or password is incorrect.
+        """
+        user: User = User.objects.filter(username=data["username"]).first()
+        if user and user.check_password(data["password"]):
+            return user
+        raise ValidationError({"error": "Invalid username or password."})
+
+class ChangePasswordSerializer(serializers.Serializer):
+    """Validate user input for changing password."""
+
+    old_password = serializers.CharField(required=True)
+    new_password = serializers.CharField(required=True)

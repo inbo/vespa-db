@@ -3,7 +3,7 @@
         <div class="modal-content">
             <h5>{{ title }}</h5>
             <p>{{ message }}</p>
-            <button @click="closeModal" class="btn btn-primary">OK</button>
+            <button @click="closeModal" class="btn btn-success">OK</button>
         </div>
     </div>
 </template>

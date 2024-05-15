@@ -13,6 +13,7 @@ from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.db import transaction
 from django.db.models import CharField, OuterRef, QuerySet, Subquery, Value
 from django.db.models.functions import Coalesce
+from django.db.utils import IntegrityError
 from django.http import HttpResponse, JsonResponse
 from django.utils.decorators import method_decorator
 from django.utils.timezone import now
@@ -29,7 +30,7 @@ from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_gis.filters import DistanceToPointFilter
-from django.db.utils import IntegrityError
+
 from vespadb.observations.filters import ObservationFilter
 from vespadb.observations.helpers import parse_and_convert_to_utc
 from vespadb.observations.models import Municipality, Observation, Province
@@ -397,11 +398,15 @@ class ObservationsViewSet(ModelViewSet):
         try:
             with transaction.atomic():
                 Observation.objects.bulk_create([Observation(**data) for data in valid_observations])
-            return Response({"message": f"Successfully imported {len(valid_observations)} observations."}, status=status.HTTP_201_CREATED)
+            return Response(
+                {"message": f"Successfully imported {len(valid_observations)} observations."},
+                status=status.HTTP_201_CREATED,
+            )
         except IntegrityError as e:
             logger.exception("Error during bulk import")
-            return Response({"error": f"An error occurred during bulk import: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+            return Response(
+                {"error": f"An error occurred during bulk import: {e!s}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     def parse_csv(self, file: InMemoryUploadedFile) -> list[dict[str, Any]]:
         """

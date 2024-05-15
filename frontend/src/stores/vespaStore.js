@@ -69,11 +69,14 @@ export const useVespaStore = defineStore('vespaStore', {
         },
         async getObservationsGeoJson() {
             this.loading = true;
-            const filterQuery = this.createFilterQuery();
-            const additionalFilters = this.isLoggedIn ? '' : `&min_observation_datetime=${new Date('April 1, 2021').toISOString()}`;
+            let filterQuery = this.createFilterQuery();
+            if (!this.filters.min_observation_date && !this.isLoggedIn) {
+                const defaultMinDate = new Date('April 1, 2021').toISOString();
+                filterQuery += (filterQuery ? '&' : '') + `min_observation_datetime=${defaultMinDate}`;
+            }
 
             try {
-                const response = await ApiService.get(`/observations/dynamic-geojson?${filterQuery}${additionalFilters}`);
+                const response = await ApiService.get(`/observations/dynamic-geojson?${filterQuery}`);
                 if (response.status === 200) {
                     this.observations = response.data.features;
                 } else {
@@ -87,42 +90,50 @@ export const useVespaStore = defineStore('vespaStore', {
             }
         },
         createFilterQuery() {
-            console.log(this.filters.visible)
-            const params = [];
+            let params = {};
 
+            // Add municipality filters if available
             if (this.filters.municipalities.length > 0) {
-                params.push(`municipality_id=${this.filters.municipalities.join(',')}`);
+                params['municipality_id'] = this.filters.municipalities.join(',');
             }
 
+            // Add province filters if available
             if (this.filters.provinces.length > 0) {
-                params.push(`province_id=${this.filters.provinces.join(',')}`);
+                params['province_id'] = this.filters.provinces.join(',');
             }
 
+            // Add ANB area active filter
             if (this.filters.anbAreasActief !== null) {
-                params.push(`anb=${this.filters.anbAreasActief}`);
+                params['anb'] = this.filters.anbAreasActief;
             }
 
+            // Add visibility filter
             if (this.filters.visible !== null) {
-                params.push(`visible=${this.filters.visible}`);
+                params['visible'] = this.filters.visible;
             }
 
+            // Add nest type filter
             if (this.filters.nestType) {
-                params.push(`nest_type=${this.filters.nestType}`);
+                params['nest_type'] = this.filters.nestType;
             }
 
+            // Add nest status filter
             if (this.filters.nestStatus) {
-                params.push(`nest_status=${this.filters.nestStatus}`);
+                params['nest_status'] = this.filters.nestStatus;
             }
 
+            // Add minimum observation date filter
             if (this.filters.min_observation_date) {
-                params.push(`min_observation_datetime=${this.filters.min_observation_date}`);
+                params['min_observation_datetime'] = this.filters.min_observation_date;
             }
 
+            // Add maximum observation date filter
             if (this.filters.max_observation_date) {
-                params.push(`max_observation_datetime=${this.filters.max_observation_date}`);
+                params['max_observation_datetime'] = this.filters.max_observation_date;
             }
 
-            return params.length > 0 ? params.join('&') : '';
+            // Convert the params object into a URL query string
+            return Object.entries(params).map(([key, value]) => `${key}=${encodeURIComponent(value)}`).join('&');
         },
         async applyFilters(filters) {
             this.filters = { ...this.filters, ...filters };

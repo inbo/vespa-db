@@ -1,7 +1,7 @@
 """Serializer for the users app."""
 
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -11,6 +11,7 @@ from rest_framework.exceptions import ValidationError
 from vespadb.users.models import VespaUser as User
 
 logger = logging.getLogger(__name__)
+
 
 class UserSerializer(serializers.ModelSerializer):
     """User serializer."""
@@ -39,26 +40,28 @@ class UserSerializer(serializers.ModelSerializer):
             "personal_data_access": {"required": False},
         }
 
-    def get_permissions(self, obj: User) -> List[str]:
+    def get_permissions(self, obj: User) -> list[str]:
         """
         Retrieve all permissions for a given user.
 
         Args:
             obj (User): The user instance for which to retrieve permissions.
 
-        Returns:
+        Returns
+        -------
             List[str]: A list of permission strings associated with the user.
         """
         return list(obj.get_all_permissions())
 
-    def create(self, validated_data: Dict[str, Any]) -> User:
+    def create(self, validated_data: dict[str, Any]) -> User:
         """
         Create a new user, ensuring the password is validated and hashed.
 
         Args:
             validated_data (Dict[str, Any]): The validated data from the serializer.
 
-        Returns:
+        Returns
+        -------
             User: The created user instance.
         """
         password = validated_data.pop("password", None)
@@ -76,7 +79,7 @@ class UserSerializer(serializers.ModelSerializer):
             user.save()
         return user
 
-    def update(self, instance: User, validated_data: Dict[str, Any]) -> User:
+    def update(self, instance: User, validated_data: dict[str, Any]) -> User:
         """
         Update a user, ensuring the password is validated and hashed if provided.
 
@@ -84,7 +87,8 @@ class UserSerializer(serializers.ModelSerializer):
             instance (User): The existing user instance to update.
             validated_data (Dict[str, Any]): The validated data from the serializer.
 
-        Returns:
+        Returns
+        -------
             User: The updated user instance.
         """
         password = validated_data.pop("password", None)
@@ -109,10 +113,12 @@ class UserSerializer(serializers.ModelSerializer):
         Args:
             value (str): The password value to validate.
 
-        Returns:
+        Returns
+        -------
             str: The validated password value.
 
-        Raises:
+        Raises
+        ------
             ValidationError: If the password validation fails.
         """
         if value is not None:
@@ -121,6 +127,7 @@ class UserSerializer(serializers.ModelSerializer):
             except DjangoValidationError as exc:
                 raise serializers.ValidationError(str(exc)) from exc
         return value
+
 
 class LoginSerializer(serializers.Serializer):
     """
@@ -133,23 +140,26 @@ class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField(write_only=True)
 
-    def validate(self, data: Dict[str, Any]) -> User:
+    def validate(self, data: dict[str, Any]) -> User:
         """
         Validate user credentials.
 
         Args:
             data (Dict[str, Any]): A dictionary containing 'username' and 'password' keys.
 
-        Returns:
+        Returns
+        -------
             User: The authenticated user object if credentials are valid.
 
-        Raises:
+        Raises
+        ------
             ValidationError: If the username or password is incorrect.
         """
         user: User = User.objects.filter(username=data["username"]).first()
         if user and user.check_password(data["password"]):
             return user
         raise ValidationError({"error": "Invalid username or password."})
+
 
 class ChangePasswordSerializer(serializers.Serializer):
     """Validate user input for changing password."""

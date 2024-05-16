@@ -102,9 +102,24 @@ export default {
     const handleFileUpload = async (event) => {
       const file = event.target.files[0];
       if (file) {
-        const formData = new FormData();
-        formData.append('file', file);
-        await vespaStore.importData(formData);
+        if (file.type === 'application/json') {
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+            const jsonContent = e.target.result;
+            try {
+              const jsonData = JSON.parse(jsonContent);
+              await vespaStore.importData(jsonData, true);
+            } catch (error) {
+              console.error('Error parsing JSON:', error);
+              vespaStore.error = 'Invalid JSON file';
+            }
+          };
+          reader.readAsText(file);
+        } else {
+          const formData = new FormData();
+          formData.append('file', file);
+          await vespaStore.importData(formData);
+        }
       }
     };
 

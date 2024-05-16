@@ -343,33 +343,63 @@ class ObservationsViewSet(ModelViewSet):
                 "An error occurred while generating GeoJSON data", status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    @method_decorator(ratelimit(key="ip", rate="15/m", method="GET", block=True))
     @action(detail=False, methods=["post"], permission_classes=[IsAdminUser])
     def bulk_import(self, request: Request) -> Response:
         """Bulk import observations from either JSON or CSV file."""
-        data = self.parse_request_data(request)
-        if isinstance(data, Response):  # If parse_request_data returned an error Response
-            return data
+        logger.info("Bulk import request received.")
 
+        # Check content type
+        content_type = request.content_type
+        logger.info("Content type: %s", content_type)
+
+        # Parse request data based on content type
+        if content_type == "application/json":
+            try:
+                data = JSONParser().parse(request)
+            except ValueError as e:
+                logger.exception("JSON parse error: %s", str(e))
+                return Response({"detail": f"JSON parse error: {e!s}"}, status=status.HTTP_400_BAD_REQUEST)
+        elif content_type.startswith("multipart/form-data"):
+            file = request.FILES.get("file")
+            if not file:
+                logger.error("CSV file is required.")
+                return Response({"error": "CSV file is required."}, status=status.HTTP_400_BAD_REQUEST)
+            data = self.parse_csv(file)
+        else:
+            logger.error("Unsupported content type.")
+            return Response({"error": "Unsupported content type."}, status=status.HTTP_400_BAD_REQUEST)
+
+        logger.info("Bulk import request data: %s", data)
+
+        # Process and validate data
         processed_data, errors = self.process_data(data)
         if errors:
+            logger.error("Data validation errors: %s", errors)
             return Response({"errors": errors}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Save valid observations
         return self.save_observations(processed_data)
 
     def parse_request_data(self, request: Request) -> list[dict[str, Any]] | Response:
-        """Parse data from the request based on content type."""
+        """Parse request data based on the content type."""
         content_type = request.content_type
+        logger.info("Content type: %s", content_type)
         if content_type == "application/json":
-            return JSONParser().parse(request)
+            parsed_data = JSONParser().parse(request)
+            logger.info("Parsed JSON data: %s", parsed_data)
+            return parsed_data
         if content_type.startswith("multipart/form-data"):
             file = request.FILES.get("file")
             if not file:
                 return Response({"error": "CSV file is required."}, status=status.HTTP_400_BAD_REQUEST)
-            return self.parse_csv(file)
+            parsed_data = self.parse_csv(file)
+            logger.info("Parsed CSV data: %s", parsed_data)
+            return parsed_data
         return Response({"error": "Unsupported content type."}, status=status.HTTP_400_BAD_REQUEST)
 
     def process_data(self, data: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-        """Process and validate data."""
+        """Process and validate the incoming data."""
         valid_observations = []
         errors = []
         for data_item in data:
@@ -382,7 +412,8 @@ class ObservationsViewSet(ModelViewSet):
         return valid_observations, errors
 
     def clean_data(self, data_dict: dict[str, Any]) -> dict[str, Any]:
-        """Remove unnecessary fields and clean data items."""
+        """Clean the incoming data and remove empty or None values."""
+        logger.info("Original data item: %s", data_dict)
         data_dict.pop("id", None)
         eradication_datetime = data_dict.get("eradication_datetime")
         if eradication_datetime:
@@ -390,10 +421,12 @@ class ObservationsViewSet(ModelViewSet):
                 data_dict["eradication_datetime"] = dateutil_parser.isoparse(eradication_datetime)
             except (ValueError, TypeError):
                 data_dict.pop("eradication_datetime", None)
-        return {k: v for k, v in data_dict.items() if v not in {None, ""}}
+        cleaned_data = {k: v for k, v in data_dict.items() if v not in [None, ""]}  # noqa: PLR6201
+        logger.info("Cleaned data item: %s", cleaned_data)
+        return cleaned_data
 
     def save_observations(self, valid_data: list[dict[str, Any]]) -> Response:
-        """Attempt to save valid observation data to the database."""
+        """Save the valid observations to the database."""
         try:
             with transaction.atomic():
                 Observation.objects.bulk_create([Observation(**data) for data in valid_data])

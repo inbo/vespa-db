@@ -253,19 +253,11 @@ class ObservationSerializer(serializers.ModelSerializer):
         return instance
 
     def to_internal_value(self, data: dict[str, Any]) -> dict[str, Any]:
-        """
-        Convert the incoming data to a Python native representation.
-
-        Args:
-            data (dict): The incoming data.
-
-        Returns
-        -------
-            dict: The Python native representation.
-        """
+        """Convert the incoming data to a Python native representation."""
+        logger.info("Raw input data: %s", data)
         internal_data = super().to_internal_value(data)
+        logger.info("Internal data after conversion: %s", internal_data)
 
-        # Convert datetime fields to UTC
         datetime_fields = [
             "created_datetime",
             "modified_datetime",
@@ -289,6 +281,7 @@ class ObservationSerializer(serializers.ModelSerializer):
                         raise serializers.ValidationError({
                             field: [f"Invalid datetime format for {field}."]
                         }).with_traceback(err.__traceback__) from None
+        logger.info("Internal data after datetime conversion: %s", internal_data)
         return internal_data  # type: ignore[no-any-return]
 
     def validate_location(self, value: dict[str, float]) -> Point:
@@ -304,13 +297,13 @@ class ObservationSerializer(serializers.ModelSerializer):
         - Point: The validated location data.
 
         """
-        latitude = value.get("latitude")
-        longitude = value.get("longitude")
-
-        if latitude is None or longitude is None:
-            raise serializers.ValidationError("Missing or invalid location data")
-
-        return Point(longitude, latitude)
+        if isinstance(value, dict):
+            latitude = value.get("latitude")
+            longitude = value.get("longitude")
+            if latitude is None or longitude is None:
+                raise serializers.ValidationError("Missing or invalid location data")
+            return Point(longitude, latitude, srid=4326)
+        raise serializers.ValidationError("Invalid location data type")
 
 
 # Municipality serializers

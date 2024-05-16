@@ -318,11 +318,13 @@ export const useVespaStore = defineStore('vespaStore', {
                 console.error('Error exporting data:', error);
             }
         },
-        async importData(formData) {
+        async importData(formData, isJson = false) {
             this.error = null;
             this.successMessage = null;
             try {
-                const response = await ApiService.post('observations/bulk_import/', formData);
+                const response = await ApiService.post('observations/bulk_import/', formData, {
+                    headers: isJson ? { 'Content-Type': 'application/json' } : { 'Content-Type': 'multipart/form-data' }
+                });
                 if (response.status === 201) {
                     this.successMessage = 'Data imported successfully';
                 } else {
@@ -336,7 +338,7 @@ export const useVespaStore = defineStore('vespaStore', {
         async login({ username, password }) {
             this.loading = true;
             await ApiService
-                .post("/app_auth/login/", {
+                .post("/login/", {
                     username: username,
                     password: password
                 })
@@ -358,7 +360,7 @@ export const useVespaStore = defineStore('vespaStore', {
         async authCheck() {
             this.loading = true;
             await ApiService
-                .get("/app_auth/auth-check")
+                .get("/auth-check")
                 .then((response) => {
                     const data = response.data;
                     if (data.isAuthenticated && data.user) {
@@ -390,7 +392,7 @@ export const useVespaStore = defineStore('vespaStore', {
         async logout() {
             this.loading = true;
             await ApiService
-                .post("/app_auth/logout/")
+                .post("/logout/")
                 .then(() => {
                     this.isLoggedIn = false;
                     this.user = {};
@@ -414,7 +416,7 @@ export const useVespaStore = defineStore('vespaStore', {
                 return false;
             }
             try {
-                await ApiService.post("/app_auth/change-password/", {
+                await ApiService.post("/change-password/", {
                     old_password: oldPassword,
                     new_password: newPassword,
                 });

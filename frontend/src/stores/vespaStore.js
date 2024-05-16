@@ -42,7 +42,8 @@ export const useVespaStore = defineStore('vespaStore', {
     }),
     getters: {
         canEditObservation: (state) => (observation) => {
-            return state.isLoggedIn && state.userMunicipalities.includes(observation.municipality);
+            const municipalityName = state.municipalities.find(m => m.id === observation.municipality)?.name;
+            return state.isLoggedIn && state.userMunicipalities.includes(municipalityName);
         },
     },
     actions: {
@@ -154,7 +155,7 @@ export const useVespaStore = defineStore('vespaStore', {
             try {
                 const response = await ApiService.get('/municipalities/');
                 if (response.status === 200) {
-                    this.municipalities.value = response.data;
+                    this.municipalities = response.data;
                 } else {
                     console.error('Failed to fetch municipalities: Status Code', response.status);
                 }

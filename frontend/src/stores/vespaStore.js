@@ -297,18 +297,12 @@ export const useVespaStore = defineStore('vespaStore', {
         },
         async exportData(format) {
             const filterQuery = this.createFilterQuery();
-            const url = `observations/export?export_format=${format}&${filterQuery}`;
+            const url = `/observations/export?export_format=${format}&${filterQuery}`;
 
             try {
                 const response = await ApiService.get(url, { responseType: 'blob' });
-                let data = response.data;
-
-                // Convert to string if the format is JSON
-                if (format === 'json') {
-                    data = JSON.stringify(data, null, 2); // Convert object to JSON string with pretty print
-                }
-
-                const downloadUrl = window.URL.createObjectURL(new Blob([data], { type: 'application/json' }));
+                const blob = new Blob([response.data], { type: response.headers['content-type'] });
+                const downloadUrl = window.URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = downloadUrl;
                 link.setAttribute('download', `export.${format}`);
@@ -317,23 +311,6 @@ export const useVespaStore = defineStore('vespaStore', {
                 link.remove();
             } catch (error) {
                 console.error('Error exporting data:', error);
-            }
-        },
-        async importData(formData, isJson = false) {
-            this.error = null;
-            this.successMessage = null;
-            try {
-                const response = await ApiService.post('observations/bulk_import/', formData, {
-                    headers: isJson ? { 'Content-Type': 'application/json' } : { 'Content-Type': 'multipart/form-data' }
-                });
-                if (response.status === 201) {
-                    this.successMessage = 'Data imported successfully';
-                } else {
-                    throw new Error(`Failed to import data: ${response.status}`);
-                }
-            } catch (error) {
-                console.error('Error importing data:', error);
-                this.error = error.message || 'Failed to import data';
             }
         },
         async login({ username, password }) {

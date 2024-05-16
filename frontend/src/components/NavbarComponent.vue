@@ -22,12 +22,6 @@
           </ul>
         </div>
 
-        <!-- Import Button (Hidden on Small Devices) -->
-        <div class="btn-group me-2 d-none d-lg-inline-flex">
-          <button type="button" class="btn btn-outline-light" @click="triggerFileInput">Import</button>
-          <input type="file" ref="fileInput" class="d-none" @change="handleFileUpload" accept=".json,.csv" />
-        </div>
-
         <!-- User Login/Logout -->
         <span v-if="isLoggedIn" class="navbar-text">
           <div class="btn-group">
@@ -50,11 +44,11 @@
 </template>
 
 <script>
+import ModalMessage from '@/components/ModalMessage.vue';
 import { useVespaStore } from '@/stores/vespaStore';
 import { Dropdown } from 'bootstrap';
 import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import ModalMessage from '@/components/ModalMessage.vue';
 
 export default {
   components: {
@@ -95,39 +89,11 @@ export default {
       router.push({ name: 'ChangePassword' });
     };
 
-    const exportData = (format) => {
-      vespaStore.exportData(format);
+    const exportData = async (format) => {
+      await vespaStore.exportData(format);
     };
 
-    const handleFileUpload = async (event) => {
-      const file = event.target.files[0];
-      if (file) {
-        if (file.type === 'application/json') {
-          const reader = new FileReader();
-          reader.onload = async (e) => {
-            const jsonContent = e.target.result;
-            try {
-              const jsonData = JSON.parse(jsonContent);
-              await vespaStore.importData(jsonData, true);
-            } catch (error) {
-              console.error('Error parsing JSON:', error);
-              vespaStore.error = 'Invalid JSON file';
-            }
-          };
-          reader.readAsText(file);
-        } else {
-          const formData = new FormData();
-          formData.append('file', file);
-          await vespaStore.importData(formData);
-        }
-      }
-    };
-
-    const triggerFileInput = () => {
-      fileInput.value.click();
-    };
-
-    return { isLoggedIn, username, logout, navigateToChangePassword, exportData, handleFileUpload, triggerFileInput, fileInput, isModalVisible, modalTitle, modalMessage };
+    return { isLoggedIn, username, logout, navigateToChangePassword, exportData, fileInput, isModalVisible, modalTitle, modalMessage };
   },
   mounted() {
     var dropdownElementList = [].slice.call(document.querySelectorAll('.dropdown-toggle'));

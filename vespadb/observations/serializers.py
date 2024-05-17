@@ -268,7 +268,7 @@ class ObservationSerializer(serializers.ModelSerializer):
             "eradication_datetime",
         ]
         for field in datetime_fields:
-            if field in data and data[field]:
+            if data.get(field):
                 if isinstance(data[field], str):
                     try:
                         internal_data[field] = parse_and_convert_to_utc(data[field])

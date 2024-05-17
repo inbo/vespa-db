@@ -1,16 +1,16 @@
 """Views for the observations app."""
 
 import csv
+import datetime
 import io
 import json
 import logging
 from typing import Any
-import datetime
-from django.core.exceptions import ValidationError
-from dateutil import parser as dateutil_parser
+
 from django.contrib.gis.db.models.functions import Transform
 from django.contrib.gis.geos import GEOSGeometry
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.db import transaction
 from django.db.models import CharField, OuterRef, QuerySet, Subquery, Value
@@ -20,13 +20,12 @@ from django.http import HttpResponse, JsonResponse
 from django.utils.decorators import method_decorator
 from django.utils.timezone import now
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
-from rest_framework.decorators import action, parser_classes
 from django_ratelimit.decorators import ratelimit
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import filters, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, parser_classes
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny, BasePermission, IsAdminUser, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -375,7 +374,7 @@ class ObservationsViewSet(ModelViewSet):
         # Parse request data based on content type
         if content_type == "application/json":
             try:
-                data = request.data.get('data', None)
+                data = request.data.get("data", None)
                 if not data:
                     return Response({"detail": "Empty data field in request body"}, status=status.HTTP_400_BAD_REQUEST)
             except ValueError as e:
@@ -410,7 +409,7 @@ class ObservationsViewSet(ModelViewSet):
         for row in reader:
             try:
                 logger.info(f"Original location data: {row['location']}")
-                row['location'] = self.validate_location(row['location'])
+                row["location"] = self.validate_location(row["location"])
                 logger.info(f"Parsed location: {row['location']}")
                 datetime_fields = [
                     "created_datetime",
@@ -425,11 +424,11 @@ class ObservationsViewSet(ModelViewSet):
                         try:
                             row[field] = parse_and_convert_to_utc(row[field])
                         except (ValueError, TypeError) as e:
-                            logger.error(f"Invalid datetime format for {field}: {row[field]} - {e}")
+                            logger.exception(f"Invalid datetime format for {field}: {row[field]} - {e}")
                             row[field] = None
                 data.append(row)
             except (ValueError, TypeError, ValidationError) as e:
-                logger.error(f"Error parsing row: {row} - {e}")
+                logger.exception(f"Error parsing row: {row} - {e}")
         return data
 
     def validate_location(self, location: str) -> GEOSGeometry:
@@ -439,11 +438,10 @@ class ObservationsViewSet(ModelViewSet):
                 geom = GEOSGeometry(location, srid=4326)
                 logger.info(f"Validated GEOSGeometry: {geom}")
                 return geom.wkt
-            else:
-                raise ValidationError("Invalid location data type")
+            raise ValidationError("Invalid location data type")
         except (ValueError, TypeError) as e:
-            logger.error(f"Invalid location data: {location} - {e}")
-            raise ValidationError("Invalid WKT format for location.")
+            logger.exception(f"Invalid location data: {location} - {e}")
+            raise ValidationError("Invalid WKT format for location.") from e
 
     def process_data(self, data: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Process and validate the incoming data."""
@@ -468,7 +466,7 @@ class ObservationsViewSet(ModelViewSet):
             "observation_datetime",
             "eradication_datetime",
             "wn_modified_datetime",
-            "wn_created_datetime"
+            "wn_created_datetime",
         ]
         for field in datetime_fields:
             if data_dict.get(field):
@@ -483,7 +481,7 @@ class ObservationsViewSet(ModelViewSet):
                 else:
                     data_dict.pop(field, None)
 
-        cleaned_data = {k: v for k, v in data_dict.items() if v not in [None, ""]}
+        cleaned_data = {k: v for k, v in data_dict.items() if v not in [None, ""]}  # noqa: PLR6201
         logger.info("Cleaned data item: %s", cleaned_data)
         return cleaned_data
 
@@ -500,7 +498,7 @@ class ObservationsViewSet(ModelViewSet):
             return Response(
                 {"error": f"An error occurred during bulk import: {e!s}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-            
+
     @swagger_auto_schema(
         method="get",
         manual_parameters=[

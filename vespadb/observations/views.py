@@ -1,15 +1,16 @@
 """Views for the observations app."""
 
 import csv
+import datetime
 import io
 import json
 import logging
 from typing import Any
 
-from dateutil import parser as dateutil_parser
 from django.contrib.gis.db.models.functions import Transform
 from django.contrib.gis.geos import GEOSGeometry
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.db import transaction
 from django.db.models import CharField, OuterRef, QuerySet, Subquery, Value
@@ -23,8 +24,8 @@ from django_ratelimit.decorators import ratelimit
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import filters, status
-from rest_framework.decorators import action
-from rest_framework.parsers import JSONParser
+from rest_framework.decorators import action, parser_classes
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny, BasePermission, IsAdminUser, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -343,8 +344,25 @@ class ObservationsViewSet(ModelViewSet):
                 "An error occurred while generating GeoJSON data", status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    @swagger_auto_schema(
+        operation_description="Bulk import observations from either JSON or CSV file.",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                "file": openapi.Schema(type=openapi.TYPE_STRING, format="binary", description="CSV file"),
+                "data": openapi.Schema(
+                    type=openapi.TYPE_ARRAY,
+                    items=openapi.Schema(type=openapi.TYPE_OBJECT),
+                    description="JSON array of observation objects",
+                ),
+            },
+            required=["data"],
+        ),
+        responses={200: "Success", 400: "Bad Request", 415: "Unsupported Media Type"},
+    )
     @method_decorator(ratelimit(key="ip", rate="15/m", method="GET", block=True))
     @action(detail=False, methods=["post"], permission_classes=[IsAdminUser])
+    @parser_classes([JSONParser, MultiPartParser, FormParser])
     def bulk_import(self, request: Request) -> Response:
         """Bulk import observations from either JSON or CSV file."""
         logger.info("Bulk import request received.")
@@ -356,7 +374,9 @@ class ObservationsViewSet(ModelViewSet):
         # Parse request data based on content type
         if content_type == "application/json":
             try:
-                data = JSONParser().parse(request)
+                data = request.data.get("data", None)
+                if not data:
+                    return Response({"detail": "Empty data field in request body"}, status=status.HTTP_400_BAD_REQUEST)
             except ValueError as e:
                 logger.exception("JSON parse error: %s", str(e))
                 return Response({"detail": f"JSON parse error: {e!s}"}, status=status.HTTP_400_BAD_REQUEST)
@@ -381,22 +401,47 @@ class ObservationsViewSet(ModelViewSet):
         # Save valid observations
         return self.save_observations(processed_data)
 
-    def parse_request_data(self, request: Request) -> list[dict[str, Any]] | Response:
-        """Parse request data based on the content type."""
-        content_type = request.content_type
-        logger.info("Content type: %s", content_type)
-        if content_type == "application/json":
-            parsed_data = JSONParser().parse(request)
-            logger.info("Parsed JSON data: %s", parsed_data)
-            return parsed_data
-        if content_type.startswith("multipart/form-data"):
-            file = request.FILES.get("file")
-            if not file:
-                return Response({"error": "CSV file is required."}, status=status.HTTP_400_BAD_REQUEST)
-            parsed_data = self.parse_csv(file)
-            logger.info("Parsed CSV data: %s", parsed_data)
-            return parsed_data
-        return Response({"error": "Unsupported content type."}, status=status.HTTP_400_BAD_REQUEST)
+    def parse_csv(self, file: InMemoryUploadedFile) -> list[dict[str, Any]]:
+        """Parse a CSV file to a list of dictionaries."""
+        file.seek(0)
+        reader = csv.DictReader(io.StringIO(file.read().decode("utf-8")))
+        data = []
+        for row in reader:
+            try:
+                logger.info(f"Original location data: {row['location']}")
+                row["location"] = self.validate_location(row["location"])
+                logger.info(f"Parsed location: {row['location']}")
+                datetime_fields = [
+                    "created_datetime",
+                    "modified_datetime",
+                    "observation_datetime",
+                    "eradication_datetime",
+                    "wn_modified_datetime",
+                    "wn_created_datetime",
+                ]
+                for field in datetime_fields:
+                    if row.get(field):
+                        try:
+                            row[field] = parse_and_convert_to_utc(row[field])
+                        except (ValueError, TypeError) as e:
+                            logger.exception(f"Invalid datetime format for {field}: {row[field]} - {e}")
+                            row[field] = None
+                data.append(row)
+            except (ValueError, TypeError, ValidationError) as e:
+                logger.exception(f"Error parsing row: {row} - {e}")
+        return data
+
+    def validate_location(self, location: str) -> GEOSGeometry:
+        """Validate and convert location data."""
+        try:
+            if isinstance(location, str):
+                geom = GEOSGeometry(location, srid=4326)
+                logger.info(f"Validated GEOSGeometry: {geom}")
+                return geom.wkt
+            raise ValidationError("Invalid location data type")
+        except (ValueError, TypeError) as e:
+            logger.exception(f"Invalid location data: {location} - {e}")
+            raise ValidationError("Invalid WKT format for location.") from e
 
     def process_data(self, data: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Process and validate the incoming data."""
@@ -415,12 +460,27 @@ class ObservationsViewSet(ModelViewSet):
         """Clean the incoming data and remove empty or None values."""
         logger.info("Original data item: %s", data_dict)
         data_dict.pop("id", None)
-        eradication_datetime = data_dict.get("eradication_datetime")
-        if eradication_datetime:
-            try:
-                data_dict["eradication_datetime"] = dateutil_parser.isoparse(eradication_datetime)
-            except (ValueError, TypeError):
-                data_dict.pop("eradication_datetime", None)
+        datetime_fields = [
+            "created_datetime",
+            "modified_datetime",
+            "observation_datetime",
+            "eradication_datetime",
+            "wn_modified_datetime",
+            "wn_created_datetime",
+        ]
+        for field in datetime_fields:
+            if data_dict.get(field):
+                if isinstance(data_dict[field], str):
+                    try:
+                        data_dict[field] = parse_and_convert_to_utc(data_dict[field]).isoformat()
+                    except (ValueError, TypeError):
+                        logger.exception(f"Invalid datetime format for {field}: {data_dict[field]}")
+                        data_dict.pop(field, None)
+                elif isinstance(data_dict[field], datetime.datetime):
+                    data_dict[field] = data_dict[field].isoformat()
+                else:
+                    data_dict.pop(field, None)
+
         cleaned_data = {k: v for k, v in data_dict.items() if v not in [None, ""]}  # noqa: PLR6201
         logger.info("Cleaned data item: %s", cleaned_data)
         return cleaned_data
@@ -438,12 +498,6 @@ class ObservationsViewSet(ModelViewSet):
             return Response(
                 {"error": f"An error occurred during bulk import: {e!s}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
-    def parse_csv(self, file: InMemoryUploadedFile) -> list[dict[str, Any]]:
-        """Parse a CSV file to a list of dictionaries."""
-        file.seek(0)
-        reader = csv.DictReader(io.StringIO(file.read().decode("utf-8")))
-        return [self.clean_data(row) for row in reader if row]
 
     @swagger_auto_schema(
         method="get",
@@ -464,17 +518,13 @@ class ObservationsViewSet(ModelViewSet):
         """Export observations data in the specified format."""
         user = request.user
         export_format = request.query_params.get("export_format", "json").lower()
-
         queryset = self.filter_queryset(self.get_queryset())
         serializer_class = self.get_serializer_class()
         serializer_context = self.get_serializer_context()
         serializer = serializer_class(queryset, many=True, context=serializer_context)
-
         serialized_data = serializer.data
-
         if export_format == "json":
             return JsonResponse(serialized_data, safe=False, json_dumps_params={"indent": 2})
-
         if export_format == "csv":
             response = HttpResponse(content_type="text/csv")
             response["Content-Disposition"] = f'attachment; filename="observations_export_{user.username}.csv"'
@@ -484,7 +534,6 @@ class ObservationsViewSet(ModelViewSet):
                 writer.writeheader()
                 writer.writerows(serialized_data)
             return response
-
         return Response({"error": "Unsupported format specified."}, status=status.HTTP_400_BAD_REQUEST)
 
 

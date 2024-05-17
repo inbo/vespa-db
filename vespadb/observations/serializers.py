@@ -4,7 +4,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
-from django.contrib.gis.geos import Point
+from django.contrib.gis.geos import GEOSGeometry, Point
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from rest_framework import serializers
@@ -281,28 +281,26 @@ class ObservationSerializer(serializers.ModelSerializer):
                         raise serializers.ValidationError({
                             field: [f"Invalid datetime format for {field}."]
                         }).with_traceback(err.__traceback__) from None
+
+        if "location" in data:
+            internal_data["location"] = self.validate_location(data["location"])
+
         logger.info("Internal data after datetime conversion: %s", internal_data)
         return internal_data  # type: ignore[no-any-return]
 
-    def validate_location(self, value: dict[str, float]) -> Point:
-        """Validate the input location data. Override this method to implement custom validation logic as needed.
-
-        Parameters
-        ----------
-        - value (Dict[str, float]): The location data to validate, expected to be a dictionary
-          with 'latitude' and 'longitude' keys.
-
-        Returns
-        -------
-        - Point: The validated location data.
-
-        """
-        if isinstance(value, dict):
+    def validate_location(self, value: Any) -> Point:
+        """Validate the input location data. Handle different formats of location data."""
+        if isinstance(value, str):
+            try:
+                return GEOSGeometry(value, srid=4326)
+            except (ValueError, TypeError) as e:
+                raise serializers.ValidationError("Invalid WKT format for location.") from e
+        elif isinstance(value, dict):
             latitude = value.get("latitude")
             longitude = value.get("longitude")
             if latitude is None or longitude is None:
                 raise serializers.ValidationError("Missing or invalid location data")
-            return Point(longitude, latitude, srid=4326)
+            return Point(float(longitude), float(latitude), srid=4326)
         raise serializers.ValidationError("Invalid location data type")
 
 

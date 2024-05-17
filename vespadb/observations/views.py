@@ -24,7 +24,6 @@ from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import filters, status
 from rest_framework.decorators import action
-from rest_framework.parsers import JSONParser
 from rest_framework.permissions import AllowAny, BasePermission, IsAdminUser, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -343,6 +342,22 @@ class ObservationsViewSet(ModelViewSet):
                 "An error occurred while generating GeoJSON data", status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    @swagger_auto_schema(
+        operation_description="Bulk import observations from either JSON or CSV file.",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                "file": openapi.Schema(type=openapi.TYPE_STRING, format="binary", description="CSV file"),
+                "data": openapi.Schema(
+                    type=openapi.TYPE_ARRAY,
+                    items=openapi.Schema(type=openapi.TYPE_OBJECT),
+                    description="JSON array of observation objects",
+                ),
+            },
+            required=["data"],
+        ),
+        responses={200: "Success", 400: "Bad Request", 415: "Unsupported Media Type"},
+    )
     @method_decorator(ratelimit(key="ip", rate="15/m", method="GET", block=True))
     @action(detail=False, methods=["post"], permission_classes=[IsAdminUser])
     def bulk_import(self, request: Request) -> Response:
@@ -356,7 +371,9 @@ class ObservationsViewSet(ModelViewSet):
         # Parse request data based on content type
         if content_type == "application/json":
             try:
-                data = JSONParser().parse(request)
+                data = request.data.get("data", None)
+                if not data:
+                    return Response({"detail": "Empty data field in request body"}, status=status.HTTP_400_BAD_REQUEST)
             except ValueError as e:
                 logger.exception("JSON parse error: %s", str(e))
                 return Response({"detail": f"JSON parse error: {e!s}"}, status=status.HTTP_400_BAD_REQUEST)
@@ -380,23 +397,6 @@ class ObservationsViewSet(ModelViewSet):
 
         # Save valid observations
         return self.save_observations(processed_data)
-
-    def parse_request_data(self, request: Request) -> list[dict[str, Any]] | Response:
-        """Parse request data based on the content type."""
-        content_type = request.content_type
-        logger.info("Content type: %s", content_type)
-        if content_type == "application/json":
-            parsed_data = JSONParser().parse(request)
-            logger.info("Parsed JSON data: %s", parsed_data)
-            return parsed_data
-        if content_type.startswith("multipart/form-data"):
-            file = request.FILES.get("file")
-            if not file:
-                return Response({"error": "CSV file is required."}, status=status.HTTP_400_BAD_REQUEST)
-            parsed_data = self.parse_csv(file)
-            logger.info("Parsed CSV data: %s", parsed_data)
-            return parsed_data
-        return Response({"error": "Unsupported content type."}, status=status.HTTP_400_BAD_REQUEST)
 
     def process_data(self, data: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Process and validate the incoming data."""
@@ -464,17 +464,13 @@ class ObservationsViewSet(ModelViewSet):
         """Export observations data in the specified format."""
         user = request.user
         export_format = request.query_params.get("export_format", "json").lower()
-
         queryset = self.filter_queryset(self.get_queryset())
         serializer_class = self.get_serializer_class()
         serializer_context = self.get_serializer_context()
         serializer = serializer_class(queryset, many=True, context=serializer_context)
-
         serialized_data = serializer.data
-
         if export_format == "json":
             return JsonResponse(serialized_data, safe=False, json_dumps_params={"indent": 2})
-
         if export_format == "csv":
             response = HttpResponse(content_type="text/csv")
             response["Content-Disposition"] = f'attachment; filename="observations_export_{user.username}.csv"'
@@ -484,7 +480,6 @@ class ObservationsViewSet(ModelViewSet):
                 writer.writeheader()
                 writer.writerows(serialized_data)
             return response
-
         return Response({"error": "Unsupported format specified."}, status=status.HTTP_400_BAD_REQUEST)
 
 

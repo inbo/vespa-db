@@ -6,6 +6,7 @@ import json
 import logging
 from typing import Any
 
+from django.core.exceptions import ValidationError
 from dateutil import parser as dateutil_parser
 from django.contrib.gis.db.models.functions import Transform
 from django.contrib.gis.geos import GEOSGeometry
@@ -19,6 +20,8 @@ from django.http import HttpResponse, JsonResponse
 from django.utils.decorators import method_decorator
 from django.utils.timezone import now
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
+from rest_framework.decorators import action, parser_classes
 from django_ratelimit.decorators import ratelimit
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
@@ -360,6 +363,7 @@ class ObservationsViewSet(ModelViewSet):
     )
     @method_decorator(ratelimit(key="ip", rate="15/m", method="GET", block=True))
     @action(detail=False, methods=["post"], permission_classes=[IsAdminUser])
+    @parser_classes([JSONParser, MultiPartParser, FormParser])
     def bulk_import(self, request: Request) -> Response:
         """Bulk import observations from either JSON or CSV file."""
         logger.info("Bulk import request received.")
@@ -371,7 +375,7 @@ class ObservationsViewSet(ModelViewSet):
         # Parse request data based on content type
         if content_type == "application/json":
             try:
-                data = request.data.get("data", None)
+                data = request.data.get('data', None)
                 if not data:
                     return Response({"detail": "Empty data field in request body"}, status=status.HTTP_400_BAD_REQUEST)
             except ValueError as e:
@@ -398,6 +402,31 @@ class ObservationsViewSet(ModelViewSet):
         # Save valid observations
         return self.save_observations(processed_data)
 
+    def parse_csv(self, file: InMemoryUploadedFile) -> list[dict[str, Any]]:
+        """Parse a CSV file to a list of dictionaries."""
+        file.seek(0)
+        reader = csv.DictReader(io.StringIO(file.read().decode("utf-8")))
+        data = []
+        for row in reader:
+            try:
+                row['location'] = self.validate_location(row['location'])
+                row['created_datetime'] = parse_and_convert_to_utc(row['created_datetime'])
+                row['modified_datetime'] = parse_and_convert_to_utc(row['modified_datetime'])
+                row['observation_datetime'] = parse_and_convert_to_utc(row['observation_datetime'])
+                row['eradication_datetime'] = parse_and_convert_to_utc(row['eradication_datetime']) if row['eradication_datetime'] else None
+                data.append(row)
+            except (ValueError, TypeError, ValidationError) as e:
+                logger.error(f"Error parsing row: {row} - {e}")
+        return data
+
+    def validate_location(self, location: str) -> GEOSGeometry:
+        """Validate and convert location data."""
+        try:
+            return GEOSGeometry(location, srid=4326)
+        except (ValueError, TypeError) as e:
+            logger.error(f"Invalid location data: {location} - {e}")
+            raise ValidationError("Invalid WKT format for location.")
+
     def process_data(self, data: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Process and validate the incoming data."""
         valid_observations = []
@@ -421,7 +450,7 @@ class ObservationsViewSet(ModelViewSet):
                 data_dict["eradication_datetime"] = dateutil_parser.isoparse(eradication_datetime)
             except (ValueError, TypeError):
                 data_dict.pop("eradication_datetime", None)
-        cleaned_data = {k: v for k, v in data_dict.items() if v not in [None, ""]}  # noqa: PLR6201
+        cleaned_data = {k: v for k, v in data_dict.items() if v not in [None, ""]}
         logger.info("Cleaned data item: %s", cleaned_data)
         return cleaned_data
 
@@ -438,13 +467,7 @@ class ObservationsViewSet(ModelViewSet):
             return Response(
                 {"error": f"An error occurred during bulk import: {e!s}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
-    def parse_csv(self, file: InMemoryUploadedFile) -> list[dict[str, Any]]:
-        """Parse a CSV file to a list of dictionaries."""
-        file.seek(0)
-        reader = csv.DictReader(io.StringIO(file.read().decode("utf-8")))
-        return [self.clean_data(row) for row in reader if row]
-
+            
     @swagger_auto_schema(
         method="get",
         manual_parameters=[

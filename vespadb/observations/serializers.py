@@ -268,25 +268,22 @@ class ObservationSerializer(serializers.ModelSerializer):
             "eradication_datetime",
         ]
         for field in datetime_fields:
-            if field in data:
-                value = data[field]
-                if value in {"", None}:
-                    internal_data[field] = None
-                else:
+            if field in data and data[field]:
+                if isinstance(data[field], str):
                     try:
-                        logger.info("Parsing and converting datetime field %s", field)
-                        logger.info("value: %s", value)
-                        internal_data[field] = parse_and_convert_to_utc(value)
+                        internal_data[field] = parse_and_convert_to_utc(data[field])
                     except (ValueError, TypeError) as err:
                         raise serializers.ValidationError({
                             field: [f"Invalid datetime format for {field}."]
                         }).with_traceback(err.__traceback__) from None
+                else:
+                    internal_data[field] = data[field]
 
         if "location" in data:
             internal_data["location"] = self.validate_location(data["location"])
 
         logger.info("Internal data after datetime conversion: %s", internal_data)
-        return internal_data  # type: ignore[no-any-return]
+        return dict(internal_data)
 
     def validate_location(self, value: Any) -> Point:
         """Validate the input location data. Handle different formats of location data."""

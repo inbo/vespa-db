@@ -98,9 +98,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
                     request.data = {'data': data}
                     request.content_type = 'application/json'
                 elif file_name.endswith('.csv'):
-                    reader = csv.DictReader(StringIO(file.read().decode('utf-8')))
-                    data = list(reader)
-                    request.data = {'file': data}
+                    request.data = {'file': file}
                     request.content_type = 'multipart/form-data'
                 else:
                     self.message_user(request, "Unsupported file format.", level="error")
@@ -116,7 +114,8 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         Handle the bulk import by calling the API endpoint.
         """
         factory = APIRequestFactory()
-        api_request = factory.post("/observations/bulk_import/", data=request.data, format=request.content_type.split('/')[-1])
+        content_type = 'json' if request.content_type == 'application/json' else 'multipart'
+        api_request = factory.post("/observations/bulk_import/", data=request.data, format=content_type)
         api_request.user = request.user
 
         # Initialize the viewset with the new request
@@ -127,6 +126,5 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         else:
             self.message_user(request, f"Failed to import observations: {response.data}", level="error")
         return redirect("admin:observations_observation_changelist")
-
 
 admin.site.register(Observation, ObservationAdmin)

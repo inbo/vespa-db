@@ -5,7 +5,7 @@ import io
 import json
 import logging
 from typing import Any
-
+import datetime
 from django.core.exceptions import ValidationError
 from dateutil import parser as dateutil_parser
 from django.contrib.gis.db.models.functions import Transform
@@ -409,11 +409,24 @@ class ObservationsViewSet(ModelViewSet):
         data = []
         for row in reader:
             try:
+                logger.info(f"Original location data: {row['location']}")
                 row['location'] = self.validate_location(row['location'])
-                row['created_datetime'] = parse_and_convert_to_utc(row['created_datetime'])
-                row['modified_datetime'] = parse_and_convert_to_utc(row['modified_datetime'])
-                row['observation_datetime'] = parse_and_convert_to_utc(row['observation_datetime'])
-                row['eradication_datetime'] = parse_and_convert_to_utc(row['eradication_datetime']) if row['eradication_datetime'] else None
+                logger.info(f"Parsed location: {row['location']}")
+                datetime_fields = [
+                    "created_datetime",
+                    "modified_datetime",
+                    "observation_datetime",
+                    "eradication_datetime",
+                    "wn_modified_datetime",
+                    "wn_created_datetime",
+                ]
+                for field in datetime_fields:
+                    if row.get(field):
+                        try:
+                            row[field] = parse_and_convert_to_utc(row[field])
+                        except (ValueError, TypeError) as e:
+                            logger.error(f"Invalid datetime format for {field}: {row[field]} - {e}")
+                            row[field] = None
                 data.append(row)
             except (ValueError, TypeError, ValidationError) as e:
                 logger.error(f"Error parsing row: {row} - {e}")
@@ -422,7 +435,12 @@ class ObservationsViewSet(ModelViewSet):
     def validate_location(self, location: str) -> GEOSGeometry:
         """Validate and convert location data."""
         try:
-            return GEOSGeometry(location, srid=4326)
+            if isinstance(location, str):
+                geom = GEOSGeometry(location, srid=4326)
+                logger.info(f"Validated GEOSGeometry: {geom}")
+                return geom.wkt
+            else:
+                raise ValidationError("Invalid location data type")
         except (ValueError, TypeError) as e:
             logger.error(f"Invalid location data: {location} - {e}")
             raise ValidationError("Invalid WKT format for location.")
@@ -444,12 +462,27 @@ class ObservationsViewSet(ModelViewSet):
         """Clean the incoming data and remove empty or None values."""
         logger.info("Original data item: %s", data_dict)
         data_dict.pop("id", None)
-        eradication_datetime = data_dict.get("eradication_datetime")
-        if eradication_datetime:
-            try:
-                data_dict["eradication_datetime"] = dateutil_parser.isoparse(eradication_datetime)
-            except (ValueError, TypeError):
-                data_dict.pop("eradication_datetime", None)
+        datetime_fields = [
+            "created_datetime",
+            "modified_datetime",
+            "observation_datetime",
+            "eradication_datetime",
+            "wn_modified_datetime",
+            "wn_created_datetime"
+        ]
+        for field in datetime_fields:
+            if data_dict.get(field):
+                if isinstance(data_dict[field], str):
+                    try:
+                        data_dict[field] = parse_and_convert_to_utc(data_dict[field]).isoformat()
+                    except (ValueError, TypeError):
+                        logger.exception(f"Invalid datetime format for {field}: {data_dict[field]}")
+                        data_dict.pop(field, None)
+                elif isinstance(data_dict[field], datetime.datetime):
+                    data_dict[field] = data_dict[field].isoformat()
+                else:
+                    data_dict.pop(field, None)
+
         cleaned_data = {k: v for k, v in data_dict.items() if v not in [None, ""]}
         logger.info("Cleaned data item: %s", cleaned_data)
         return cleaned_data

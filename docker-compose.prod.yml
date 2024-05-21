@@ -7,6 +7,7 @@ services:
       target: frontend-prod
     ports:
       - "3000:80"
+
   devcontainer:
     build:
       context: .
@@ -17,6 +18,7 @@ services:
     tty: true
     volumes:
       - .:/workspaces/vespadb/
+
   app:
     build:
       context: .
@@ -29,35 +31,9 @@ services:
     command: [ "serve", "--dev" ]
     working_dir: /workspaces/vespadb/
     environment:
-      - PYTHONPATH=/workspaces/vespadb
-      - debug=False
+      - DJANGO_SETTINGS_MODULE=vespadb.settings
     depends_on:
-      db:
-        condition: service_healthy
-
-  db:
-    image: postgis/postgis:latest
-    environment:
-      POSTGRES_DB: vespadb
-      POSTGRES_USER: vespauser
-      POSTGRES_PASSWORD: vespauserpassword
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U vespauser -d vespadb" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  pgadmin:
-    image: dpage/pgadmin4
-    environment:
-      PGADMIN_DEFAULT_EMAIL: "admin@admin.com"
-      PGADMIN_DEFAULT_PASSWORD: "root"
-    ports:
-      - "5050:80"
-    depends_on:
-      - db
+      - redis
 
   redis:
     image: "redis:alpine"
@@ -69,10 +45,7 @@ services:
     command: celery-worker
     volumes:
       - .:/workspaces/vespadb/
-    environment:
-      - TZ=UTC
     depends_on:
-      - db
       - redis
 
   celery_beat:
@@ -80,10 +53,7 @@ services:
     command: celery-beat
     volumes:
       - .:/workspaces/vespadb/
-    environment:
-      - TZ=UTC
     depends_on:
-      - db
       - redis
 
 volumes:

@@ -163,6 +163,22 @@ export const useVespaStore = defineStore('vespaStore', {
                 console.error('Error fetching municipalities:', error);
             }
         },
+        async fetchMunicipalitiesByProvinces(provinceIds) {
+            try {
+                const response = await ApiService.get('/municipalities/by-provinces/', {
+                    params: {
+                        province_ids: provinceIds.join(',')
+                    }
+                });
+                if (response.status === 200) {
+                    this.municipalities = response.data;
+                } else {
+                    console.error('Failed to fetch filtered municipalities: Status Code', response.status);
+                }
+            } catch (error) {
+                console.error('Error fetching filtered municipalities:', error);
+            }
+        },
         createCircleMarker(feature, latlng) {
             let markerOptions = {
                 radius: 10 + (feature.properties.observations_count || 0) * 0.5,

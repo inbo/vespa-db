@@ -13,12 +13,9 @@
             @change="emitFilterUpdate">
           </v-autocomplete>
         </div>
-        <div class="col-12" v-if="formattedMunicipalities.length > 0">
-          <v-autocomplete v-model="selectedMunicipalities" :items="municipalities.length ? municipalities.map(municipality => ({
-            title: municipality.name,
-            value: municipality.id
-          })) : []" item-text="title" item-value="value" label="gemeente(s)" multiple chips dense solo
-            @change="emitFilterUpdate">
+        <div class="col-12">
+          <v-autocomplete v-model="selectedMunicipalities" :items="filteredMunicipalities" item-text="title"
+            item-value="value" label="gemeente(s)" multiple chips dense solo @change="emitFilterUpdate">
           </v-autocomplete>
         </div>
         <div class="col-12">
@@ -67,6 +64,7 @@
     </div>
   </div>
 </template>
+
 <script>
 import { useVespaStore } from '@/stores/vespaStore';
 import { DateTime } from 'luxon';
@@ -121,6 +119,15 @@ export default {
       id: municipality.id
     })));
 
+    const filteredMunicipalities = computed(() => {
+      if (selectedProvinces.value.length === 0) {
+        return formattedMunicipalities.value;
+      }
+      return formattedMunicipalities.value.filter(municipality =>
+        selectedProvinces.value.includes(municipality.province)
+      );
+    });
+
     const emitFilterUpdate = () => {
       const minDateCET = minDate.value ? DateTime.fromJSDate(minDate.value).setZone('Europe/Paris').toFormat('yyyy-MM-dd\'T\'HH:mm:ss') : null;
       const maxDateCET = maxDate.value ? DateTime.fromJSDate(maxDate.value).setZone('Europe/Paris').toFormat('yyyy-MM-dd\'T\'HH:mm:ss') : null;
@@ -155,6 +162,16 @@ export default {
       emitFilterUpdate();
     };
 
+    const fetchMunicipalitiesByProvinces = async () => {
+      if (selectedProvinces.value.length > 0) {
+        await vespaStore.fetchMunicipalitiesByProvinces(selectedProvinces.value);
+      } else {
+        await vespaStore.fetchMunicipalities();
+      }
+    };
+
+    watch([selectedProvinces], fetchMunicipalitiesByProvinces, { deep: true });
+
     watch([minDate, maxDate], emitFilterUpdate, { immediate: true });
 
     watch([selectedMunicipalities, selectedProvinces, selectedNestType, selectedNestStatus, anbAreasActief, selectedObservationStart, selectedObservationEnd, visibleActief], () => {
@@ -171,6 +188,7 @@ export default {
       provinces,
       loading,
       formattedMunicipalities,
+      filteredMunicipalities,
       nestType,
       minDate,
       selectedObservationStart,

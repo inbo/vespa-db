@@ -6,6 +6,7 @@ import io
 import json
 import logging
 from typing import Any
+from django.shortcuts import get_list_or_404
 
 from django.contrib.gis.db.models.functions import Transform
 from django.contrib.gis.geos import GEOSGeometry
@@ -550,6 +551,25 @@ class MunicipalityViewSet(ReadOnlyModelViewSet):
             return [AllowAny()]
         return [IsAdminUser()]
 
+    @action(detail=False, methods=['get'], url_path='by-provinces')
+    def filter_by_provinces(self, request: Request) -> Response:
+        """
+        Filter municipalities by given province IDs.
+
+        :param request: HTTP request containing province IDs.
+        :return: Filtered municipalities.
+        """
+        province_ids = request.query_params.getlist('province_ids')
+        if province_ids:
+            municipalities = Municipality.objects.filter(province_id__in=province_ids)
+        else:
+            return Response(
+                {"detail": "No province IDs provided."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        serializer = self.get_serializer(municipalities, many=True)
+        return Response(serializer.data)
 
 class ProvinceViewSet(ReadOnlyModelViewSet):
     """ViewSet for the Province model."""

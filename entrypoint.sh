@@ -4,6 +4,10 @@
 set -e
 
 # Migrate the database
+mkdir -p /workspaces/vespadb/logs
+touch /workspaces/vespadb/logs/django.log
+chmod -R 755 /workspaces/vespadb/logs
+
 echo "Applying database migrations..."
 python manage.py migrate --noinput
 # Collect static files

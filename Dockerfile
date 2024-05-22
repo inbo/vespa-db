@@ -52,6 +52,9 @@ ENV PATH /opt/vespadb-env/bin:$PATH
 ENV VIRTUAL_ENV /opt/vespadb-env
 
 WORKDIR /workspaces/vespadb/
+# Create logs directory
+RUN mkdir -p /workspaces/vespadb/logs
+RUN chmod -R 755 /workspaces/vespadb/logs
 
 RUN mkdir -p /root/.cache/pypoetry/ && mkdir -p /root/.config/pypoetry/ && \
     mkdir -p src/vespadb/ && touch src/vespadb/__init__.py && touch README.md

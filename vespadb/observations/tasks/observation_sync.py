@@ -53,13 +53,17 @@ def fetch_observations_page(token: str, modified_since: str, offset: int = 0) ->
     """Fetch a page of observations."""
     try:
         headers = {"Authorization": f"Bearer {token}"}
-        params: dict[str, str | int] = {
+        params: dict[str, str | int | list[str]] = {
             "modified_after": modified_since,
             "limit": 100,
             "offset": offset,
+            "validation_status": ["P", "J"],
         }
         response = requests.get(
-            str(os.environ.get("WAARNEMINGEN_OBSERVATIONS_URL")), headers=headers, params=params, timeout=10
+            "https://waarnemingen.be/api/v1/inbo/vespa-watch/observations/",
+            headers=headers,
+            params=params,
+            timeout=10,
         )
         response.raise_for_status()
         json_response = response.json()

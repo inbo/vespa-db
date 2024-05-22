@@ -16,34 +16,25 @@ from pathlib import Path
 from celery.schedules import crontab
 from dotenv import load_dotenv
 
-from vespadb.secrets import get_secret
-
 load_dotenv()
 
-if os.getenv("DJANGO_ENV") == "development":
-    secrets = {
-        "DJANGO_SECRET_KEY": os.getenv("DJANGO_SECRET_KEY"),
-        "DJANGO_ALLOWED_HOSTS": os.getenv("DJANGO_ALLOWED_HOSTS", "localhost").split(","),
-        "CORS_ALLOWED_ORIGINS": os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000").split(","),
-        "CSRF_TRUSTED_ORIGINS": os.getenv("CSRF_TRUSTED_ORIGINS", "http://localhost:3000").split(","),
-        "CSRF_COOKIE_DOMAIN": os.getenv("CSRF_COOKIE_DOMAIN", "localhost"),
-        "SESSION_COOKIE_DOMAIN": os.getenv("SESSION_COOKIE_DOMAIN", "localhost"),
-        "POSTGRES_DB": os.getenv("POSTGRES_DB"),
-        "POSTGRES_USER": os.getenv("POSTGRES_USER"),
-        "POSTGRES_PASSWORD": os.getenv("POSTGRES_PASSWORD"),
-        "POSTGRES_HOST": os.getenv("POSTGRES_HOST"),
-        "POSTGRES_PORT": os.getenv("POSTGRES_PORT"),
-        "REDIS_LOCATION": os.getenv("REDIS_LOCATION", "redis://redis:6379/1"),
-        "CELERY_BROKER_URL": os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0"),
-        "REDIS_REFRESH_RATE_MIN": os.getenv("REDIS_REFRESH_RATE_MIN", "15"),
-        "DJANGO_DEBUG": os.getenv("DJANGO_DEBUG", "False"),
-    }
-else:
-    secrets = get_secret("vespadb-secrets")  # type: ignore[assignment]
-
-# Ensure secrets are available
-if secrets is None:
-    raise Exception("Secrets not found")  # noqa: TRY002
+secrets = {
+    "DJANGO_SECRET_KEY": os.getenv("DJANGO_SECRET_KEY"),
+    "DJANGO_ALLOWED_HOSTS": os.getenv("DJANGO_ALLOWED_HOSTS", "localhost").split(","),
+    "CORS_ALLOWED_ORIGINS": os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000").split(","),
+    "CSRF_TRUSTED_ORIGINS": os.getenv("CSRF_TRUSTED_ORIGINS", "http://localhost:3000").split(","),
+    "CSRF_COOKIE_DOMAIN": os.getenv("CSRF_COOKIE_DOMAIN", "localhost"),
+    "SESSION_COOKIE_DOMAIN": os.getenv("SESSION_COOKIE_DOMAIN", "localhost"),
+    "POSTGRES_DB": os.getenv("POSTGRES_DB"),
+    "POSTGRES_USER": os.getenv("POSTGRES_USER"),
+    "POSTGRES_PASSWORD": os.getenv("POSTGRES_PASSWORD"),
+    "POSTGRES_HOST": os.getenv("POSTGRES_HOST"),
+    "POSTGRES_PORT": os.getenv("POSTGRES_PORT"),
+    "REDIS_LOCATION": os.getenv("REDIS_LOCATION", "redis://redis:6379/1"),
+    "CELERY_BROKER_URL": os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0"),
+    "REDIS_REFRESH_RATE_MIN": os.getenv("REDIS_REFRESH_RATE_MIN", "15"),
+    "DJANGO_DEBUG": os.getenv("DJANGO_DEBUG", "False"),
+}
 
 # Core settings
 BASE_DIR = Path(__file__).resolve().parent.parent

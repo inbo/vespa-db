@@ -1,5 +1,4 @@
 """Handlers."""
-
 from pathlib import Path
 from typing import Any
 
@@ -35,10 +34,18 @@ class Command(BaseCommand):
         :param args: Variable length argument list.
         :param options: Arbitrary keyword arguments.
         """
-        if ANB.objects.exists():
-            self.stdout.write(self.style.SUCCESS("ANB data already exists in the database. No changes made."))
-            return
-
         shapefile_path: str = str((Path(__file__).parent / "data" / "anb" / "am_patdat.shp").resolve())
         lm = LayerMapping(ANB, shapefile_path, anb_mapping, transform=False, encoding="iso-8859-1")
-        lm.save(strict=True, verbose=True)
+        # Loop through each feature in the shapefile
+        for feature in lm.layer:
+            # Extract the attributes from the feature
+            attrs = lm.feature_kwargs(feature)
+
+            # Check if an ANB with the same domain already exists in the database
+            if ANB.objects.filter(domain=attrs["domain"]).exists():
+                self.stdout.write(self.style.WARNING(f"ANB with domain '{attrs['domain']}' already exists in the database."))
+            else:
+                # If it doesn't exist, create a new ANB instance
+                anb_instance = ANB(**attrs)
+                anb_instance.save()
+                self.stdout.write(self.style.SUCCESS(f"ANB with domain '{attrs['domain']}' has been added to the database."))

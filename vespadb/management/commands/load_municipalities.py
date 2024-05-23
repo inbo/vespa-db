@@ -22,7 +22,6 @@ municipality_mapping = {
     "polygon": "MULTIPOLYGON",
 }
 
-
 class Command(BaseCommand):
     """A custom management command that loads a ShapeFile containing municipality boundaries into the database.
 
@@ -38,10 +37,19 @@ class Command(BaseCommand):
         :param args: Variable length argument list.
         :param options: Arbitrary keyword arguments.
         """
-        if Municipality.objects.exists():
-            self.stdout.write(self.style.SUCCESS("Municipality data already exists in the database. No changes made."))
-            return
-
         shapefile_path: str = str((Path(__file__).parent / "data" / "municipalities" / "Refgem.shp").resolve())
         lm = LayerMapping(Municipality, shapefile_path, municipality_mapping, transform=False, encoding="iso-8859-1")
-        lm.save(strict=True, verbose=True)
+
+        # Loop through each feature in the shapefile
+        for feature in lm.layer:
+            # Extract the attributes from the feature
+            attrs = lm.feature_kwargs(feature)
+
+            # Check if a Municipality with the same name already exists in the database
+            if Municipality.objects.filter(name=attrs["name"]).exists():
+                self.stdout.write(self.style.WARNING(f"Municipality with name '{attrs['name']}' already exists in the database."))
+            else:
+                # If it doesn't exist, create a new Municipality instance
+                municipality_instance = Municipality(**attrs)
+                municipality_instance.save()
+                self.stdout.write(self.style.SUCCESS(f"Municipality with name '{attrs['name']}' has been added to the database."))

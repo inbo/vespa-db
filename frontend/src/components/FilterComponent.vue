@@ -14,8 +14,11 @@
           </v-autocomplete>
         </div>
         <div class="col-12">
-          <v-autocomplete v-model="selectedMunicipalities" :items="filteredMunicipalities" item-text="title"
-            item-value="value" label="gemeente(s)" multiple chips dense solo @change="emitFilterUpdate">
+          <v-autocomplete v-model="selectedMunicipalities" :items="municipalities.length ? municipalities.map(municipality => ({
+            title: municipality.name,
+            value: municipality.id
+          })) : []" item-text="title" item-value="value" label="gemeente(s)" multiple chips dense solo
+            @change="emitFilterUpdate">
           </v-autocomplete>
         </div>
         <div class="col-12">
@@ -95,9 +98,9 @@ export default {
       { name: 'potentieel nest (meer info nodig)', value: 'potentieel_nest' },
     ]);
     const nestStatus = ref([
-      { name: 'Uitgeroeid', value: 'eradicated' },
+      { name: 'Bestreden', value: 'eradicated' },
       { name: 'Gereserveerd', value: 'reserved' },
-      { name: 'Open', value: 'open' }
+      { name: 'Niet bestreden', value: 'open' }
     ]);
     const anbAreaOptions = ref([
       { name: 'Niet in ANB gebied', value: false },
@@ -113,20 +116,6 @@ export default {
     const selectedObservationEnd = ref(false);
     const menu1 = ref(false);
     const menu2 = ref(false);
-
-    const formattedMunicipalities = computed(() => municipalities.value.map(municipality => ({
-      name: municipality.name,
-      id: municipality.id
-    })));
-
-    const filteredMunicipalities = computed(() => {
-      if (selectedProvinces.value.length === 0) {
-        return formattedMunicipalities.value;
-      }
-      return formattedMunicipalities.value.filter(municipality =>
-        selectedProvinces.value.includes(municipality.province)
-      );
-    });
 
     const emitFilterUpdate = () => {
       const minDateCET = minDate.value ? DateTime.fromJSDate(minDate.value).setZone('Europe/Paris').toFormat('yyyy-MM-dd\'T\'HH:mm:ss') : null;
@@ -170,7 +159,7 @@ export default {
       }
     };
 
-    watch([selectedProvinces], fetchMunicipalitiesByProvinces, { deep: true });
+    watch(selectedProvinces, fetchMunicipalitiesByProvinces, { deep: true, immediate: true });
 
     watch([minDate, maxDate], emitFilterUpdate, { immediate: true });
 
@@ -187,8 +176,6 @@ export default {
       municipalities,
       provinces,
       loading,
-      formattedMunicipalities,
-      filteredMunicipalities,
       nestType,
       minDate,
       selectedObservationStart,

@@ -146,6 +146,10 @@ class Province(models.Model):
     length = models.FloatField(blank=True, null=True)
     surface = models.FloatField(blank=True, null=True)
 
+    class Meta:
+        unique_together = ('name',)
+        ordering = ['name']
+        
     def __str__(self) -> str:
         """Return the string representation of the model."""
         return str(self.name)
@@ -170,6 +174,10 @@ class Municipality(models.Model):
         Province, on_delete=models.SET_NULL, null=True, blank=True, related_name="municipalities"
     )
 
+    class Meta:
+        unique_together = ('name',)
+        ordering = ['name']
+        
     def __str__(self) -> str:
         """Return the string representation of the model."""
         return str(self.name)
@@ -214,11 +222,12 @@ class Observation(models.Model):
 
     observer_phone_number = models.CharField(max_length=20, blank=True, null=True)
     observer_email = models.EmailField(blank=True, null=True)
+    observer_received_email = models.BooleanField(default=False)
     observer_name = models.CharField(max_length=255, blank=True, null=True)
     observation_datetime = models.DateTimeField()
 
     wn_cluster_id = models.IntegerField(blank=True, null=True)
-    notes = models.TextField(blank=True, null=True)
+    admin_notes = models.TextField(blank=True, null=True)
 
     modified_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, related_name="modified_observations", on_delete=models.SET_NULL, null=True
@@ -229,10 +238,10 @@ class Observation(models.Model):
     wn_modified_datetime = models.DateTimeField(blank=True, null=True)
     wn_created_datetime = models.DateTimeField(blank=True, null=True)
     visible = models.BooleanField(default=True)
-    images = models.JSONField(default=list)
+    images = models.JSONField(default=list, blank=True, null=True)
 
     reserved_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, related_name="reserved_observations", on_delete=models.SET_NULL, null=True
+        settings.AUTH_USER_MODEL, related_name="reserved_observations", on_delete=models.SET_NULL, null=True, blank=True
     )
     reserved_datetime = models.DateTimeField(blank=True, null=True)
 

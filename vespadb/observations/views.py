@@ -6,12 +6,11 @@ import io
 import json
 import logging
 from typing import Any
-from django.shortcuts import get_list_or_404
 
 from django.contrib.gis.db.models.functions import Transform
 from django.contrib.gis.geos import GEOSGeometry
 from django.core.cache import cache
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.db import transaction
 from django.db.models import CharField, OuterRef, QuerySet, Subquery, Value
@@ -134,6 +133,9 @@ class ObservationsViewSet(ModelViewSet):
         serializer: BaseSerializer
             The serializer containing the validated data.
         """
+        user = self.request.user
+        if not user.is_staff and ("admin_notes" in self.request.data or "observer_received_email" in self.request.data):
+            raise PermissionDenied("You do not have permission to modify admin fields.")
         serializer.save(modified_by=self.request.user, modified_datetime=now())
 
     def partial_update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
@@ -286,18 +288,15 @@ class ObservationsViewSet(ModelViewSet):
     @method_decorator(ratelimit(key="ip", rate="15/m", method="GET", block=True))
     @action(detail=False, methods=["get"], url_path="dynamic-geojson")
     def geojson(self, request: Request) -> HttpResponse:
-        """Return GeoJSON data based on the request parameters."""
+        """Generate GeoJSON data for the observations."""
         try:
-            # Create a modified query dictionary excluding 'bbox'
             query_params = request.GET.copy()
             bbox_str = query_params.pop("bbox", None)
 
-            # Sort parameters and create a cache key without 'bbox'
             sorted_params = "&".join(sorted(f"{key}={value}" for key, value in query_params.items()))
             cache_key = f"vespadb::{request.path}::{sorted_params}"
             logger.info(f"Checking cache for {cache_key}")
 
-            # Attempt to get cached data
             cached_data = cache.get(cache_key)
             if cached_data:
                 logger.info("Cache hit - Returning cached response")
@@ -320,7 +319,6 @@ class ObservationsViewSet(ModelViewSet):
             else:
                 bbox = None
 
-            # Apply filters
             queryset = self.filter_queryset(self.get_queryset())
 
             if bbox:
@@ -331,13 +329,22 @@ class ObservationsViewSet(ModelViewSet):
             features = [
                 {
                     "type": "Feature",
-                    "properties": {"id": obs.id},
+                    "properties": {
+                        "id": obs.id,
+                        "status": (
+                            "eradicated"
+                            if obs.eradication_datetime
+                            else "reserved"
+                            if obs.reserved_datetime
+                            else "default"
+                        ),
+                    },
                     "geometry": json.loads(obs.point.geojson) if obs.point else None,
                 }
                 for obs in queryset
             ]
             geojson_response = {"type": "FeatureCollection", "features": features}
-            cache.set(cache_key, geojson_response, REDIS_CACHE_EXPIRATION)  # 24 hours
+            cache.set(cache_key, geojson_response, REDIS_CACHE_EXPIRATION)
             return JsonResponse(geojson_response)
         except Exception:
             logger.exception("An error occurred while generating GeoJSON data")
@@ -551,25 +558,28 @@ class MunicipalityViewSet(ReadOnlyModelViewSet):
             return [AllowAny()]
         return [IsAdminUser()]
 
-    @action(detail=False, methods=['get'], url_path='by-provinces')
-    def filter_by_provinces(self, request: Request) -> Response:
-        """
-        Filter municipalities by given province IDs.
-
-        :param request: HTTP request containing province IDs.
-        :return: Filtered municipalities.
-        """
-        province_ids = request.query_params.getlist('province_ids')
-        if province_ids:
-            municipalities = Municipality.objects.filter(province_id__in=province_ids)
-        else:
-            return Response(
-                {"detail": "No province IDs provided."},
-                status=status.HTTP_400_BAD_REQUEST,
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter(
+                "province_ids",
+                openapi.IN_QUERY,
+                description="Comma-separated list of province IDs",
+                type=openapi.TYPE_STRING,
             )
-        
+        ]
+    )
+    @action(detail=False, methods=["get"])
+    def by_provinces(self, request: Request) -> Response:
+        """Return municipalities filtered by province IDs."""
+        province_ids = request.query_params.get("province_ids")
+        if not province_ids:
+            return Response({"detail": "province_ids parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        province_ids = province_ids.split(",")
+        municipalities = Municipality.objects.filter(province_id__in=province_ids).order_by("name")
         serializer = self.get_serializer(municipalities, many=True)
         return Response(serializer.data)
+
 
 class ProvinceViewSet(ReadOnlyModelViewSet):
     """ViewSet for the Province model."""

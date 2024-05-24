@@ -38,7 +38,7 @@ secrets = {
 
 # Core settings
 BASE_DIR = Path(__file__).resolve().parent.parent
-SECRET_KEY = secrets["DJANGO_SECRET_KEY"]
+SECRET_KEY = secrets["SECRET_KEY"]
 ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS").split(",")  # type: ignore[union-attr]
 ALLOWED_HOSTS.append(gethostbyname(gethostname()))
 DEBUG = secrets["DJANGO_DEBUG"] == "True"

@@ -15,6 +15,8 @@ from pathlib import Path
 
 from celery.schedules import crontab
 from dotenv import load_dotenv
+from socket import gethostbyname
+from socket import gethostname
 
 load_dotenv()
 
@@ -39,7 +41,8 @@ secrets = {
 # Core settings
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = secrets["DJANGO_SECRET_KEY"]
-ALLOWED_HOSTS = secrets["DJANGO_ALLOWED_HOSTS"]
+ALLOWED_HOSTS = os.environ.get("ALLOWED_HOST").split(",") # type: ignore[union-attr]
+ALLOWED_HOSTS.append(gethostbyname(gethostname()))
 DEBUG = secrets["DJANGO_DEBUG"] == "True"
 
 # vespawatch specific settings

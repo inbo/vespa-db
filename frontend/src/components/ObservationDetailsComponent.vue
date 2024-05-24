@@ -1,5 +1,6 @@
 <template>
     <div v-if="selectedObservation">
+        <h3>Observatie details</h3>
         <div class="card">
             <div class="card-body">
                 <dl class="row">
@@ -20,11 +21,9 @@
 
                     <dt class="col-sm-6">Nest Hoogte</dt>
                     <dd class="col-sm-9">
-                        <span v-if="!isEditing">{{ getEnumLabel(nestHeightEnum, selectedObservation.nest_height)
-                            }}</span>
+                        <span v-if="!isEditing">{{ getEnumLabel(nestHeightEnum, selectedObservation.nest_height) }}</span>
                         <select v-else v-model="editableObservation.nest_height" class="form-control">
-                            <option v-for="(label, value) in nestHeightEnum" :key="value" :value="value">{{ label }}
-                            </option>
+                            <option v-for="(label, value) in nestHeightEnum" :key="value" :value="value">{{ label }}</option>
                         </select>
                     </dd>
 
@@ -32,18 +31,15 @@
                     <dd class="col-sm-9">
                         <span v-if="!isEditing">{{ getEnumLabel(nestSizeEnum, selectedObservation.nest_size) }}</span>
                         <select v-else v-model="editableObservation.nest_size" class="form-control">
-                            <option v-for="(label, value) in nestSizeEnum" :key="value" :value="value">{{ label }}
-                            </option>
+                            <option v-for="(label, value) in nestSizeEnum" :key="value" :value="value">{{ label }}</option>
                         </select>
                     </dd>
 
                     <dt class="col-sm-6">Nest Locatie</dt>
                     <dd class="col-sm-9">
-                        <span v-if="!isEditing">{{ getEnumLabel(nestLocationEnum, selectedObservation.nest_location)
-                            }}</span>
+                        <span v-if="!isEditing">{{ getEnumLabel(nestLocationEnum, selectedObservation.nest_location) }}</span>
                         <select v-else v-model="editableObservation.nest_location" class="form-control">
-                            <option v-for="(label, value) in nestLocationEnum" :key="value" :value="value">{{ label }}
-                            </option>
+                            <option v-for="(label, value) in nestLocationEnum" :key="value" :value="value">{{ label }}</option>
                         </select>
                     </dd>
 
@@ -51,16 +47,14 @@
                     <dd class="col-sm-9">
                         <span v-if="!isEditing">{{ getEnumLabel(nestTypeEnum, selectedObservation.nest_type) }}</span>
                         <select v-else v-model="editableObservation.nest_type" class="form-control">
-                            <option v-for="(label, value) in nestTypeEnum" :key="value" :value="value">{{ label }}
-                            </option>
+                            <option v-for="(label, value) in nestTypeEnum" :key="value" :value="value">{{ label }}</option>
                         </select>
                     </dd>
 
                     <dt class="col-sm-6">Observatie Datum</dt>
                     <dd class="col-sm-9">
                         <span v-if="!isEditing">{{ formatDate(selectedObservation.observation_datetime) }}</span>
-                        <input v-else v-model="editableObservation.observation_datetime" type="datetime-local"
-                            class="form-control" />
+                        <input v-else v-model="editableObservation.observation_datetime" type="datetime-local" class="form-control" />
                     </dd>
 
                     <dt class="col-sm-6">Cluster ID</dt>
@@ -74,10 +68,8 @@
 
                     <dt class="col-sm-6">Bestreden op</dt>
                     <dd class="col-sm-9">
-                        <span v-if="!isEditing">{{ formatDate(selectedObservation.eradication_datetime, 'Onbestreden')
-                            }}</span>
-                        <input v-else v-model="editableObservation.eradication_datetime" type="datetime-local"
-                            class="form-control" />
+                        <span v-if="!isEditing">{{ formatDate(selectedObservation.eradication_datetime, 'Onbestreden') }}</span>
+                        <input v-else v-model="editableObservation.eradication_datetime" type="datetime-local" class="form-control" />
                     </dd>
 
                     <dt class="col-sm-6">Gemeente</dt>
@@ -87,27 +79,41 @@
                     </div>
                 </dl>
 
-                <div v-if="isLoggedIn && canEdit && !isEditing">
-                    <button class="btn btn-success me-2" @click="startEdit">Wijzig</button>
-                    <button v-if="!selectedObservation.reserved_by && canReserve" class="btn btn-success me-2"
-                        @click="reserveObservation">Reserveren</button>
-                    <button v-if="isUserReserver" class="btn btn-danger me-2" @click="cancelReservation">Reservatie
-                        annuleren</button>
-                    <button v-if="isEditing && canEdit" class="btn btn-success me-2"
-                        @click="confirmUpdate">Bevestig</button>
-                    <button v-if="isEditing && canEdit" class="btn btn-secondary" @click="cancelEdit">Annuleer</button>
-                    <button v-if="isLoggedIn && canEdit && !isEditing && !selectedObservation.eradication_datetime"
-                        class="btn btn-success me-2" @click="markObservationAsEradicated">Nest markeren als
-                        bestreden</button>
-                    <button v-if="isLoggedIn && canEdit && !isEditing && selectedObservation.eradication_datetime"
-                        class="btn btn-danger me-2" @click="markObservationAsNotEradicated">Nest markeren als
-                        onbestreden</button>
-                </div>
+                <div v-if="canEditAdminFields">
+                    <dt class="col-sm-6">Admin Notes</dt>
+                    <dd class="col-sm-9">
+                        <span v-if="!isEditing">{{ selectedObservation.admin_notes }}</span>
+                        <textarea v-else v-model="editableObservation.admin_notes" class="form-control"></textarea>
+                    </dd>
 
+                    <dt class="col-sm-6">Observer Sent Email</dt>
+                    <dd class="col-sm-9">
+                        <span v-if="!isEditing">{{ selectedObservation.observer_received_email ? 'Ja' : 'Nee' }}</span>
+                        <input v-else type="checkbox" v-model="editableObservation.observer_received_email" class="form-check-input" />
+                    </dd>
+                </div>
+                <div v-if="isLoggedIn && canEdit">
+                    <button class="btn btn-success me-2" v-if="!isEditing" @click="startEdit">Wijzig</button>
+                    <button class="btn btn-success me-2" v-if="isEditing" @click="confirmUpdate">Bevestig</button>
+                    <button class="btn btn-secondary me-2" v-if="isEditing" @click="cancelEdit">Annuleer</button>
+                </div>
+                <div v-if="isLoggedIn && canEdit && !isEditing && !selectedObservation.eradication_datetime">
+                    <button class="btn btn-success me-2" @click="markObservationAsEradicated">Nest markeren als bestreden</button>
+                </div>
+                <div v-if="isLoggedIn && canEdit && !isEditing && selectedObservation.eradication_datetime">
+                    <button class="btn btn-danger me-2" @click="markObservationAsNotEradicated">Nest markeren als onbestreden</button>
+                </div>
+                <div v-if="isLoggedIn && canEdit && !isEditing && !selectedObservation.reserved_by">
+                    <button class="btn btn-success me-2" @click="reserveObservation">Reserveren</button>
+                </div>
+                <div v-if="isLoggedIn && canEdit && !isEditing && isUserReserver">
+                    <button class="btn btn-danger me-2" @click="cancelReservation">Reservatie annuleren</button>
+                </div>
             </div>
         </div>
     </div>
 </template>
+
 <script>
 import { useVespaStore } from '@/stores/vespaStore';
 import { computed, ref, watch } from 'vue';
@@ -122,7 +128,10 @@ export default {
         const canEdit = computed(() => vespaStore.canEditObservation(selectedObservation.value));
         const isUserReserver = computed(() => vespaStore.isLoggedIn && vespaStore.selectedObservation.reserved_by === vespaStore.user.id);
         const canReserve = computed(() => vespaStore.user.reservation_count < 50);
-
+        const canEditAdminFields = computed(() => {
+            console.log('canEditAdminFields:', vespaStore.isAdmin);
+            return vespaStore.isAdmin;
+        });
         const editableObservation = ref({});
 
         const nestHeightEnum = {
@@ -158,6 +167,8 @@ export default {
             "nest_type",
             "observation_datetime",
             "eradication_datetime",
+            "admin_notes",
+            "observer_received_email"
         ];
 
         const formatDate = (isoString, defaultValue = "") => {
@@ -187,7 +198,6 @@ export default {
             return enumObject[value] || value;
         };
 
-        // Bereken de reserveringsstatus en de duur van de reservering
         const reservationStatus = computed(() => {
             const reservationDatetime = selectedObservation.value.reserved_datetime;
             if (reservationDatetime) {
@@ -197,12 +207,12 @@ export default {
                 const daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
                 const hoursDiff = Math.floor((timeDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
 
-                if (daysDiff < 5) { // Als minder dan 5 dagen zijn verstreken
+                if (daysDiff < 5) {
                     let remainingDays = 5 - daysDiff;
                     let remainingHours = 0;
 
                     if (hoursDiff > 0) {
-                        remainingDays--; // Trek een dag af als er uren zijn
+                        remainingDays--;
                         remainingHours = 24 - hoursDiff;
                     }
 
@@ -219,22 +229,26 @@ export default {
                     return 'Reservering verlopen';
                 }
             } else {
-                return null; // Niet gereserveerd
+                return null;
             }
         });
+
         const markObservationAsEradicated = () => {
             if (selectedObservation.value) {
                 vespaStore.markObservationAsEradicated(selectedObservation.value.id);
             }
         };
+
         const markObservationAsNotEradicated = () => {
             if (selectedObservation.value) {
                 vespaStore.markObservationAsNotEradicated(selectedObservation.value.id);
             }
         };
+
         const canMarkAsEradicated = computed(() => {
             return vespaStore.isLoggedIn && vespaStore.canEditObservation(selectedObservation.value);
         });
+
         const closeDetails = () => {
             emit('closeDetails');
             vespaStore.isDetailsPaneOpen = false;
@@ -293,9 +307,10 @@ export default {
             await vespaStore.cancelReservation(selectedObservation.value);
         };
 
-        watch(selectedObservation, () => {
-            if (selectedObservation.value) {
-                editableObservation.value = { ...selectedObservation.value };
+        watch(() => vespaStore.selectedObservation, (newVal) => {
+            if (newVal) {
+                console.log('Selected Observation Changed:', newVal);
+                editableObservation.value = { ...newVal };
                 editableObservation.value.observation_datetime = formatToDatetimeLocal(selectedObservation.value.observation_datetime);
                 editableObservation.value.eradication_datetime = formatToDatetimeLocal(selectedObservation.value.eradication_datetime);
             }
@@ -324,7 +339,8 @@ export default {
             reservationStatus,
             canMarkAsEradicated,
             markObservationAsEradicated,
-            markObservationAsNotEradicated
+            markObservationAsNotEradicated,
+            canEditAdminFields
         };
     },
 };

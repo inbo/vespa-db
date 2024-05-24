@@ -8,6 +8,8 @@ from drf_yasg import openapi
 from drf_yasg.views import get_schema_view
 from rest_framework import permissions
 
+from vespadb.healthcheck import HealthCheckView
+
 schema_view = get_schema_view(
     openapi.Info(
         title="Vespawatch API Documentation",
@@ -30,6 +32,7 @@ urlpatterns = [
     # Include the observations app URLs
     path("", include("vespadb.observations.urls", namespace="observations")),
     path("", include("vespadb.users.urls", namespace="users")),
+    path("health/", HealthCheckView.as_view(), name="health_check"),
 ]
 
 if settings.DEBUG:

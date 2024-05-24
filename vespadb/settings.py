@@ -21,7 +21,6 @@ load_dotenv()
 
 secrets = {
     "DJANGO_SECRET_KEY": os.getenv("DJANGO_SECRET_KEY"),
-    "DJANGO_ALLOWED_HOSTS": os.getenv("DJANGO_ALLOWED_HOSTS", "localhost").split(","),
     "CORS_ALLOWED_ORIGINS": os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000").split(","),
     "CSRF_TRUSTED_ORIGINS": os.getenv("CSRF_TRUSTED_ORIGINS", "http://localhost:3000").split(","),
     "CSRF_COOKIE_DOMAIN": os.getenv("CSRF_COOKIE_DOMAIN", "localhost"),
@@ -40,7 +39,7 @@ secrets = {
 # Core settings
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = secrets["DJANGO_SECRET_KEY"]
-ALLOWED_HOSTS = os.environ.get("ALLOWED_HOST").split(",")  # type: ignore[union-attr]
+ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS").split(",")  # type: ignore[union-attr]
 ALLOWED_HOSTS.append(gethostbyname(gethostname()))
 DEBUG = secrets["DJANGO_DEBUG"] == "True"
 

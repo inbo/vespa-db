@@ -1,9 +1,10 @@
-"""Healtcheck endpoint"""
-from django.http import JsonResponse, HttpRequest
-from django.views import View
+"""Healtcheck endpoint."""
+
 from typing import Any
-from django.http import JsonResponse, HttpRequest
+
+from django.http import HttpRequest, JsonResponse
 from django.views import View
+
 
 class HealthCheckView(View):
     """View to handle health check requests."""

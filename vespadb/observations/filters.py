@@ -1,12 +1,15 @@
 """Filters for the Observation model."""
 
 import logging
+from typing import Any
 
 import django_filters
+from django.contrib.admin import SimpleListFilter
 from django.db.models import Q, QuerySet
+from django.utils.translation import gettext_lazy as _
 from rest_framework_gis.filterset import GeoFilterSet
 
-from vespadb.observations.models import Observation
+from vespadb.observations.models import Municipality, Observation, Province
 
 logger = logging.getLogger(__name__)
 
@@ -108,3 +111,79 @@ class ObservationFilter(GeoFilterSet):
         geo_filters = {
             "location": ["exact", "distance_lte", "dwithin"],
         }
+
+
+class ProvinceFilter(SimpleListFilter):
+    """Custom filter for selecting provinces in the admin panel."""
+
+    title: str = _("province")
+    parameter_name: str = "province"
+
+    def lookups(self, request: Any, model_admin: Any) -> list[tuple[int, str]]:
+        """
+        Return a list of tuples for the provinces to be used in the filter dropdown.
+
+        Args:
+            request (Any): The HTTP request object.
+            model_admin (Any): The admin model object.
+
+        Returns
+        -------
+            List[Tuple[int, str]]: List of province id and name tuples.
+        """
+        provinces = Province.objects.all()
+        return [(province.id, province.name) for province in provinces]
+
+    def queryset(self, request: Any, queryset: QuerySet) -> QuerySet | None:
+        """
+        Filter the queryset based on the selected province.
+
+        Args:
+            request (Any): The HTTP request object.
+            queryset (QuerySet): The initial queryset to be filtered.
+
+        Returns
+        -------
+            Optional[QuerySet]: The filtered queryset based on the selected province, or the original queryset if no province is selected.
+        """
+        if self.value():
+            return queryset.filter(province_id=self.value())
+        return queryset
+
+
+class MunicipalityExcludeFilter(SimpleListFilter):
+    """Custom filter for excluding a specific municipality in the admin panel."""
+
+    title: str = _("exclude municipality")
+    parameter_name: str = "municipality__exclude"
+
+    def lookups(self, request: Any, model_admin: Any) -> list[tuple[int, str]]:
+        """
+        Return a list of tuples for the municipalities to be used in the filter dropdown.
+
+        Args:
+            request (Any): The HTTP request object.
+            model_admin (Any): The admin model object.
+
+        Returns
+        -------
+            List[Tuple[int, str]]: List of municipality id and name tuples.
+        """
+        municipalities = Municipality.objects.all()
+        return [(municipality.id, municipality.name) for municipality in municipalities]
+
+    def queryset(self, request: Any, queryset: QuerySet) -> QuerySet | None:
+        """
+        Filter the queryset to exclude the selected municipality.
+
+        Args:
+            request (Any): The HTTP request object.
+            queryset (QuerySet): The initial queryset to be filtered.
+
+        Returns
+        -------
+            Optional[QuerySet]: The filtered queryset with the selected municipality excluded, or the original queryset if no municipality is selected.
+        """
+        if self.value():
+            return queryset.exclude(municipality_id=self.value())
+        return queryset

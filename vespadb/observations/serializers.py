@@ -11,7 +11,7 @@ from rest_framework import serializers
 from rest_framework.request import Request
 
 from vespadb.observations.helpers import parse_and_convert_to_cet, parse_and_convert_to_utc
-from vespadb.observations.models import Municipality, Observation
+from vespadb.observations.models import Municipality, Observation, Province
 from vespadb.users.models import VespaUser
 
 if TYPE_CHECKING:
@@ -100,6 +100,7 @@ class ObservationSerializer(serializers.ModelSerializer):
     """Serializer for the full details of an Observation model instance."""
 
     municipality_name = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
 
     class Meta:
         """Meta class for the ObservationSerializer."""
@@ -111,6 +112,10 @@ class ObservationSerializer(serializers.ModelSerializer):
             "wn_cluster_id": {"required": False, "allow_null": True},
             "eradication_datetime": {"required": False, "allow_null": True},
             "id": {"read_only": True},
+            "admin_notes": {"required": False, "allow_blank": True, "allow_null": True},
+            "observer_received_email": {"required": False, "allow_null": True},
+            "images": {"required": False, "allow_null": True},
+            "reserved_by": {"required": False, "allow_null": True},
         }
 
     def get_municipality_name(self, obj: Observation) -> str | None:
@@ -126,6 +131,24 @@ class ObservationSerializer(serializers.ModelSerializer):
         Optional[str]: The name of the municipality or None if not available.
         """
         return obj.municipality.name if obj.municipality else None
+
+    def get_status(self, obj: Observation) -> str:
+        """
+        Determine the status of the observation based on its properties.
+
+        Parameters
+        ----------
+        obj (Observation): The Observation instance.
+
+        Returns
+        -------
+        str: The status of the observation.
+        """
+        if obj.eradication_datetime:
+            return "eradicated"
+        if obj.reserved_datetime:
+            return "reserved"
+        return "default"
 
     def to_representation(self, instance: Observation) -> dict[str, Any]:
         """
@@ -214,6 +237,10 @@ class ObservationSerializer(serializers.ModelSerializer):
             serializers.ValidationError: If a non-admin user tries to update an observation reserved by another user.
         """
         user = self.context["request"].user
+        if not user.is_staff:
+            # Non-admins cannot update admin_notes and observer_received_email fields
+            validated_data.pop("admin_notes", None)
+            validated_data.pop("observer_received_email", None)
 
         # Conditionally set `reserved_by` and `reserved_datetime` for all users
         if "reserved_by" in validated_data and instance.reserved_by is None:
@@ -244,6 +271,7 @@ class ObservationSerializer(serializers.ModelSerializer):
             "eradication_result",
             "eradication_product",
             "eradication_notes",
+            "images",
         ]
 
         for field in set(validated_data) - set(allowed_fields):
@@ -318,5 +346,5 @@ class ProvinceSerializer(serializers.ModelSerializer):
     class Meta:
         """Meta class for the ProvinceSerializer."""
 
-        model = Municipality
+        model = Province
         fields = ["id", "name"]

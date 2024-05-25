@@ -260,3 +260,12 @@ SWAGGER_SETTINGS = {
     "JSON_EDITOR": True,
     "REFETCH_SCHEMA_WITH_AUTH": True,
 }
+
+# Email settings
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'watchvespa@gmail.com'
+EMAIL_HOST_PASSWORD = 'nbul zrlp rbjs xaom'
+DEFAULT_FROM_EMAIL = 'vespawatch@inbo.be'

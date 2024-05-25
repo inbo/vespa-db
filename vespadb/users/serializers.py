@@ -33,6 +33,7 @@ class UserSerializer(serializers.ModelSerializer):
             "permissions",
             "personal_data_access",
             "reservation_count",
+            "is_staff",
         ]
         extra_kwargs = {
             "password": {"write_only": True, "required": False},

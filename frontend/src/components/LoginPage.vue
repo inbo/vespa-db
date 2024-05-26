@@ -10,15 +10,15 @@
                             <div class="form-group mb-3">
                                 <label for="username" class="form-label">Gebruikersnaam</label>
                                 <input type="text" id="username" class="form-control" v-model="username"
-                                    placeholder="Gebruikersnaam">
+                                    @keyup.enter="login" placeholder="Gebruikersnaam">
                             </div>
                             <div class="form-group mb-3">
                                 <label for="password" class="form-label">Wachtwoord</label>
                                 <input type="password" id="password" class="form-control" v-model="password"
-                                    placeholder="Wachtwoord">
+                                    @keyup.enter="login" placeholder="Wachtwoord">
                             </div>
                             <button @click="login" class="btn btn-success w-100">Login</button>
-                            <p v-if="error" class="mt-3 text-danger">{{ error }}</p>
+                            <p v-if="formattedError" class="mt-3 text-danger">{{ formattedError }}</p>
                         </div>
                     </div>
                 </div>
@@ -26,6 +26,7 @@
         </div>
     </div>
 </template>
+
 <script>
 import { useVespaStore } from '@/stores/vespaStore';
 import { computed, ref } from 'vue';
@@ -45,6 +46,12 @@ export default {
             return Array.isArray(vespaStore.error) ? vespaStore.error.join(', ') : vespaStore.error;
         });
 
+        const formattedError = computed(() => {
+            if (!error.value) return null;
+            // Additional checks can be added here for other known errors
+            return error.value;
+        });
+
         const login = async () => {
             await vespaStore.login({ username: username.value, password: password.value });
             if (vespaStore.isLoggedIn) {
@@ -56,10 +63,8 @@ export default {
             username,
             password,
             login,
-            error
+            formattedError
         };
     }
 };
 </script>
-
-  

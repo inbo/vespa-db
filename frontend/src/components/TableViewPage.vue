@@ -64,7 +64,7 @@
 
 <script>
 import { useVespaStore } from '@/stores/vespaStore';
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import FilterComponent from './FilterComponent.vue';
 import NavbarComponent from './NavbarComponent.vue';
@@ -162,9 +162,6 @@ export default {
             vespaStore.getObservations();
         }, { deep: true });
 
-        onMounted(() => {
-            vespaStore.getObservations();
-        });
 
         return {
             table_observations,

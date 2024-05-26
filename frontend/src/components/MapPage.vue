@@ -14,6 +14,9 @@
         :class="{ 'd-none': !isDetailsPaneOpen, 'd-block': isDetailsPaneOpen, 'col-12': true, 'col-md-6': true, 'col-lg-4': true }">
         <ObservationDetailsComponent />
       </div>
+      <div v-if="formattedError" class="alert alert-danger position-absolute top-0 start-50 translate-middle-x mt-2">
+        {{ formattedError }}
+      </div>
     </div>
   </div>
 </template>
@@ -42,6 +45,15 @@ export default {
     const isLoggedIn = computed(() => vespaStore.isLoggedIn);
     const isDetailsPaneOpen = computed(() => vespaStore.isDetailsPaneOpen);
     const isFilterPaneOpen = ref(false);
+    const error = computed(() => vespaStore.error);
+
+    const formattedError = computed(() => {
+      if (!error.value) return null;
+      if (error.value.includes("Failed to fetch observation details")) {
+        return "Het ophalen van observatiedetails is mislukt.";
+      }
+      return error.value;
+    });
 
     const startEdit = () => {
       isEditing.value = true;
@@ -121,8 +133,8 @@ export default {
           });
         },
       });
-
       const observationId = router.currentRoute.value.params.id;
+
       if (observationId) {
         await vespaStore.fetchObservationDetails(observationId);
         const location = selectedObservation.value.location;
@@ -141,7 +153,6 @@ export default {
             }),
           ],
         });
-        updateMarkers();
       } else {
         vespaStore.map = L.map('map', {
           center: [50.8503, 4.3517],
@@ -153,9 +164,9 @@ export default {
             }),
           ],
         });
-        updateMarkers();
       }
     });
+
 
     return {
       isDetailsPaneOpen,
@@ -169,6 +180,7 @@ export default {
       startEdit,
       confirmUpdate,
       cancelEdit,
+      formattedError,
     };
   },
 };

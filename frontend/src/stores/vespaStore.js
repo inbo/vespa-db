@@ -122,14 +122,25 @@ export const useVespaStore = defineStore('vespaStore', {
             }
 
             if (this.filters.min_observation_date) {
-                params['min_observation_datetime'] = this.filters.min_observation_date;
+                params['min_observation_datetime'] = this.formatDateWithoutTime(this.filters.min_observation_date);
             }
 
             if (this.filters.max_observation_date) {
-                params['max_observation_datetime'] = this.filters.max_observation_date;
+                params['max_observation_datetime'] = this.formatDateWithoutTime(this.filters.max_observation_date);
             }
 
             return Object.entries(params).map(([key, value]) => `${key}=${encodeURIComponent(value)}`).join('&');
+        },
+        formatDateWithoutTime(date) {
+            const d = new Date(date);
+            let month = '' + (d.getMonth() + 1);
+            let day = '' + d.getDate();
+            const year = d.getFullYear();
+
+            if (month.length < 2) month = '0' + month;
+            if (day.length < 2) day = '0' + day;
+
+            return [year, month, day].join('-');
         },
         async applyFilters(filters) {
             this.filters = { ...this.filters, ...filters };
@@ -256,10 +267,11 @@ export const useVespaStore = defineStore('vespaStore', {
                     console.log('Fetched Observation Details:', response.data);
                     this.selectedObservation = response.data;
                 } else {
-                    console.error('Failed to fetch observation details:', response.status);
+                    throw new Error('Failed to fetch observation details');
                 }
             } catch (error) {
                 console.error('Error fetching observation details:', error);
+                this.error = 'Het ophalen van observatiedetails is mislukt.';
             }
         },
         formatToISO8601(datetime) {
@@ -327,25 +339,31 @@ export const useVespaStore = defineStore('vespaStore', {
         },
         async login({ username, password }) {
             this.loading = true;
-            await ApiService
-                .post("/login/", {
-                    username: username,
-                    password: password
-                })
-                .then(() => {
+            this.error = null;
+            try {
+                const response = await ApiService.post("/login/", { username, password });
+                if (response.status === 200) {
                     this.isLoggedIn = true;
                     this.authCheck();
-                })
-                .catch((error) => {
-                    if (error.response && error.response.data) {
-                        this.error = error.response.data.error;
+                }
+            } catch (error) {
+                if (error.response && error.response.data) {
+                    // Assuming the error response contains a key named `error` with the message
+                    const errorMsg = error.response.data.error;
+                    if (Array.isArray(errorMsg)) {
+                        this.error = errorMsg.join(', ');
+                    } else if (errorMsg.includes("Invalid username or password")) {
+                        this.error = "Ongeldige gebruikersnaam of wachtwoord.";
                     } else {
-                        this.error = "An unexpected error occurred";
+                        this.error = errorMsg;
                     }
-                    this.isLoggedIn = false;
-                    this.user = {};
-                    this.loading = false;
-                });
+                } else {
+                    this.error = "Er is een onverwachte fout opgetreden.";
+                }
+                this.isLoggedIn = false;
+                this.user = {};
+                this.loading = false;
+            }
         },
         async authCheck() {
             this.loading = true;
@@ -398,6 +416,7 @@ export const useVespaStore = defineStore('vespaStore', {
         },
         async changePassword(oldPassword, newPassword, confirmPassword) {
             this.loading = true;
+            this.error = null;
             if (!oldPassword || !newPassword) {
                 this.error = "Vul aub alle velden in.";
                 this.loading = false;

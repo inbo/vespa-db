@@ -1,0 +1,17 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<h2>Email Sending Result</h2>
+<h3>Successful Emails</h3>
+<ul>
+    {% for id in success_list %}
+    <li>Observation ID: {{ id }}</li>
+    {% endfor %}
+</ul>
+
+<h3>Failed Emails</h3>
+<ul>
+    {% for id in fail_list %}
+    <li>Observation ID: {{ id }}</li>
+    {% endfor %}
+</ul>
+{% endblock %}

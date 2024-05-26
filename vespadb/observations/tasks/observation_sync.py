@@ -2,7 +2,7 @@
 
 import logging
 import os
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import requests
@@ -88,27 +88,38 @@ def create_observations(observations_to_create: list[Observation]) -> None:
 
 def update_observations(observations_to_update: list[Observation], wn_ids_to_update: list[str]) -> None:
     """Update existing observations."""
-    # Map updated observations by wn_id for easy access during update
     observations_update_dict = {obs.wn_id: obs for obs in observations_to_update}
-    # Fetch all observations to be updated from the database in one query
     existing_observations_to_update = Observation.objects.filter(wn_id__in=wn_ids_to_update)
+    observations_to_bulk_update = []
+
     for observation in existing_observations_to_update:
         updated_observation = observations_update_dict[observation.wn_id]
+        update_needed = False
+
         for field in FIELDS_TO_UPDATE:
             if hasattr(observation, field):
                 new_value = getattr(updated_observation, field)
                 field_type = getattr(Observation, field).field
 
                 if isinstance(field_type, models.ForeignKey):
-                    # Check if the field is a foreign key relation to Municipality or Province
                     if isinstance(field_type.related_model, Municipality):
                         new_value = updated_observation.municipality_id
                     elif isinstance(field_type.related_model, Province):
                         new_value = updated_observation.province_id
-                setattr(observation, field, new_value)
 
-    logger.info("Updating %s observations", len(existing_observations_to_update))
-    Observation.objects.bulk_update(existing_observations_to_update, FIELDS_TO_UPDATE, batch_size=BATCH_SIZE)
+                current_value = getattr(observation, field)
+                if current_value != new_value:
+                    setattr(observation, field, new_value)
+                    update_needed = True
+
+        if update_needed:
+            observations_to_bulk_update.append(observation)
+
+    if observations_to_bulk_update:
+        logger.info("Updating %s observations", len(observations_to_bulk_update))
+        Observation.objects.bulk_update(observations_to_bulk_update, FIELDS_TO_UPDATE, batch_size=BATCH_SIZE)
+    else:
+        logger.info("No updates required for the observations.")
 
 
 def fetch_nest_observations(token: str, cluster_id: int) -> list[int]:
@@ -168,6 +179,10 @@ def manage_observations_visibility(token: str) -> None:
             continue
 
         observations = list(Observation.objects.filter(wn_id__in=observation_ids))
+        if not observations:
+            logger.info(f"No observations found for cluster {cluster['id']}.")
+            continue  # Skip if no observations are found
+
         if len(observations) != len(observation_ids):
             logger.info(f"Failed to fetch all observations for cluster {cluster['id']}.")
 
@@ -184,26 +199,38 @@ def manage_observations_visibility(token: str) -> None:
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
-def fetch_and_update_observations(self: Task, since_week: int = 2) -> None:
+def fetch_and_update_observations(self: Task, since_week: int | None = None, date: str | None = None) -> None:  # noqa: C901, PLR0912
     """Fetch observations from the waarnemingen API and update the database.
 
     Observations are fetched in batches and processed in bulk to minimize query overhead.
-    All observations that have been modified by waarnmeingen in the last two weeks are fetched.
+    Observations can be fetched based on weeks back or a specific date.
     Only observations with a modified by field set to the system user are updated.
     """
-    logger.info("start updating observations")
+    logger.info("Start updating observations")
     token = get_oauth_token()
     if not token:
         raise self.retry(exc=Exception("Failed to obtain OAuth2 token"))
 
-    modified_since = (
-        (timezone.now() - timedelta(weeks=since_week)).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
-    )
+    if date:
+        try:
+            modified_since = (
+                datetime.strptime(date, "%d%m%Y")
+                .replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=UTC)
+                .isoformat()
+            )
+        except ValueError as e:
+            raise ValueError("Invalid date format. Use ddMMyyyy.") from e
+    elif since_week is not None:
+        modified_since = (
+            (timezone.now() - timedelta(weeks=since_week))
+            .replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=UTC)
+            .isoformat()
+        )
+    else:
+        raise ValueError("Either since_week or date must be provided.")
 
     # Pre-fetch existing observations to minimize query overhead
-    existing_observations_dict = {
-        obs["wn_id"]: obs["modified_by"] for obs in Observation.objects.all().values("wn_id", "modified_by")
-    }
+    existing_observations_dict = {obs["wn_id"]: None for obs in Observation.objects.all().values("wn_id")}
     system_user = get_system_user(UserType.SYNC)
     wn_ids_to_update = []
     observations_to_update: list[Observation] = []
@@ -223,17 +250,11 @@ def fetch_and_update_observations(self: Task, since_week: int = 2) -> None:
                 wn_id = mapped_data.pop("wn_id")
 
                 if wn_id in existing_observations_dict:
-                    # Check if modified_by is system_user before update
-                    if existing_observations_dict[wn_id] == system_user.id:
-                        # Update only observations that have been modified by the system user
-                        # This is to prevent overwriting manual changes made by users
-                        wn_ids_to_update.append(wn_id)
-                        observations_to_update.append(
-                            Observation(
-                                wn_id=wn_id, **mapped_data, modified_by=system_user, modified_datetime=current_time
-                            )
-                        )
-                        logger.info("Observation with wn_id %s is ready to be updated.", wn_id)
+                    wn_ids_to_update.append(wn_id)
+                    observations_to_update.append(
+                        Observation(wn_id=wn_id, **mapped_data, modified_by=system_user, modified_datetime=current_time)
+                    )
+                    logger.info("Observation with wn_id %s is ready to be updated.", wn_id)
                 elif wn_id not in {obs.wn_id for obs in observations_to_create}:
                     observations_to_create.append(
                         Observation(
@@ -267,6 +288,6 @@ def fetch_and_update_observations(self: Task, since_week: int = 2) -> None:
         len(observations_to_create),
         len(observations_to_update),
     )
-    logger.info("start managing observations visibility")
+    logger.info("Start managing observations visibility")
     manage_observations_visibility(token)
-    logger.info("finished managing observations visibility")
+    logger.info("Finished managing observations visibility")

@@ -11,7 +11,8 @@ from rest_framework import serializers
 from rest_framework.request import Request
 
 from vespadb.observations.helpers import parse_and_convert_to_cet, parse_and_convert_to_utc
-from vespadb.observations.models import Municipality, Observation
+from vespadb.observations.models import Municipality, Observation, Province
+from vespadb.observations.utils import get_municipality_from_coordinates
 from vespadb.users.models import VespaUser
 
 if TYPE_CHECKING:
@@ -43,6 +44,9 @@ public_read_fields = [
     "public_domain",
     "municipality_name",
     "visible",
+    "reserved_by_first_name",
+    "modified_by_first_name",
+    "created_by_first_name",
 ]
 
 # Define the fields that authenticated users can read
@@ -60,6 +64,7 @@ user_read_fields = [
     "nest_size",
     "nest_location",
     "nest_type",
+    "observation_datetime",
     "notes",
     "modified_by",
     "created_by",
@@ -84,6 +89,9 @@ user_read_fields = [
     "public_domain",
     "municipality_name",
     "visible",
+    "reserved_by_first_name",
+    "modified_by_first_name",
+    "created_by_first_name",
 ]
 
 # Define the conditional fields for authenticated users with specific permissions
@@ -91,15 +99,18 @@ conditional_fields = [
     "observer_phone_number",
     "observer_email",
     "observer_name",
-    "observation_datetime",
 ]
 
 
-# Observation serializers
+# Observation serializersclass ObservationSerializer(serializers.ModelSerializer):
 class ObservationSerializer(serializers.ModelSerializer):
     """Serializer for the full details of an Observation model instance."""
 
     municipality_name = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+    reserved_by_first_name = serializers.SerializerMethodField()
+    modified_by_first_name = serializers.SerializerMethodField()
+    created_by_first_name = serializers.SerializerMethodField()
 
     class Meta:
         """Meta class for the ObservationSerializer."""
@@ -111,21 +122,35 @@ class ObservationSerializer(serializers.ModelSerializer):
             "wn_cluster_id": {"required": False, "allow_null": True},
             "eradication_datetime": {"required": False, "allow_null": True},
             "id": {"read_only": True},
+            "admin_notes": {"required": False, "allow_blank": True, "allow_null": True},
+            "observer_received_email": {"required": False, "allow_null": True},
+            "images": {"required": False, "allow_null": True},
+            "reserved_by": {"required": False, "allow_null": True},
         }
 
     def get_municipality_name(self, obj: Observation) -> str | None:
-        """
-        Retrieve the name of the municipality associated with the observation, if any.
-
-        Parameters
-        ----------
-        obj (Observation): The Observation instance.
-
-        Returns
-        -------
-        Optional[str]: The name of the municipality or None if not available.
-        """
+        """Retrieve the name of the municipality associated with the observation, if any."""
         return obj.municipality.name if obj.municipality else None
+
+    def get_status(self, obj: Observation) -> str:
+        """Determine the status of the observation based on its properties."""
+        if obj.eradication_datetime:
+            return "eradicated"
+        if obj.reserved_datetime:
+            return "reserved"
+        return "default"
+
+    def get_reserved_by_first_name(self, obj: Observation) -> str | None:
+        """Retrieve the first name of the user who reserved the observation."""
+        return obj.reserved_by.first_name if obj.reserved_by else None
+
+    def get_modified_by_first_name(self, obj: Observation) -> str | None:
+        """Retrieve the first name of the user who modified the observation."""
+        return obj.modified_by.first_name if obj.modified_by else None
+
+    def get_created_by_first_name(self, obj: Observation) -> str | None:
+        """Retrieve the first name of the user who created the observation."""
+        return obj.created_by.first_name if obj.created_by else None
 
     def to_representation(self, instance: Observation) -> dict[str, Any]:
         """
@@ -134,6 +159,14 @@ class ObservationSerializer(serializers.ModelSerializer):
         :param instance: Observation instance.
         :return: A dictionary representation of the observation instance with filtered fields.
         """
+        if not instance.municipality and instance.location:
+            long = instance.location.x
+            lat = instance.location.y
+            instance.municipality = get_municipality_from_coordinates(long, lat)
+            if instance.municipality:
+                instance.province = instance.municipality.province
+            instance.save(update_fields=["municipality", "province"])
+
         data: dict[str, Any] = super().to_representation(instance)
         # Convert datetime fields to CET for outgoing representation
         datetime_fields = [
@@ -173,13 +206,7 @@ class ObservationSerializer(serializers.ModelSerializer):
         return {field: data[field] for field in public_read_fields if field in data}
 
     def validate_reserved_by(self, value: VespaUser) -> VespaUser:
-        """
-        Validate that the user does not exceed the maximum number of allowed reservations.
-
-        :param value: The user instance to be set as reserved_by.
-        :return: The validated user instance.
-        :raises ValidationError: If the user exceeds the maximum number of reservations.
-        """
+        """Validate that the user does not exceed the maximum number of allowed reservations."""
         if value:
             current_reservations_count = Observation.objects.filter(
                 reserved_by=value, eradication_datetime__isnull=True
@@ -192,28 +219,12 @@ class ObservationSerializer(serializers.ModelSerializer):
         return value
 
     def update(self, instance: Observation, validated_data: dict[Any, Any]) -> Observation:
-        """
-        Update method to handle observation reservations.
-
-        This method checks if the `reserved_by` field is being updated. If it is and the current value is None,
-        it sets `reserved_datetime` to the current time and updates `reserved_by` to the current user.
-
-        It also prevents non-admin users from updating observations that are reserved by someone else.
-
-        Parameters
-        ----------
-            instance (Observation): The observation instance that is being updated.
-            validated_data (dict): Dictionary of new data for the observation.
-
-        Returns
-        -------
-            Observation: The updated observation instance.
-
-        Raises
-        ------
-            serializers.ValidationError: If a non-admin user tries to update an observation reserved by another user.
-        """
+        """Update method to handle observation reservations."""
         user = self.context["request"].user
+        if not user.is_staff:
+            # Non-admins cannot update admin_notes and observer_received_email fields
+            validated_data.pop("admin_notes", None)
+            validated_data.pop("observer_received_email", None)
 
         # Conditionally set `reserved_by` and `reserved_datetime` for all users
         if "reserved_by" in validated_data and instance.reserved_by is None:
@@ -244,6 +255,7 @@ class ObservationSerializer(serializers.ModelSerializer):
             "eradication_result",
             "eradication_product",
             "eradication_notes",
+            "images",
         ]
 
         for field in set(validated_data) - set(allowed_fields):
@@ -318,5 +330,5 @@ class ProvinceSerializer(serializers.ModelSerializer):
     class Meta:
         """Meta class for the ProvinceSerializer."""
 
-        model = Municipality
+        model = Province
         fields = ["id", "name"]

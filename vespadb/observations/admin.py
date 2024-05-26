@@ -1,19 +1,28 @@
 """VespaDB Observations admin module."""
 
 import json
+import logging
 from typing import Any
 
 from django import forms
-from django.contrib import admin
+from django.contrib import admin, messages
+from django.contrib.admin import ModelAdmin
 from django.contrib.gis import admin as gis_admin
+from django.core.mail import send_mail
+from django.db.models.query import QuerySet
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.template.response import TemplateResponse
 from django.urls import path
+from django.utils.timezone import now
 from rest_framework.test import APIRequestFactory
 
-from vespadb.observations.models import Observation
+from vespadb.observations.filters import MunicipalityExcludeFilter, ProvinceFilter
+from vespadb.observations.forms import SendEmailForm
+from vespadb.observations.models import Municipality, Observation, Province
 from vespadb.observations.views import ObservationsViewSet
+
+logger = logging.getLogger(__name__)
 
 
 class FileImportForm(forms.Form):
@@ -38,6 +47,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         "eradication_result",
         "municipality",
         "province",
+        "anb",
         "reserved_by",
         "created_by",
         "modified_by",
@@ -52,8 +62,9 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         "nest_location",
         "nest_type",
         "eradication_result",
-        "municipality",
-        "province",
+        ProvinceFilter,
+        MunicipalityExcludeFilter,
+        "anb",
         "reserved_by",
         "created_by",
         "modified_by",
@@ -62,24 +73,41 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
     filter_horizontal = ()
     ordering = ("-observation_datetime",)
     raw_id_fields = ("municipality", "province")
+    actions = ["send_email_to_observers", "mark_as_eradicated", "mark_as_not_visible"]
 
     def changelist_view(self, request: HttpRequest, extra_context: Any = None) -> TemplateResponse:
-        """Override the changelist view to add custom context."""
+        """
+        Override the changelist view to add custom context.
+
+        :param request: HttpRequest object
+        :param extra_context: Additional context data
+        :return: TemplateResponse object
+        """
         extra_context = extra_context or {}
         extra_context["import_file_url"] = "import-file/"
         return super().changelist_view(request, extra_context=extra_context)
 
     def get_urls(self) -> Any:
-        """Get the custom URLs for the admin interface."""
+        """
+        Get the custom URLs for the admin interface.
+
+        :return: List of URLs
+        """
         urls = super().get_urls()
         custom_urls = [
             path("import-file/", self.admin_site.admin_view(self.import_file), name="import_file"),
             path("bulk-import/", self.admin_site.admin_view(self.bulk_import_view), name="bulk_import"),
+            path("send-email/", self.admin_site.admin_view(self.send_email_to_observers), name="send-email"),
         ]
         return custom_urls + urls
 
     def import_file(self, request: HttpRequest) -> HttpResponse:
-        """Render the file import form and handle the form submission."""
+        """
+        Render the file import form and handle the form submission.
+
+        :param request: HttpRequest object
+        :return: HttpResponse object
+        """
         if request.method == "POST":
             form = FileImportForm(request.POST, request.FILES)
             if form.is_valid():
@@ -103,7 +131,12 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         return render(request, "admin/file_form.html", {"form": form})
 
     def bulk_import_view(self, request: HttpRequest) -> HttpResponse:
-        """Handle the bulk import by calling the API endpoint."""
+        """
+        Handle the bulk import by calling the API endpoint.
+
+        :param request: HttpRequest object
+        :return: HttpResponse object
+        """
         factory = APIRequestFactory()
         content_type = "json" if request.content_type == "application/json" else "multipart"
         api_request = factory.post("/observations/bulk_import/", data=request.data, format=content_type)
@@ -118,5 +151,112 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
             self.message_user(request, f"Failed to import observations: {response.data}", level="error")
         return redirect("admin:observations_observation_changelist")
 
+    @admin.action(description="Verzend emails naar observatoren")
+    def send_email_to_observers(
+        self, request: HttpRequest, queryset: QuerySet[Observation]
+    ) -> TemplateResponse | HttpResponse:
+        """
+        Send emails to the observers of the selected observations.
+
+        :param request: HttpRequest object
+        :param queryset: QuerySet of selected observations
+        :return: TemplateResponse or HttpResponse object
+        """
+        if "apply" in request.POST:
+            form = SendEmailForm(request.POST)
+            if form.is_valid():
+                subject = form.cleaned_data["subject"]
+                message = form.cleaned_data["message"]
+                resend = form.cleaned_data["resend"]
+
+                success_list = []
+                fail_list = []
+
+                for observation in queryset:
+                    if not observation.observer_email:
+                        fail_list.append(observation.id)
+                        continue
+                    if observation.observer_received_email and not resend:
+                        fail_list.append(observation.id)
+                        continue
+                    try:
+                        send_mail(subject, message, "vespawatch@inbo.be", [observation.observer_email])
+                        logger.info(f"Email sent to {observation.observer_email} for observation {observation.id}")
+                        observation.observer_received_email = True
+                        observation.save()
+                        success_list.append(observation.id)
+                    except Exception as e:
+                        logger.exception(
+                            f"Failed to send email to {observation.observer_email} for observation {observation.id}: {e}"
+                        )
+                        fail_list.append(observation.id)
+
+                return TemplateResponse(
+                    request,
+                    "admin/send_email_result.html",
+                    {
+                        "success_list": success_list,
+                        "fail_list": fail_list,
+                    },
+                )
+
+        else:
+            form = SendEmailForm()
+
+        return render(request, "admin/send_email.html", {"observations": queryset, "form": form})
+
+    @admin.action(description="Markeer observatie(s) als bestreden")
+    def mark_as_eradicated(self, modeladmin: ModelAdmin, request: HttpRequest, queryset: Any) -> None:
+        """
+        Admin action to mark selected observations as eradicated.
+
+        Parameters
+        ----------
+        - modeladmin (ModelAdmin): The current model admin instance.
+        - request (HttpRequest): The current request object.
+        - queryset (Any): The queryset of selected observations.
+
+        Returns
+        -------
+        - None
+        """
+        count = queryset.update(eradication_datetime=now())
+        modeladmin.message_user(request, f"{count} observations marked as eradicated.", messages.SUCCESS)
+
+    @admin.action(description="Markeer observatie(s) als niet zichtbaar")
+    def mark_as_not_visible(self, modeladmin: ModelAdmin, request: HttpRequest, queryset: Any) -> None:
+        """
+        Admin action to mark selected observations as not visible.
+
+        Parameters
+        ----------
+        - modeladmin (ModelAdmin): The current model admin instance.
+        - request (HttpRequest): The current request object.
+        - queryset (Any): The queryset of selected observations.
+
+        Returns
+        -------
+        - None
+        """
+        count = queryset.update(visible=False)
+        modeladmin.message_user(request, f"{count} observations marked as not visible.", messages.SUCCESS)
+
+
+class ProvinceAdmin(admin.ModelAdmin):
+    """Admin class for Province model."""
+
+    list_display = ("id", "name")
+    search_fields = ("name",)
+
+
+class MunicipalityAdmin(admin.ModelAdmin):
+    """Admin class for Municipality model."""
+
+    list_display = ("id", "name", "province")
+    list_filter = ("province",)
+    search_fields = ("name",)
+
 
 admin.site.register(Observation, ObservationAdmin)
+admin.site.register(Province, ProvinceAdmin)
+admin.site.register(Municipality, MunicipalityAdmin)

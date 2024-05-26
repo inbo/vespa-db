@@ -19,7 +19,7 @@ from rest_framework.test import APIRequestFactory
 
 from vespadb.observations.filters import MunicipalityExcludeFilter, ProvinceFilter
 from vespadb.observations.forms import SendEmailForm
-from vespadb.observations.models import Observation
+from vespadb.observations.models import Municipality, Observation, Province
 from vespadb.observations.views import ObservationsViewSet
 
 logger = logging.getLogger(__name__)
@@ -242,4 +242,21 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         modeladmin.message_user(request, f"{count} observations marked as not visible.", messages.SUCCESS)
 
 
+class ProvinceAdmin(admin.ModelAdmin):
+    """Admin class for Province model."""
+
+    list_display = ("id", "name")
+    search_fields = ("name",)
+
+
+class MunicipalityAdmin(admin.ModelAdmin):
+    """Admin class for Municipality model."""
+
+    list_display = ("id", "name", "province")
+    list_filter = ("province",)
+    search_fields = ("name",)
+
+
 admin.site.register(Observation, ObservationAdmin)
+admin.site.register(Province, ProvinceAdmin)
+admin.site.register(Municipality, MunicipalityAdmin)

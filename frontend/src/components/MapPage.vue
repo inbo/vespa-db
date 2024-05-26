@@ -12,9 +12,6 @@
       </div>
       <div class="details-panel"
         :class="{ 'd-none': !isDetailsPaneOpen, 'd-block': isDetailsPaneOpen, 'col-12': true, 'col-md-6': true, 'col-lg-4': true }">
-        <div class="d-flex justify-content-between align-items-center">
-          <button type="button" class="btn-close" aria-label="Close" @click="toggleDetailsPane"></button>
-        </div>
         <ObservationDetailsComponent />
       </div>
     </div>

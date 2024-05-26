@@ -10,9 +10,9 @@ from rest_framework import permissions
 
 schema_view = get_schema_view(
     openapi.Info(
-        title="Vespawatch API Documentation",
+        title="VespaDB API Documentation",
         default_version="v1",
-        description="Vespawatch API Documentation",
+        description="VespaDB API Documentation",
         terms_of_service="",
         contact=openapi.Contact(email=""),
         license=openapi.License(name=""),

@@ -2,7 +2,7 @@
 
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import requests
@@ -215,7 +215,7 @@ def fetch_and_update_observations(self: Task, since_week: int | None = None, dat
         try:
             modified_since = (
                 datetime.strptime(date, "%d%m%Y")
-                .replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc)
+                .replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=UTC)
                 .isoformat()
             )
         except ValueError as e:
@@ -223,7 +223,7 @@ def fetch_and_update_observations(self: Task, since_week: int | None = None, dat
     elif since_week is not None:
         modified_since = (
             (timezone.now() - timedelta(weeks=since_week))
-            .replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc)
+            .replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=UTC)
             .isoformat()
         )
     else:

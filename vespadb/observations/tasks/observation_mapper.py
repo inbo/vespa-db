@@ -176,6 +176,7 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
         "province": municipality.province if municipality else None,
         "wn_validation_status": validation_status,
         "wn_cluster_id": cluster_id,
+        "images": external_data.get("photos", []),
         **mapped_enums,
     }
 

@@ -23,8 +23,22 @@ class Command(BaseCommand):
 
         for municipality in Municipality.objects.all():
             provinces = Province.objects.filter(polygon__intersects=municipality.polygon)
+
             if provinces.exists():
-                province = provinces.first()
+                if provinces.count() == 1:
+                    province = provinces.first()
+                else:
+                    # Calculate intersection areas and choose the province with the largest intersection area
+                    max_intersection_area = 0
+                    chosen_province = None
+                    for province in provinces:
+                        intersection = municipality.polygon.intersection(province.polygon)
+                        intersection_area = intersection.area
+                        if intersection_area > max_intersection_area:
+                            max_intersection_area = intersection_area
+                            chosen_province = province
+                    province = chosen_province
+
                 municipality.province = province
                 municipality.save()
                 self.stdout.write(
@@ -33,4 +47,16 @@ class Command(BaseCommand):
                     )
                 )
             else:
-                self.stdout.write(self.style.WARNING(f"No province found for municipality {municipality.name}"))
+                # Fallback to using the centroid if no intersections found
+                centroid = municipality.polygon.centroid
+                province = Province.objects.filter(polygon__contains=centroid).first()
+                if province:
+                    municipality.province = province
+                    municipality.save()
+                    self.stdout.write(
+                        self.style.SUCCESS(
+                            f"Successfully assigned province {province.name} to municipality {municipality.name} using centroid"
+                        )
+                    )
+                else:
+                    self.stdout.write(self.style.WARNING(f"No province found for municipality {municipality.name}"))

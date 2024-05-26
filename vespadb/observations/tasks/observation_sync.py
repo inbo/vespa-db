@@ -2,8 +2,8 @@
 
 import logging
 import os
-from datetime import timedelta, datetime
-from typing import Any, Optional
+from datetime import datetime, timedelta
+from typing import Any
 
 import requests
 from celery import Task, shared_task
@@ -197,8 +197,9 @@ def manage_observations_visibility(token: str) -> None:
             update_observation_visibility(observations, observation_ids_to_hide)
             logger.info(f"Updated visibility for {len(observations)} observations in cluster {cluster['id']}.")
 
+
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
-def fetch_and_update_observations(self: Task, since_week: Optional[int] = None, date: Optional[str] = None) -> None:
+def fetch_and_update_observations(self: Task, since_week: int | None = None, date: str | None = None) -> None:  # noqa: C901, PLR0912
     """Fetch observations from the waarnemingen API and update the database.
 
     Observations are fetched in batches and processed in bulk to minimize query overhead.
@@ -212,12 +213,18 @@ def fetch_and_update_observations(self: Task, since_week: Optional[int] = None, 
 
     if date:
         try:
-            modified_since = datetime.strptime(date, "%d%m%Y").replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
-        except ValueError:
-            raise ValueError("Invalid date format. Use ddMMyyyy.")
+            modified_since = (
+                datetime.strptime(date, "%d%m%Y")
+                .replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc)
+                .isoformat()
+            )
+        except ValueError as e:
+            raise ValueError("Invalid date format. Use ddMMyyyy.") from e
     elif since_week is not None:
         modified_since = (
-            (timezone.now() - timedelta(weeks=since_week)).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+            (timezone.now() - timedelta(weeks=since_week))
+            .replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc)
+            .isoformat()
         )
     else:
         raise ValueError("Either since_week or date must be provided.")

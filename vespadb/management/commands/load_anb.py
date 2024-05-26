@@ -1,4 +1,5 @@
 """Handlers."""
+
 from pathlib import Path
 from typing import Any
 
@@ -43,9 +44,13 @@ class Command(BaseCommand):
 
             # Check if an ANB with the same domain already exists in the database
             if ANB.objects.filter(domain=attrs["domain"]).exists():
-                self.stdout.write(self.style.WARNING(f"ANB with domain '{attrs['domain']}' already exists in the database."))
+                self.stdout.write(
+                    self.style.WARNING(f"ANB with domain '{attrs['domain']}' already exists in the database.")
+                )
             else:
                 # If it doesn't exist, create a new ANB instance
                 anb_instance = ANB(**attrs)
                 anb_instance.save()
-                self.stdout.write(self.style.SUCCESS(f"ANB with domain '{attrs['domain']}' has been added to the database."))
+                self.stdout.write(
+                    self.style.SUCCESS(f"ANB with domain '{attrs['domain']}' has been added to the database.")
+                )

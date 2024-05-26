@@ -22,6 +22,7 @@ municipality_mapping = {
     "polygon": "MULTIPOLYGON",
 }
 
+
 class Command(BaseCommand):
     """A custom management command that loads a ShapeFile containing municipality boundaries into the database.
 
@@ -47,9 +48,13 @@ class Command(BaseCommand):
 
             # Check if a Municipality with the same name already exists in the database
             if Municipality.objects.filter(name=attrs["name"]).exists():
-                self.stdout.write(self.style.WARNING(f"Municipality with name '{attrs['name']}' already exists in the database."))
+                self.stdout.write(
+                    self.style.WARNING(f"Municipality with name '{attrs['name']}' already exists in the database.")
+                )
             else:
                 # If it doesn't exist, create a new Municipality instance
                 municipality_instance = Municipality(**attrs)
                 municipality_instance.save()
-                self.stdout.write(self.style.SUCCESS(f"Municipality with name '{attrs['name']}' has been added to the database."))
+                self.stdout.write(
+                    self.style.SUCCESS(f"Municipality with name '{attrs['name']}' has been added to the database.")
+                )

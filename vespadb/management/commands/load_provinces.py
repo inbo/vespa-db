@@ -1,4 +1,3 @@
-
 """Handlers."""
 
 from pathlib import Path
@@ -19,6 +18,7 @@ provinces_mapping = {
     "surface": "OPPERVL",
     "polygon": "GEOMETRY",
 }
+
 
 class Command(BaseCommand):
     """A custom management command that loads a ShapeFile containing province boundaries into the database.
@@ -45,9 +45,13 @@ class Command(BaseCommand):
 
             # Check if a Province with the same name already exists in the database
             if Province.objects.filter(name=attrs["name"]).exists():
-                self.stdout.write(self.style.WARNING(f"Province with name '{attrs['name']}' already exists in the database."))
+                self.stdout.write(
+                    self.style.WARNING(f"Province with name '{attrs['name']}' already exists in the database.")
+                )
             else:
                 # If it doesn't exist, create a new Province instance
                 province_instance = Province(**attrs)
                 province_instance.save()
-                self.stdout.write(self.style.SUCCESS(f"Province with name '{attrs['name']}' has been added to the database."))
+                self.stdout.write(
+                    self.style.SUCCESS(f"Province with name '{attrs['name']}' has been added to the database.")
+                )

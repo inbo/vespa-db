@@ -17,10 +17,10 @@ class Command(BaseCommand):
         sync_with_waarnemingen = input("Do you want to sync with waarnemingen.be? (yes/no): ")
         if sync_with_waarnemingen.lower() in {"yes", "y"}:
             choice = input("Enter '1' to specify weeks back or '2' to specify a date (ddMMyyyy): ")
-            if choice == '1':
+            if choice == "1":
                 since_week = int(input("Enter the number of weeks back to load observations: "))
                 fetch_and_update_observations(since_week=since_week)
-            elif choice == '2':
+            elif choice == "2":
                 date = input("Enter the date (ddMMyyyy) to load observations from: ")
                 fetch_and_update_observations(date=date)
             else:

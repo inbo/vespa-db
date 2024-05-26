@@ -147,9 +147,11 @@ class Province(models.Model):
     surface = models.FloatField(blank=True, null=True)
 
     class Meta:
-        unique_together = ('name',)
-        ordering = ['name']
-        
+        """Meta class for the Province model."""
+
+        unique_together = ("name",)
+        ordering = ["name"]
+
     def __str__(self) -> str:
         """Return the string representation of the model."""
         return str(self.name)
@@ -175,9 +177,11 @@ class Municipality(models.Model):
     )
 
     class Meta:
-        unique_together = ('name',)
-        ordering = ['name']
-        
+        """Meta class for the Municipality model."""
+
+        unique_together = ("name",)
+        ordering = ["name"]
+
     def __str__(self) -> str:
         """Return the string representation of the model."""
         return str(self.name)

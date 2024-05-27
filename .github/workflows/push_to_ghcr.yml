@@ -27,7 +27,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          dockerfile: Dockerfile.frontend
+          file: Dockerfile.frontend
           target: frontend-prod
           push: true
           tags: |

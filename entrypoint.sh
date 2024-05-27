@@ -8,6 +8,8 @@ mkdir -p /workspaces/vespadb/logs
 touch /workspaces/vespadb/logs/django.log
 chmod -R 755 /workspaces/vespadb/logs
 
+mkdir -p /workspaces/vespadb/static
+
 echo "Applying database migrations..."
 python manage.py migrate --noinput
 # Collect static files

@@ -8,8 +8,8 @@ on:
   pull_request:
 
 jobs:
-  build_and_push:
-    name: Build and push
+  build_and_push_frontend:
+    name: Build and push frontend
     runs-on: ubuntu-latest
     permissions: write-all
     steps:
@@ -23,18 +23,13 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and push
+      - name: Build and push frontend
         uses: docker/build-push-action@v5
-        env:
-          BUILD_BRANCH: ${{ github.head_ref || github.ref_name }}
         with:
           context: .
-          target: app
+          dockerfile: Dockerfile.frontend
+          target: frontend-prod
           push: true
-          build-args: |
-            BUILD_BRANCH=${{ env.BUILD_BRANCH }}
-            BUILD_COMMIT=${{ github.sha }}
-            BUILD_TIMESTAMP=${{ env.BUILD_TIMESTAMP }}
           tags: |
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ env.BUILD_BRANCH }}
+            ghcr.io/${{ github.repository }}:frontend-latest
+            ghcr.io/${{ github.repository }}:frontend-${{ github.head_ref || github.ref_name }}

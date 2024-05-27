@@ -4,12 +4,15 @@ services:
   frontend:
     build:
       context: .
+      dockerfile: Dockerfile.frontend
       target: frontend-prod
     ports:
       - "3000:80"
+
   devcontainer:
     build:
       context: .
+      dockerfile: Dockerfile.backend
       args:
         PYTHON_VERSION: ${PYTHON_VERSION:-3.11.6}
       target: dev
@@ -17,9 +20,11 @@ services:
     tty: true
     volumes:
       - .:/workspaces/vespadb/
+
   app:
     build:
       context: .
+      dockerfile: Dockerfile.backend
       target: app
     tty: true
     ports:
@@ -65,7 +70,9 @@ services:
       - "6379:6379"
 
   celery_worker:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
     command: celery-worker
     volumes:
       - .:/workspaces/vespadb/
@@ -76,7 +83,9 @@ services:
       - redis
 
   celery_beat:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
     command: celery-beat
     volumes:
       - .:/workspaces/vespadb/
@@ -88,7 +97,6 @@ services:
 
 volumes:
   postgres_data:
-
 
 networks:
   default:

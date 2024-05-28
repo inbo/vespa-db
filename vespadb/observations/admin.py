@@ -36,20 +36,19 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
 
     list_display = (
         "id",
-        "observation_datetime",
-        "eradication_datetime",
-        "eradicator_name",
         "wn_validation_status",
-        "nest_height",
-        "nest_size",
+        "created_by",
+        "observation_datetime",
+        "province",
+        "municipality",
         "nest_location",
         "nest_type",
+        "nest_height",
+        "nest_size",
+        "eradication_datetime",
         "eradication_result",
-        "municipality",
-        "province",
-        "anb",
+        "eradicator_name",
         "reserved_by",
-        "created_by",
         "modified_by",
     )
     list_filter = (

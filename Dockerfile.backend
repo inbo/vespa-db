@@ -8,15 +8,12 @@ ENV PYTHONFAULTHANDLER=1 \
     PYTHONUNBUFFERED=1 \
     POETRY_VERSION=1.7.1
 
-# Install Poetry, Poe the Poet, and pre-commit
+# Install Poetry, Poe the Poet, pre-commit, nginx
 RUN --mount=type=cache,target=/root/.cache/pip/ \
     pip install poetry==$POETRY_VERSION poethepoet pre-commit
-
-# Install curl, compilers, GDAL dependencies, and PostgreSQL client
-RUN rm /etc/apt/apt.conf.d/docker-clean
 RUN --mount=type=cache,target=/var/cache/apt/ \
     --mount=type=cache,target=/var/lib/apt/ \
-    apt-get update && apt-get install --no-install-recommends --yes curl build-essential gdal-bin libgdal-dev postgresql-client
+    apt-get update && apt-get install --no-install-recommends --yes curl build-essential gdal-bin libgdal-dev postgresql-client nginx
 
 # Configure GDAL environment variables, adjust according to the installed GDAL version
 ENV GDAL_LIBRARY_PATH /usr/lib/libgdal.so
@@ -69,9 +66,15 @@ RUN --mount=type=cache,target=/root/.cache/pypoetry/ \
 
 COPY . .
 
+# Collect static files
+RUN python manage.py collectstatic --noinput
+
 # Add entrypoint script
 COPY entrypoint.sh /workspaces/vespadb/entrypoint.sh
 RUN chmod +x /workspaces/vespadb/entrypoint.sh
+
+# Copy nginx configuration file
+COPY nginx.conf /etc/nginx/nginx.conf
 
 # Use the entrypoint script
 ENTRYPOINT ["/workspaces/vespadb/entrypoint.sh"]

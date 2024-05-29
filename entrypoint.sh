@@ -14,6 +14,10 @@ mkdir -p /workspaces/vespadb/static
 echo "Applying database migrations..."
 python manage.py migrate --noinput
 
+# Collect static files
+echo "Collecting static files..."
+python manage.py collectstatic --noinput
+
 # Load initial data if required
 echo "Loading municipalities, provinces and anb areas..."
 python manage.py load_municipalities

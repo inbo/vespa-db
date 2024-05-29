@@ -26,8 +26,11 @@ python manage.py assign_provinces_to_municipalities
 echo "Create django admin user with python manage.py createsuperuser"
 echo "Load waarnemingen observation data via: python manage.py load_waarnemingen_observations"
 
+# Start Gunicorn
+echo "Starting Gunicorn..."
+gunicorn --workers 3 --bind 0.0.0.0:8000 vespadb.wsgi:application &
+
 # Start Nginx
 echo "Starting Nginx..."
 nginx -g "daemon off;"
-
 exec "$@"

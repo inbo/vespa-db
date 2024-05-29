@@ -66,9 +66,6 @@ RUN --mount=type=cache,target=/root/.cache/pypoetry/ \
 
 COPY . .
 
-# Collect static files
-RUN python manage.py collectstatic --noinput
-
 # Add entrypoint script
 COPY entrypoint.sh /workspaces/vespadb/entrypoint.sh
 RUN chmod +x /workspaces/vespadb/entrypoint.sh

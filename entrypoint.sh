@@ -10,6 +10,7 @@ chmod -R 755 /workspaces/vespadb/logs
 
 # Ensure static directory exists
 mkdir -p /workspaces/vespadb/static
+mkdir -p /workspaces/vespadb/collected_static
 
 echo "Applying database migrations..."
 python manage.py migrate --noinput

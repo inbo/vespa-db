@@ -39,8 +39,9 @@ secrets = {
 # Core settings
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = secrets["DJANGO_SECRET_KEY"]
-ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",")
-ALLOWED_HOSTS.append(gethostbyname(gethostname()))
+# ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",")
+# ALLOWED_HOSTS.append(gethostbyname(gethostname()))
+ALLOWED_HOSTS = ["*"]
 DEBUG = secrets["DJANGO_DEBUG"] == "True"
 
 # vespawatch specific settings

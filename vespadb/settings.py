@@ -206,7 +206,7 @@ LOGGING = {
 }
 
 # Static and template settings
-STATIC_URL = "/static/"
+STATIC_URL = "/collected_static/"
 STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]

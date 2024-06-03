@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - uat
 
 jobs:
   build:
@@ -18,6 +19,14 @@ jobs:
         with:
           node-version: 16
 
+      - name: Set environment variable
+        run: |
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "VITE_APP_API_URL=https://main.data.vespawatch.be" >> $GITHUB_ENV
+          elif [ "${{ github.ref }}" == "refs/heads/uat" ]; then
+            echo "VITE_APP_API_URL=https://uat.data.vespawatch.be" >> $GITHUB_ENV
+          fi
+
       - name: Install dependencies and build Vue project
         run: |
           cd frontend
@@ -25,6 +34,7 @@ jobs:
           npm run build
 
       - name: Deploy to GitHub Pages
+        if: github.ref == 'refs/heads/main'
         uses: JamesIves/github-pages-deploy-action@4.0.0
         with:
           branch: gh-pages

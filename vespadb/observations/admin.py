@@ -6,7 +6,6 @@ from typing import Any
 
 from django import forms
 from django.contrib import admin, messages
-from django.contrib.admin import ModelAdmin
 from django.contrib.gis import admin as gis_admin
 from django.core.mail import send_mail
 from django.db.models.query import QuerySet
@@ -63,6 +62,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         "eradication_result",
         ProvinceFilter,
         MunicipalityExcludeFilter,
+        "municipality",
         "anb",
         "reserved_by",
         "created_by",
@@ -205,7 +205,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         return render(request, "admin/send_email.html", {"observations": queryset, "form": form})
 
     @admin.action(description="Markeer observatie(s) als bestreden")
-    def mark_as_eradicated(self, modeladmin: ModelAdmin, request: HttpRequest, queryset: Any) -> None:
+    def mark_as_eradicated(self, request: HttpRequest, queryset: Any) -> None:
         """
         Admin action to mark selected observations as eradicated.
 
@@ -220,16 +220,15 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         - None
         """
         count = queryset.update(eradication_datetime=now())
-        modeladmin.message_user(request, f"{count} observations marked as eradicated.", messages.SUCCESS)
+        self.message_user(request, f"{count} observations marked as eradicated.", messages.SUCCESS)
 
     @admin.action(description="Markeer observatie(s) als niet zichtbaar")
-    def mark_as_not_visible(self, modeladmin: ModelAdmin, request: HttpRequest, queryset: Any) -> None:
+    def mark_as_not_visible(self, request: HttpRequest, queryset: Any) -> None:
         """
         Admin action to mark selected observations as not visible.
 
         Parameters
         ----------
-        - modeladmin (ModelAdmin): The current model admin instance.
         - request (HttpRequest): The current request object.
         - queryset (Any): The queryset of selected observations.
 
@@ -238,7 +237,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         - None
         """
         count = queryset.update(visible=False)
-        modeladmin.message_user(request, f"{count} observations marked as not visible.", messages.SUCCESS)
+        self.message_user(request, f"{count} observations marked as not visible.", messages.SUCCESS)
 
 
 class ProvinceAdmin(admin.ModelAdmin):

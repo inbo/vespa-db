@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 BBOX_LENGTH = 4
-REDIS_CACHE_EXPIRATION = 86400
+REDIS_CACHE_EXPIRATION = 900  # 15 minutes
 
 
 class ObservationsViewSet(ModelViewSet):

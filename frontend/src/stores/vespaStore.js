@@ -193,7 +193,7 @@ export const useVespaStore = defineStore('vespaStore', {
                 });
                 if (response.status === 200) {
                     this.selectedObservation = { ...this.selectedObservation, ...response.data };
-                    this.updateMarkerColor(observation.id, '#808080');
+                    this.updateMarkerColor(observation.id, '#FF7800');
                     await this.authCheck();
                 } else {
                     throw new Error('Failed to reserve the observation');
@@ -363,6 +363,18 @@ export const useVespaStore = defineStore('vespaStore', {
                 this.isLoggedIn = false;
                 this.user = {};
                 this.loading = false;
+            }
+        },
+        async fetchMunicipalitiesByProvinces(provinceIds) {
+            try {
+                const response = await ApiService.get(`/municipalities/by_provinces/?province_ids=${provinceIds.join(',')}`);
+                if (response.status === 200) {
+                    this.municipalities = response.data;
+                } else {
+                    console.error('Failed to fetch filtered municipalities: Status Code', response.status);
+                }
+            } catch (error) {
+                console.error('Error fetching filtered municipalities:', error);
             }
         },
         async authCheck() {

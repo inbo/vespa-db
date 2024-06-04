@@ -193,7 +193,7 @@ export const useVespaStore = defineStore('vespaStore', {
                 });
                 if (response.status === 200) {
                     this.selectedObservation = { ...this.selectedObservation, ...response.data };
-                    this.updateMarkerColor(observation.id, '#808080');
+                    this.updateMarkerColor(observation.id, '#FF7800');
                     await this.authCheck();
                 } else {
                     throw new Error('Failed to reserve the observation');

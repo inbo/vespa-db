@@ -6,6 +6,17 @@
         <i class="fas fa-sliders-h"></i> Filters
       </button>
       <div id="map" class="h-100"></div>
+      <div class="map-legend" v-if="map">
+        <div>
+          <span class="legend-icon bg-green"></span> Bestreden
+        </div>
+        <div>
+          <span class="legend-icon bg-grey"></span> Gereserveerd
+        </div>
+        <div>
+          <span class="legend-icon bg-orange"></span> Standaard
+        </div>
+      </div>
       <div class="filter-panel"
         :class="{ 'd-none': !isFilterPaneOpen, 'd-block': isFilterPaneOpen, 'col-12': true, 'col-md-6': true, 'col-lg-4': true }">
         <FilterComponent />
@@ -23,6 +34,8 @@
 
 <script>
 import { useVespaStore } from '@/stores/vespaStore';
+import 'leaflet.markercluster';
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import 'leaflet/dist/leaflet.css';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
@@ -41,7 +54,7 @@ export default {
     const router = useRouter();
     const selectedObservation = computed(() => vespaStore.selectedObservation);
     const isEditing = computed(() => vespaStore.isEditing);
-    const map = computed(() => vespaStore.map);
+    const map = ref(null);
     const isLoggedIn = computed(() => vespaStore.isLoggedIn);
     const isDetailsPaneOpen = computed(() => vespaStore.isDetailsPaneOpen);
     const isFilterPaneOpen = ref(false);
@@ -99,7 +112,7 @@ export default {
         });
         vespaStore.markerClusterGroup.clearLayers();
         vespaStore.markerClusterGroup.addLayer(geoJsonLayer);
-        vespaStore.map.addLayer(vespaStore.markerClusterGroup);
+        map.value.addLayer(vespaStore.markerClusterGroup);
       });
     };
 
@@ -143,7 +156,7 @@ export default {
           .split(' ')
           .map(parseFloat);
 
-        vespaStore.map = L.map('map', {
+        map.value = L.map('map', {
           center: [latitude, longitude],
           zoom: 16,
           maxZoom: 20,
@@ -154,7 +167,7 @@ export default {
           ],
         });
       } else {
-        vespaStore.map = L.map('map', {
+        map.value = L.map('map', {
           center: [50.8503, 4.3517],
           zoom: 9,
           maxZoom: 20,
@@ -165,6 +178,8 @@ export default {
           ],
         });
       }
+
+      vespaStore.map = map.value;
     });
 
 
@@ -185,3 +200,38 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+.map-legend {
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  background: white;
+  padding: 10px;
+  border-radius: 5px;
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  z-index: 1000;
+}
+
+.legend-icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-right: 8px;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+
+.bg-green {
+  background-color: green;
+}
+
+.bg-grey {
+  background-color: grey;
+}
+
+.bg-orange {
+  background-color: orange;
+}
+</style>

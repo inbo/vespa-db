@@ -6,7 +6,6 @@ from typing import Any
 
 from django import forms
 from django.contrib import admin, messages
-from django.contrib.admin import ModelAdmin
 from django.contrib.gis import admin as gis_admin
 from django.core.mail import send_mail
 from django.db.models.query import QuerySet

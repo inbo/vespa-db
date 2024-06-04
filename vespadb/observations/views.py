@@ -6,7 +6,7 @@ import io
 import json
 import logging
 from typing import Any
-
+from django.shortcuts import get_list_or_404
 from django.contrib.gis.db.models.functions import Transform
 from django.contrib.gis.geos import GEOSGeometry
 from django.core.cache import cache
@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 BBOX_LENGTH = 4
-REDIS_CACHE_EXPIRATION = 86400
+REDIS_CACHE_EXPIRATION = 86400 # 24 hours
 
 
 class ObservationsViewSet(ModelViewSet):

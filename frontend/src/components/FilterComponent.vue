@@ -55,14 +55,6 @@
             @change="emitFilterUpdate">
           </v-autocomplete>
         </div>
-        <div class="col-12">
-          <v-autocomplete v-model="visibleActief" :items="VisibleOptions.length ? VisibleOptions.map(visible => ({
-            title: visible.name,
-            value: visible.value
-          })) : []" item-text="title" item-value="value" label="Zichtbaarheid" multiple chips dense solo
-            @change="emitFilterUpdate">
-          </v-autocomplete>
-        </div>
       </div>
     </div>
   </div>
@@ -197,7 +189,7 @@ export default {
       toggleMenu2,
       closeMenu2,
       VisibleOptions,
-      visibleActief
+      visibleActief,
     };
   }
 };

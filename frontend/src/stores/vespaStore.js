@@ -365,6 +365,18 @@ export const useVespaStore = defineStore('vespaStore', {
                 this.loading = false;
             }
         },
+        async fetchMunicipalitiesByProvinces(provinceIds) {
+            try {
+                const response = await ApiService.get(`/municipalities/by_provinces/?province_ids=${provinceIds.join(',')}`);
+                if (response.status === 200) {
+                    this.municipalities = response.data;
+                } else {
+                    console.error('Failed to fetch filtered municipalities: Status Code', response.status);
+                }
+            } catch (error) {
+                console.error('Error fetching filtered municipalities:', error);
+            }
+        },
         async authCheck() {
             this.loading = true;
             await ApiService

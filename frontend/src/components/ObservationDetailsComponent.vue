@@ -3,7 +3,7 @@
         <div class="float-end">
             <button type="button" class="btn-close" aria-label="Close" @click="closeDetails"></button>
         </div>
-        <div class="container mt-5">
+        <div class="container mt-2">
             <text class="text-muted text-uppercase small">Melding <span id="identifier">{{ selectedObservation.id }}</span></text>
             <h3 class="mt-3 mb-3">
                 <span id="observation-datetime">{{ selectedObservation.observation_datetime ? formatDate(selectedObservation.observation_datetime) : '' }}</span>,

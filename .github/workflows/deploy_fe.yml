@@ -22,9 +22,9 @@ jobs:
       - name: Set environment variable
         run: |
           if [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            echo "VITE_APP_API_URL=https://main.data.vespawatch.be" >> $GITHUB_ENV
+            echo "VITE_APP_API_URL=https://uat.db.vespawatch.be" >> $GITHUB_ENV
           elif [ "${{ github.ref }}" == "refs/heads/uat" ]; then
-            echo "VITE_APP_API_URL=https://uat.data.vespawatch.be" >> $GITHUB_ENV
+            echo "VITE_APP_API_URL=https://uat.db.vespawatch.be" >> $GITHUB_ENV
           fi
 
       - name: Install dependencies and build Vue project

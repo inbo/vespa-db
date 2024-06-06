@@ -4,7 +4,7 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: frontend/Dockerfile.frontend
+      dockerfile: Dockerfile.frontend
       target: frontend-prod
     ports:
       - "3000:80"
@@ -97,6 +97,7 @@ services:
 
 volumes:
   postgres_data:
+
 
 networks:
   default:

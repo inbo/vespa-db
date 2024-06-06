@@ -21,7 +21,7 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           context: frontend
-          file: frontend/Dockerfile.frontend
+          file: Dockerfile.frontend
           push: true
           tags: username/repository:latest
           build-args: |

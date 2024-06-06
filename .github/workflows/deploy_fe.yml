@@ -23,6 +23,7 @@ jobs:
           context: frontend
           file: frontend/Dockerfile.frontend
           push: true
+          tags: username/repository:latest
           build-args: |
             VITE_APP_API_URL=https://uat.db.vespawatch.be
 

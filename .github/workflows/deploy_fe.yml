@@ -26,6 +26,7 @@ jobs:
           tags: username/repository:latest
           build-args: |
             VITE_APP_API_URL=https://uat.db.vespawatch.be
+          no-cache: true
 
       - name: Deploy to GitHub Pages
         if: github.ref == 'refs/heads/main'

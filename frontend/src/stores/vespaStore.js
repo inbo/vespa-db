@@ -406,7 +406,6 @@ export const useVespaStore = defineStore('vespaStore', {
                     }
                 })
                 .catch((error) => {
-                    console.error(error.response.data);
                     this.error = error;
                     this.isLoggedIn = false;
                     this.loading = false;

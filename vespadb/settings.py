@@ -22,15 +22,15 @@ secrets = {
     "DJANGO_SECRET_KEY": os.getenv("SECRET_KEY"),
     "CORS_ALLOWED_ORIGINS": os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000").split(","),
     "CSRF_TRUSTED_ORIGINS": os.getenv("CSRF_TRUSTED_ORIGINS", "http://localhost:3000").split(","),
-    "CSRF_COOKIE_DOMAIN": os.getenv("CSRF_COOKIE_DOMAIN", "localhost"),
-    "SESSION_COOKIE_DOMAIN": os.getenv("SESSION_COOKIE_DOMAIN", "localhost"),
+    "CSRF_COOKIE_DOMAIN": os.getenv("CSRF_COOKIE_DOMAIN"),
+    "SESSION_COOKIE_DOMAIN": os.getenv("SESSION_COOKIE_DOMAIN"),
     "POSTGRES_DB": os.getenv("POSTGRES_DB"),
     "POSTGRES_USER": os.getenv("POSTGRES_USER"),
     "POSTGRES_PASSWORD": os.getenv("POSTGRES_PASSWORD"),
     "POSTGRES_HOST": os.getenv("POSTGRES_HOST"),
     "POSTGRES_PORT": os.getenv("POSTGRES_PORT"),
-    "REDIS_LOCATION": os.getenv("REDIS_LOCATION", "redis://redis:6379/1"),
-    "CELERY_BROKER_URL": os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0"),
+    "REDIS_LOCATION": os.getenv("REDIS_LOCATION"),
+    "CELERY_BROKER_URL": os.getenv("CELERY_BROKER_URL"),
     "REDIS_REFRESH_RATE_MIN": os.getenv("REDIS_REFRESH_RATE_MIN", "15"),
     "DJANGO_DEBUG": os.getenv("DJANGO_DEBUG", "False"),
 }
@@ -121,7 +121,7 @@ CELERY_TIMEZONE = "UTC"
 CELERY_BEAT_SCHEDULE = {
     "fetch_and_update_observations": {
         "task": "vespadb.observations.tasks.observation_sync.fetch_and_update_observations",
-        "schedule": crontab(hour=10, minute=33),  # Runs every day at X AM UTC.
+        "schedule": crontab(hour=10, minute=0),  # Runs every day at X AM UTC.
     },
     "remove_expired_reservations": {
         "task": "vespadb.observations.tasks.reservation_cleanup.free_expired_reservations_and_audit_reservation_count",

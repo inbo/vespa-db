@@ -25,6 +25,16 @@ export default defineConfig({
           styles: 'wght@100;300;400;500;700;900',
         }],
       },
+      custom: {
+        families: [
+          {
+            name: 'MaterialDesignIcons',
+            local: 'MaterialDesignIcons',
+            src: './src/assets/materialdesignicons-webfont.woff2',
+          },
+        ],
+        preload: true,
+      }
     }),
   ],
   define: { 'process.env': {} },

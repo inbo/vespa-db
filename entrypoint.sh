@@ -31,6 +31,13 @@ python manage.py assign_provinces_to_municipalities
 echo "Create django admin user with python manage.py createsuperuser"
 echo "Load waarnemingen observation data via: python manage.py load_waarnemingen_observations"
 
+echo "Starting Celery worker..."
+celery -A vespadb worker --loglevel=info &
+
+# Start Celery beat scheduler
+echo "Starting Celery beat scheduler..."
+celery -A vespadb beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+
 # Start Gunicorn
 echo "Starting Gunicorn..."
 gunicorn --workers 3 --bind 0.0.0.0:8000 vespadb.wsgi:application &

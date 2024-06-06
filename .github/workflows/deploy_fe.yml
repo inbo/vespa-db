@@ -27,6 +27,9 @@ jobs:
           build-args: |
             VITE_APP_API_URL=https://uat.db.vespawatch.be
           no-cache: true
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Deploy to GitHub Pages
         if: github.ref == 'refs/heads/main'

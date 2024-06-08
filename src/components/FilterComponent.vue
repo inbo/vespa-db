@@ -64,10 +64,6 @@
 import { useVespaStore } from '@/stores/vespaStore';
 import { DateTime } from 'luxon';
 import { computed, onMounted, ref, watch } from 'vue';
-<<<<<<< HEAD:src/components/FilterComponent.vue
-import debounce from 'lodash/debounce';
-=======
->>>>>>> b010eac (fix frontend deployment):frontend/src/components/FilterComponent.vue
 
 export default {
   setup() {

@@ -64,12 +64,8 @@
 import { useVespaStore } from '@/stores/vespaStore';
 import { DateTime } from 'luxon';
 import { computed, onMounted, ref, watch } from 'vue';
-import NavbarComponent from './NavbarComponent.vue';
 
 export default {
-  components: {
-    NavbarComponent,
-  },
   setup() {
     const vespaStore = useVespaStore();
 
@@ -180,7 +176,6 @@ export default {
       selectedNestStatus,
       anbAreasActief,
       emitFilterUpdate,
-      minDate,
       maxDate,
       menu1,
       menu2,

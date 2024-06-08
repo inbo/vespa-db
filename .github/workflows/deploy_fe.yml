@@ -40,7 +40,7 @@ jobs:
       - name: Copy build output
         run: |
           docker create --name build-container vespawatch/vespadb:latest &&
-          docker cp build-container:/usr/share/nginx/html. frontend/dist &&
+          docker cp build-container:/usr/share/nginx/html/. frontend/dist &&
           docker rm build-container
           
       - name: Deploy to GitHub Pages

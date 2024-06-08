@@ -29,7 +29,7 @@ jobs:
           context: .
           file: Dockerfile.frontend
           push: false
-          tags: vespawatch/vespadb:frontend-prod
+          tags: vespawatch/vespadb:latest
           build-args: |
             VITE_APP_API_URL=https://uat.db.vespawatch.be
           no-cache: true
@@ -38,7 +38,7 @@ jobs:
         run: mkdir -p frontend/dist
 
       - name: Copy build output
-        run: docker create --name build-container vespawatch/vespadb:frontend-prod && docker cp build-container:/app/dist/. frontend/dist && docker rm build-container
+        run: docker create --name build-container vespawatch/vespadb:latest && docker cp build-container:/app/dist/. frontend/dist && docker rm build-container
 
       - name: Deploy to GitHub Pages
         if: github.ref == 'refs/heads/main'

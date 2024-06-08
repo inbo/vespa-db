@@ -23,16 +23,22 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
 
-      - name: Build and push Docker image
+      - name: Build Docker image
         uses: docker/build-push-action@v2
         with:
           context: .
           file: Dockerfile.frontend
-          push: true
-          tags: vespawatch/vespadb:latest
+          push: false
+          tags: vespawatch/vespadb:build
           build-args: |
             VITE_APP_API_URL=https://uat.db.vespawatch.be
           no-cache: true
+
+      - name: Create dist directory
+        run: mkdir -p frontend/dist
+
+      - name: Copy build output
+        run: docker create --name build-container vespawatch/vespadb:build && docker cp build-container:/app/dist/. frontend/dist && docker rm build-container
 
       - name: Deploy to GitHub Pages
         if: github.ref == 'refs/heads/main'

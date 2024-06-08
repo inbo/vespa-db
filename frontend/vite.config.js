@@ -10,7 +10,7 @@ import { defineConfig } from 'vite'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  base: '/vespa-db/',
+  base: './',
   plugins: [
     Vue({
       template: { transformAssetUrls }

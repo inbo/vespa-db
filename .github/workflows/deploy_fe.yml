@@ -33,10 +33,16 @@ jobs:
           build-args: |
             VITE_APP_API_URL=https://uat.db.vespawatch.be
           no-cache: true
-      
-      - name: Extract built files
-        run: docker cp $(docker create vespawatch/vespadb:latest):/usr/share/nginx/html frontend/dist
 
+      - name: Create dist directory
+        run: mkdir -p frontend/dist
+
+      - name: Copy build output
+        run: |
+          docker create --name build-container vespawatch/vespadb:latest &&
+          docker cp build-container:/usr/share/nginx/html. frontend/dist &&
+          docker rm build-container
+          
       - name: Deploy to GitHub Pages
         if: github.ref == 'refs/heads/main'
         uses: JamesIves/github-pages-deploy-action@4.0.0

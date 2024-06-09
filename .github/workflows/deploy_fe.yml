@@ -19,6 +19,9 @@ jobs:
         with:
           node-version: '18'
 
+      - name: Install Vite globally
+        run: npm i -g vite
+
       - name: Install dependencies
         run: |
           cd frontend
@@ -27,7 +30,7 @@ jobs:
       - name: Build Vue app
         run: |
           cd frontend
-          VITE_APP_API_URL=https://uat.db.vespawatch.be npm run build --if-present
+          VITE_APP_API_URL=https://uat.db.vespawatch.be vite build
 
       - name: Deploy to GitHub Pages
         if: github.ref == 'refs/heads/main'

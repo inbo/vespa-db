@@ -7,46 +7,31 @@ on:
       - uat
 
 jobs:
-  build:
-    runs-on: ubuntu-20.04
+  build-and-deploy:
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v2
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          node-version: '18'
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
-
-      - name: Build Docker image
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          file: Dockerfile.frontend
-          push: true
-          tags: vespawatch/vespadb:latest
-          build-args: |
-            VITE_APP_API_URL=https://uat.db.vespawatch.be
-          no-cache: true
-
-      - name: Create dist directory
-        run: mkdir -p frontend/dist
-
-      - name: Copy build output
+      - name: Install dependencies
         run: |
-          docker create --name build-container vespawatch/vespadb:latest &&
-          docker cp build-container:/usr/share/nginx/html/. frontend/dist &&
-          docker rm build-container
-          
+          cd frontend
+          npm install
+
+      - name: Build Vue app
+        run: |
+          cd frontend
+          VITE_APP_API_URL=https://uat.db.vespawatch.be npm run build --if-present
+
       - name: Deploy to GitHub Pages
         if: github.ref == 'refs/heads/main'
-        uses: JamesIves/github-pages-deploy-action@4.0.0
+        uses: peaceiris/actions-gh-pages@v3
         with:
-          branch: gh-pages
-          folder: frontend/dist
-          clean: true
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: frontend/dist

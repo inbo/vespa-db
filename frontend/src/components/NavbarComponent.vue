@@ -1,7 +1,7 @@
 <template>
   <nav class="navbar navbar-expand-lg navbar-dark bg-success">
     <div class="container-fluid">
-      <a class="navbar-brand" href="/">VespaDB</a>
+      <router-link to="/" class="navbar-brand" active-class="active">VespaDB</router-link>
       <div class="d-flex align-items-center">
         <!-- View Mode Toggle -->
         <div class="btn-group me-2" role="group">
@@ -35,7 +35,7 @@
             </ul>
           </div>
         </span>
-        <a v-else href="/login" class="btn btn-outline-light ms-2">Inloggen</a>
+        <router-link to="/login" class="btn btn-outline-light" active-class="active">Inloggen</router-link>
       </div>
     </div>
   </nav>

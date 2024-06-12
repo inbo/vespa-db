@@ -147,7 +147,7 @@ export default {
       }
     };
 
-    watch(selectedProvinces, fetchMunicipalitiesByProvinces, { deep: true, immediate: true });
+    watch(selectedProvinces, fetchMunicipalitiesByProvinces, { deep: true });
 
     watch([minDate, maxDate], emitFilterUpdate, { immediate: true });
 

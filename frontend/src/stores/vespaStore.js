@@ -7,6 +7,7 @@ import { defineStore } from 'pinia';
 
 export const useVespaStore = defineStore('vespaStore', {
     state: () => ({
+        loadingAuth: true,
         isLoggedIn: false,
         loading: false,
         error: null,
@@ -296,18 +297,6 @@ export const useVespaStore = defineStore('vespaStore', {
                 return null;
             }
         },
-        async fetchMunicipalities() {
-            try {
-                const response = await ApiService.get('/municipalities/');
-                if (response.status === 200) {
-                    this.municipalities = response.data;
-                } else {
-                    console.error('Failed to fetch municipalities: Status Code', response.status);
-                }
-            } catch (error) {
-                console.error('Error fetching municipalities:', error);
-            }
-        },
         async updateObservation(observation) {
             try {
                 const response = await ApiService.patch(`/observations/${observation.id}/`, observation);
@@ -335,6 +324,18 @@ export const useVespaStore = defineStore('vespaStore', {
                 link.remove();
             } catch (error) {
                 console.error('Error exporting data:', error);
+            }
+        },
+        async fetchMunicipalitiesByProvinces(provinceIds) {
+            try {
+                const response = await ApiService.get(`/municipalities/by_provinces/?province_ids=${provinceIds.join(',')}`);
+                if (response.status === 200) {
+                    this.municipalities = response.data;
+                } else {
+                    console.error('Failed to fetch filtered municipalities: Status Code', response.status);
+                }
+            } catch (error) {
+                console.error('Error fetching filtered municipalities:', error);
             }
         },
         async login({ username, password }) {
@@ -365,51 +366,30 @@ export const useVespaStore = defineStore('vespaStore', {
                 this.loading = false;
             }
         },
-        async fetchMunicipalitiesByProvinces(provinceIds) {
+        async authCheck() {
+            this.loadingAuth = true; // Start loading
+            this.loading = true;
             try {
-                const response = await ApiService.get(`/municipalities/by_provinces/?province_ids=${provinceIds.join(',')}`);
-                if (response.status === 200) {
-                    this.municipalities = response.data;
+                const response = await ApiService.get("/auth-check");
+                const data = response.data;
+                if (data.isAuthenticated && data.user) {
+                    this.user = data.user;
+                    this.userMunicipalities = data.user.municipalities;
+                    this.isAdmin = data.user.is_staff;
+                    this.error = "";
+                    this.isLoggedIn = true;
                 } else {
-                    console.error('Failed to fetch filtered municipalities: Status Code', response.status);
+                    this.error = "";
+                    this.isLoggedIn = false;
+                    this.isAdmin = false;
                 }
             } catch (error) {
-                console.error('Error fetching filtered municipalities:', error);
+                this.error = error;
+                this.isLoggedIn = false;
+            } finally {
+                this.loadingAuth = false;
+                this.loading = false;
             }
-        },
-        async authCheck() {
-            this.loading = true;
-            await ApiService
-                .get("/auth-check")
-                .then((response) => {
-                    const data = response.data;
-                    if (data.isAuthenticated && data.user) {
-                        this.user = data.user;
-                        this.userMunicipalities = data.user.municipalities;
-                        this.isAdmin = data.user.is_staff;
-                        console.log('User is admin:', this.isAdmin);
-                        this.error = "";
-                        this.isLoggedIn = true;
-                        this.loading = false;
-
-                        if (!this.authInterval) {
-                            this.authInterval = setInterval(() => {
-                                this.authCheck();
-                            }, 1000 * 60 * 21);
-                        }
-                    } else {
-                        this.error = "";
-                        this.isLoggedIn = false;
-                        this.isAdmin = false;
-                        this.loading = false;
-                        this.authInterval = null;
-                    }
-                })
-                .catch((error) => {
-                    this.error = error;
-                    this.isLoggedIn = false;
-                    this.loading = false;
-                });
         },
         async logout() {
             this.loading = true;

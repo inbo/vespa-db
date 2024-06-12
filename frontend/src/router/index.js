@@ -16,8 +16,16 @@ const routes = [
     name: 'MapPage',
     component: MapPage
   },
-  { path: '/map/observation/:id', component: MapPage },
-  { path: '/table/observation/:id', component: TableViewPage },
+  { 
+    path: '/map/observation/:id', 
+    name: 'ObservationDetailMap',
+    component: MapPage 
+  },
+  { 
+    path: '/table/observation/:id', 
+    name: 'ObservationDetailTable',
+    component: TableViewPage 
+  },
   {
     path: '/table',
     name: 'TableView',

@@ -140,7 +140,7 @@ export default {
         disableClusteringAtZoom: 16,
         iconCreateFunction: (cluster) => {
           return L.divIcon({
-            html: `<div style="background-color: rgba(76,175,80,255);"><span>${cluster.getChildCount()}</span></div>`,
+            html: `<div style="background-color: rgba(153,72,0,0.5);"><span>${cluster.getChildCount()}</span></div>`,
             className: 'marker-cluster',
             iconSize: L.point(40, 40),
           });

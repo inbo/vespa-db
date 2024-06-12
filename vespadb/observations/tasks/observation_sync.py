@@ -199,7 +199,7 @@ def manage_observations_visibility(token: str) -> None:
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
-def fetch_and_update_observations(self: Task, since_week: int | None = None, date: str | None = None) -> None:  # noqa: C901, PLR0912
+def fetch_and_update_observations(self: Task, since_week: int | None = None, date: str | None = None) -> None:  # noqa: C901, PLR0912, PLR0915
     """Fetch observations from the waarnemingen API and update the database.
 
     Observations are fetched in batches and processed in bulk to minimize query overhead.
@@ -227,7 +227,13 @@ def fetch_and_update_observations(self: Task, since_week: int | None = None, dat
             .isoformat()
         )
     else:
-        raise ValueError("Either since_week or date must be provided.")
+        # Default to 2 weeks back
+        since_week = 2
+        modified_since = (
+            (timezone.now() - timedelta(weeks=since_week))
+            .replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=UTC)
+            .isoformat()
+        )
 
     # Pre-fetch existing observations to minimize query overhead
     existing_observations_dict = {obs["wn_id"]: None for obs in Observation.objects.all().values("wn_id")}

@@ -22,7 +22,7 @@ secrets = {
     "DJANGO_SECRET_KEY": os.getenv("SECRET_KEY"),
     "CORS_ALLOWED_ORIGINS": os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000").split(","),
     "CSRF_TRUSTED_ORIGINS": os.getenv("CSRF_TRUSTED_ORIGINS", "http://localhost:3000").split(","),
-    "CSRF_COOKIE_DOMAIN": os.getenv("CSRF_COOKIE_DOMAIN"),
+    "CSRF_COOKIE_DOMAIN": os.getenv("CSRF_COOKIE_DOMAIN", ".uat.db.vespawatch.be"),
     "SESSION_COOKIE_DOMAIN": os.getenv("SESSION_COOKIE_DOMAIN"),
     "POSTGRES_DB": os.getenv("POSTGRES_DB"),
     "POSTGRES_USER": os.getenv("POSTGRES_USER"),

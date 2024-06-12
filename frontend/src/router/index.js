@@ -1,5 +1,5 @@
 import { useVespaStore } from '@/stores/vespaStore';
-import { createRouter, createWebHistory } from 'vue-router';
+import { createRouter, createWebHashHistory } from 'vue-router';
 import ChangePasswordPage from '../components/ChangePasswordPage.vue';
 import Login from '../components/LoginPage.vue';
 import MapPage from '../components/MapPage.vue';
@@ -36,7 +36,7 @@ const routes = [
 ];
 
 const router = createRouter({
-  history: createWebHistory('/vespa-db/'),
+  history: createWebHashHistory('/vespa-db/'),
   routes,
 });
 

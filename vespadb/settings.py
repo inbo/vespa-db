@@ -121,11 +121,11 @@ CELERY_TIMEZONE = "UTC"
 CELERY_BEAT_SCHEDULE = {
     "fetch_and_update_observations": {
         "task": "vespadb.observations.tasks.observation_sync.fetch_and_update_observations",
-        "schedule": crontab(hour=10, minute=0),  # Runs every day at X AM UTC.
+        "schedule": crontab(hour=4, minute=0),  # Runs every day at X AM UTC.
     },
     "remove_expired_reservations": {
         "task": "vespadb.observations.tasks.reservation_cleanup.free_expired_reservations_and_audit_reservation_count",
-        "schedule": crontab(hour=7, minute=0),  # Runs every day at X AM UTC
+        "schedule": crontab(hour=5, minute=30),  # Runs every day at X AM UTC
     },
 }
 

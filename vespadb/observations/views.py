@@ -46,7 +46,8 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 BBOX_LENGTH = 4
-REDIS_CACHE_EXPIRATION = 900  # 15 minutes
+GEOJSON_REDIS_CACHE_EXPIRATION = 900  # 15 minutes
+GET_REDIS_CACHE_EXPIRATION = 86400  # 1 day
 
 
 class ObservationsViewSet(ModelViewSet):
@@ -344,7 +345,7 @@ class ObservationsViewSet(ModelViewSet):
                 for obs in queryset
             ]
             geojson_response = {"type": "FeatureCollection", "features": features}
-            cache.set(cache_key, geojson_response, REDIS_CACHE_EXPIRATION)
+            cache.set(cache_key, geojson_response, GEOJSON_REDIS_CACHE_EXPIRATION)
             return JsonResponse(geojson_response)
         except Exception:
             logger.exception("An error occurred while generating GeoJSON data")
@@ -571,6 +572,11 @@ class MunicipalityViewSet(ReadOnlyModelViewSet):
     @action(detail=False, methods=["get"])
     def by_provinces(self, request: Request) -> Response:
         """Return municipalities filtered by province IDs."""
+        cache_key = "vespadb::municipalities_by_province::list"
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            return Response(cached_data)
+
         province_ids = request.query_params.get("province_ids")
         if not province_ids:
             return Response({"detail": "province_ids parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
@@ -578,7 +584,20 @@ class MunicipalityViewSet(ReadOnlyModelViewSet):
         province_ids = province_ids.split(",")
         municipalities = Municipality.objects.filter(province_id__in=province_ids).order_by("name")
         serializer = self.get_serializer(municipalities, many=True)
+        cache.set(cache_key, serializer.data, GET_REDIS_CACHE_EXPIRATION)
         return Response(serializer.data)
+
+    @method_decorator(ratelimit(key="ip", rate="15/m", method="GET", block=True))
+    def list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        """Override the list method to add caching."""
+        cache_key = "vespadb::municipalities::list"
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            return Response(cached_data)
+
+        response = super().list(request, *args, **kwargs)
+        cache.set(cache_key, response.data, GET_REDIS_CACHE_EXPIRATION)
+        return response
 
 
 class ProvinceViewSet(ReadOnlyModelViewSet):
@@ -593,3 +612,15 @@ class ProvinceViewSet(ReadOnlyModelViewSet):
         if self.request.method == "GET":
             return [AllowAny()]
         return [IsAdminUser()]
+
+    @method_decorator(ratelimit(key="ip", rate="15/m", method="GET", block=True))
+    def list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        """Override the list method to add caching."""
+        cache_key = "vespadb::provinces::list"
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            return Response(cached_data)
+
+        response = super().list(request, *args, **kwargs)
+        cache.set(cache_key, response.data, GET_REDIS_CACHE_EXPIRATION)
+        return response

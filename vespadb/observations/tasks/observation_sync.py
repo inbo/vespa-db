@@ -8,7 +8,6 @@ from typing import Any
 import requests
 from celery import Task, shared_task
 from django.db import models, transaction
-from django.utils import timezone
 from django.utils.timezone import now
 from dotenv import load_dotenv
 
@@ -84,6 +83,7 @@ def create_observations(observations_to_create: list[Observation]) -> None:
     """Bulk create observations."""
     if observations_to_create:
         Observation.objects.bulk_create(observations_to_create, batch_size=BATCH_SIZE, ignore_conflicts=True)
+        logger.info("Created %s new observations", len(observations_to_create))
 
 
 def update_observations(observations_to_update: list[Observation], wn_ids_to_update: list[str]) -> None:
@@ -140,10 +140,7 @@ def fetch_nest_observations(token: str, cluster_id: int) -> list[int]:
 def update_observation_visibility(observations: list[Observation], observation_ids_to_hide: set[int]) -> None:
     """Update visibility of observations based on their registration dates."""
     for observation in observations:
-        if observation.id in observation_ids_to_hide:
-            observation.visible = False
-        else:
-            observation.visible = True
+        observation.visible = observation.id not in observation_ids_to_hide
     Observation.objects.bulk_update(observations, ["visible"], batch_size=BATCH_SIZE)
 
 
@@ -183,9 +180,6 @@ def manage_observations_visibility(token: str) -> None:
             logger.info(f"No observations found for cluster {cluster['id']}.")
             continue  # Skip if no observations are found
 
-        if len(observations) != len(observation_ids):
-            logger.info(f"Failed to fetch all observations for cluster {cluster['id']}.")
-
         observation_dates = {obs.id: obs.observation_datetime for obs in observations}
 
         # Determine observations to hide
@@ -199,7 +193,7 @@ def manage_observations_visibility(token: str) -> None:
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
-def fetch_and_update_observations(self: Task, since_week: int | None = None, date: str | None = None) -> None:  # noqa: C901, PLR0912, PLR0915
+def fetch_and_update_observations(self: Task, since_week: int | None = None, date: str | None = None) -> None:  # noqa: C901, PLR0912
     """Fetch observations from the waarnemingen API and update the database.
 
     Observations are fetched in batches and processed in bulk to minimize query overhead.
@@ -222,7 +216,7 @@ def fetch_and_update_observations(self: Task, since_week: int | None = None, dat
             raise ValueError("Invalid date format. Use ddMMyyyy.") from e
     elif since_week is not None:
         modified_since = (
-            (timezone.now() - timedelta(weeks=since_week))
+            (now() - timedelta(weeks=since_week))
             .replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=UTC)
             .isoformat()
         )
@@ -230,22 +224,23 @@ def fetch_and_update_observations(self: Task, since_week: int | None = None, dat
         # Default to 2 weeks back
         since_week = 2
         modified_since = (
-            (timezone.now() - timedelta(weeks=since_week))
+            (now() - timedelta(weeks=since_week))
             .replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=UTC)
             .isoformat()
         )
 
     # Pre-fetch existing observations to minimize query overhead
-    existing_observations_dict = {obs["wn_id"]: None for obs in Observation.objects.all().values("wn_id")}
+    existing_wn_ids = cache_wn_ids()
     system_user = get_system_user(UserType.SYNC)
-    wn_ids_to_update = []
-    observations_to_update: list[Observation] = []
-    observations_to_create: list[Observation] = []
     offset = 0
+
     while True:
         data = fetch_observations_page(token, modified_since, offset)
 
         if data:
+            observations_to_update = []
+            observations_to_create = []
+            wn_ids_to_update = []
             for external_data in data["results"]:
                 mapped_data = map_external_data_to_observation_model(external_data)
                 current_time = now()
@@ -255,13 +250,12 @@ def fetch_and_update_observations(self: Task, since_week: int | None = None, dat
 
                 wn_id = mapped_data.pop("wn_id")
 
-                if wn_id in existing_observations_dict:
+                if wn_id in existing_wn_ids:
                     wn_ids_to_update.append(wn_id)
                     observations_to_update.append(
                         Observation(wn_id=wn_id, **mapped_data, modified_by=system_user, modified_datetime=current_time)
                     )
-                    logger.info("Observation with wn_id %s is ready to be updated.", wn_id)
-                elif wn_id not in {obs.wn_id for obs in observations_to_create}:
+                else:
                     observations_to_create.append(
                         Observation(
                             wn_id=wn_id,
@@ -272,7 +266,10 @@ def fetch_and_update_observations(self: Task, since_week: int | None = None, dat
                             modified_datetime=current_time,
                         )
                     )
-                    logger.info("Observation with wn_id %s is ready to be created.", wn_id)
+
+            with transaction.atomic():  # Ensure that all operations are atomic
+                create_observations(observations_to_create)
+                update_observations(observations_to_update, wn_ids_to_update)
 
             if not data.get("next"):
                 break
@@ -281,19 +278,6 @@ def fetch_and_update_observations(self: Task, since_week: int | None = None, dat
             break
         offset += len(data["results"])
 
-    logger.info("Fetched %s observations", len(observations_to_create) + len(observations_to_update))
-    logger.info(
-        "Creating %s observations, updating %s observations", len(observations_to_create), len(observations_to_update)
-    )
-    with transaction.atomic():  # Ensure that all operations are atomic
-        create_observations(observations_to_create)
-        update_observations(observations_to_update, wn_ids_to_update)
-
-    logger.info(
-        "Finished processing observations. Created: %s, Updated: %s",
-        len(observations_to_create),
-        len(observations_to_update),
-    )
-    logger.info("Start managing observations visibility")
+    logger.info("Finished processing observations")
     manage_observations_visibility(token)
     logger.info("Finished managing observations visibility")

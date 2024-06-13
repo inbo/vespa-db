@@ -2,8 +2,9 @@
 
 import logging
 from datetime import timedelta
+from typing import Any
 
-from celery import Task, shared_task
+from celery import shared_task
 from django.conf import settings
 from django.db.models import Count, Q
 from django.utils import timezone
@@ -18,7 +19,7 @@ logger = logging.getLogger("vespadb.observations.tasks")
 
 
 @shared_task
-def free_expired_reservations_and_audit_reservation_count(self: Task) -> None:
+def free_expired_reservations_and_audit_reservation_count(*args: Any, **kwargs: Any) -> None:
     """Free expired reservations and audit the reservation count for each observation."""
     logger.info("start freeing expired reservations")
     cleanup_expired_reservations()

@@ -16,15 +16,15 @@ const routes = [
     name: 'MapPage',
     component: MapPage
   },
-  { 
-    path: '/map/observation/:id', 
+  {
+    path: '/map/observation/:id',
     name: 'ObservationDetailMap',
-    component: MapPage 
+    component: MapPage
   },
-  { 
-    path: '/table/observation/:id', 
+  {
+    path: '/table/observation/:id',
     name: 'ObservationDetailTable',
-    component: TableViewPage 
+    component: TableViewPage
   },
   {
     path: '/table',
@@ -44,7 +44,7 @@ const routes = [
 ];
 
 const router = createRouter({
-  history: createWebHashHistory('/vespa-db/'),
+  history: createWebHashHistory(),
   routes,
 });
 

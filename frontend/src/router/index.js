@@ -44,7 +44,7 @@ const routes = [
 ];
 
 const router = createRouter({
-  history: createWebHashHistory('/vespa-db/'),
+  history: createWebHashHistory('/'),
   routes,
 });
 

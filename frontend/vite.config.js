@@ -11,7 +11,6 @@ import { defineConfig, loadEnv } from 'vite'
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   // Load environment variables based on the current mode
-  // Set the second parameter to '' to load all .env files regardless of the mode
   const env = loadEnv(mode, process.cwd(), '')
 
   return {
@@ -44,7 +43,7 @@ export default defineConfig(({ mode }) => {
     ],
     define: {
       'process.env': {
-        VITE_APP_API_URL: JSON.stringify(env.VITE_APP_API_URL),
+        VITE_APP_API_URL: JSON.stringify(process.env.VITE_APP_API_URL || env.VITE_APP_API_URL),
       }
     },
     resolve: {

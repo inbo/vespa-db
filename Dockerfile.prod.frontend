@@ -6,7 +6,7 @@ FROM node:18 AS builder
 WORKDIR /app
 
 # Set environment variables
-ENV VUE_APP_API_URL=https://uat-db.vespawatch.be
+ENV VUE_APP_API_URL=https://db.vespawatch.be
 
 # Copy the package.json and package-lock.json files
 COPY frontend/package*.json ./

@@ -6,10 +6,9 @@ FROM node:18 AS builder
 WORKDIR /app
 
 # Set build argument
-ARG VITE_APP_API_URL=https://uat-db.vespawatch.be
-
+ARG VITE_APP_API_URL
 # Set environment variable for build process
-ENV VITE_APP_API_URL=$VITE_APP_API_URL
+ENV VITE_APP_API_URL $VITE_APP_API_URL
 
 # Copy the package.json and package-lock.json files
 COPY frontend/package*.json ./

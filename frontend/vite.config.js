@@ -8,10 +8,13 @@ import Vuetify, { transformAssetUrls } from 'vite-plugin-vuetify'
 import { fileURLToPath, URL } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
 
+// Log statement to ensure the config file is being executed
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
-  // Load environment variables based on the current mode
-  const env = loadEnv(mode, process.cwd(), '')
+  // Determine the root path
+  const env = loadEnv(mode, process.cwd())
+
   return {
     base: '/',
     plugins: [
@@ -40,11 +43,6 @@ export default defineConfig(({ mode }) => {
         }
       }),
     ],
-    define: {
-      'process.env': {
-        VITE_APP_API_URL: JSON.stringify(process.env.VITE_APP_API_URL || env.VITE_APP_API_URL),
-      }
-    },
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url))
@@ -62,5 +60,8 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 3000,
     },
+    define: {
+      'process.env': env
+    }
   }
 })

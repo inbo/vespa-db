@@ -13,8 +13,9 @@ import { defineConfig, loadEnv } from 'vite'
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   // Determine the root path
-  const env = loadEnv(mode, process.cwd())
-
+  const root = process.cwd();
+  const env = loadEnv(mode, root)
+  console.log('vite_env', env)
   return {
     base: '/',
     plugins: [

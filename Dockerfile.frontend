@@ -11,13 +11,10 @@ COPY frontend/package*.json ./
 RUN npm install --loglevel verbose
 
 # Copy the rest of the application files from the frontend folder
-COPY frontend/ .
-
-# Copy the .env file for local development
-COPY .env ./
+COPY frontend/ ./
 
 # Build the application using the specified config
-RUN npx vite build --config vite.config.js
+RUN npx vite build
 
 # Stage 2: Serve the application with Nginx
 FROM nginx:alpine as frontend-prod

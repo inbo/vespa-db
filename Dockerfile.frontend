@@ -4,7 +4,7 @@ FROM node:18 AS builder
 # Set the working directory
 WORKDIR /app
 
-# Copy the package.json and package-lock.json files from the frontend folder
+# Copy the package.json and package-lock.json files
 COPY package*.json ./
 
 # Log the contents of the working directory
@@ -37,7 +37,7 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 # Log the contents of the nginx html directory
 RUN echo "Contents of /usr/share/nginx/html after copying built files:" && ls -la /usr/share/nginx/html
 
-# Copy the Nginx configuration file from the frontend folder
+# Copy the Nginx configuration file
 COPY nginx-frontend.conf /etc/nginx/nginx.conf
 
 # Log the contents of the nginx config directory

@@ -22,6 +22,10 @@ COPY . ./
 # Log the contents of the working directory
 RUN echo "Contents of /app after copying frontend files:" && ls -la /app
 
+# Set environment variable via build argument
+ARG VITE_APP_API_URL
+ENV VITE_APP_API_URL=$VITE_APP_API_URL
+
 # Build the application using the specified config
 RUN npx vite build
 

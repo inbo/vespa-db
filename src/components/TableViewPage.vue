@@ -6,7 +6,7 @@
                 <i class="fas fa-sliders-h"></i> Filters
             </button>
             <div class="filter-panel"
-                :class="{'d-none': !isFilterPaneOpen, 'd-block': isFilterPaneOpen, 'col-12': true, 'col-md-6': true, 'col-lg-4': true}">
+                :class="{ 'd-none': !isFilterPaneOpen, 'd-block': isFilterPaneOpen, 'col-12': true, 'col-md-6': true, 'col-lg-4': true }">
                 <FilterComponent />
             </div>
             <div class="container mt-4">
@@ -20,16 +20,19 @@
                         <table class="table table-hover table-sm">
                             <thead class="table-light">
                                 <tr>
-                                    <th scope="col" v-for="header in tableHeaders" :key="header.value" @click="toggleSort(header.value)">
+                                    <th scope="col" v-for="header in tableHeaders" :key="header.value"
+                                        @click="toggleSort(header.value)">
                                         {{ header.text }}
                                         <span v-if="sortBy === header.value">
-                                            <i class="fas" :class="{'fa-sort-up': sortOrder === 'asc', 'fa-sort-down': sortOrder === 'desc'}"></i>
+                                            <i class="fas"
+                                                :class="{ 'fa-sort-up': sortOrder === 'asc', 'fa-sort-down': sortOrder === 'desc' }"></i>
                                         </span>
                                     </th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr v-for="observation in table_observations" :key="observation.id" @click="openObservationDetails(observation)">
+                                <tr v-for="observation in table_observations" :key="observation.id"
+                                    @click="openObservationDetails(observation)">
                                     <td>{{ observation.id }}</td>
                                     <td>{{ observation.municipality_name }}</td>
                                     <td>{{ formatDate(observation.created_datetime) }}</td>
@@ -41,7 +44,8 @@
                         </table>
                     </div>
                     <div v-if="totalObservations > 0" class="d-flex justify-content-start mt-3">
-                        <button class="btn btn-outline-success mr-2" @click="fetchPage('prev')" :disabled="!previousPage">
+                        <button class="btn btn-outline-success mr-2" @click="fetchPage('prev')"
+                            :disabled="!previousPage">
                             <i class="fas fa-chevron-left"></i> Previous
                         </button>
                         <button class="btn btn-outline-success" @click="fetchPage('next')" :disabled="!nextPage">
@@ -64,7 +68,7 @@
 
 <script>
 import { useVespaStore } from '@/stores/vespaStore';
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import FilterComponent from './FilterComponent.vue';
 import NavbarComponent from './NavbarComponent.vue';
@@ -162,6 +166,9 @@ export default {
             vespaStore.getObservations();
         }, { deep: true });
 
+        onMounted(() => {
+            vespaStore.getObservations();
+        });
 
         return {
             table_observations,

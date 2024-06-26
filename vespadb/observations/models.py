@@ -249,9 +249,9 @@ class Observation(models.Model):
     )
     reserved_datetime = models.DateTimeField(blank=True, null=True)
 
-    eradication_datetime = models.DateTimeField(blank=True, null=True)
+    eradication_date = models.DateTimeField(blank=True, null=True)
     eradicator_name = models.CharField(max_length=255, blank=True, null=True)
-    eradication_duration = models.TimeField(blank=True, null=True)
+    eradication_duration = models.CharField(max_length=50, blank=True, null=True)
     eradication_persons = models.IntegerField(blank=True, null=True)
     eradication_result = models.CharField(max_length=50, choices=EradicationResultEnum, blank=True, null=True)
     eradication_product = models.CharField(max_length=50, choices=EradicationProductEnum, blank=True, null=True)
@@ -279,7 +279,7 @@ class Observation(models.Model):
 
     def __str__(self) -> str:
         """Return the string representation of the model."""
-        return f"Observation {self.id} - location: {self.location} - eradicated: {self.eradication_datetime}"
+        return f"Observation {self.id} - location: {self.location} - eradicated: {self.eradication_date}"
 
     def save(self, *args: Any, **kwargs: Any) -> None:
         """

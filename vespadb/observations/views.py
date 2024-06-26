@@ -163,7 +163,7 @@ class ObservationsViewSet(ModelViewSet):
             "wn_created_datetime",
             "reserved_datetime",
             "observation_datetime",
-            "eradication_datetime",
+            "eradication_date",
         ]
         for field in datetime_fields:
             if field in data:
@@ -334,7 +334,7 @@ class ObservationsViewSet(ModelViewSet):
                         "id": obs.id,
                         "status": (
                             "eradicated"
-                            if obs.eradication_datetime
+                            if obs.eradication_date
                             else "reserved"
                             if obs.reserved_datetime
                             else "default"
@@ -424,7 +424,7 @@ class ObservationsViewSet(ModelViewSet):
                     "created_datetime",
                     "modified_datetime",
                     "observation_datetime",
-                    "eradication_datetime",
+                    "eradication_date",
                     "wn_modified_datetime",
                     "wn_created_datetime",
                 ]
@@ -473,7 +473,7 @@ class ObservationsViewSet(ModelViewSet):
             "created_datetime",
             "modified_datetime",
             "observation_datetime",
-            "eradication_datetime",
+            "eradication_date",
             "wn_modified_datetime",
             "wn_created_datetime",
         ]

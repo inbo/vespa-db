@@ -37,7 +37,7 @@ public_read_fields = [
     "modified_by",
     "created_by",
     "province",
-    "eradication_datetime",
+    "eradication_date",
     "municipality",
     "province",
     "images",
@@ -73,7 +73,7 @@ user_read_fields = [
     "images",
     "reserved_by",
     "reserved_datetime",
-    "eradication_datetime",
+    "eradication_date",
     "eradicator_name",
     "eradication_duration",
     "eradication_persons",
@@ -120,7 +120,7 @@ class ObservationSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             "wn_id": {"required": False, "allow_null": True},
             "wn_cluster_id": {"required": False, "allow_null": True},
-            "eradication_datetime": {"required": False, "allow_null": True},
+            "eradication_date": {"required": False, "allow_null": True},
             "id": {"read_only": True},
             "admin_notes": {"required": False, "allow_blank": True, "allow_null": True},
             "observer_received_email": {"required": False, "allow_null": True},
@@ -134,7 +134,7 @@ class ObservationSerializer(serializers.ModelSerializer):
 
     def get_status(self, obj: Observation) -> str:
         """Determine the status of the observation based on its properties."""
-        if obj.eradication_datetime:
+        if obj.eradication_date:
             return "eradicated"
         if obj.reserved_datetime:
             return "reserved"
@@ -176,7 +176,7 @@ class ObservationSerializer(serializers.ModelSerializer):
             "wn_created_datetime",
             "reserved_datetime",
             "observation_datetime",
-            "eradication_datetime",
+            "eradication_date",
         ]
         for field in datetime_fields:
             if data.get(field):
@@ -209,7 +209,7 @@ class ObservationSerializer(serializers.ModelSerializer):
         """Validate that the user does not exceed the maximum number of allowed reservations."""
         if value:
             current_reservations_count = Observation.objects.filter(
-                reserved_by=value, eradication_datetime__isnull=True
+                reserved_by=value, eradication_date__isnull=True
             ).count()
             if current_reservations_count >= settings.MAX_RESERVATIONS:
                 logger.error(f"User {value.id} exceeded the reservation limit.")
@@ -248,7 +248,7 @@ class ObservationSerializer(serializers.ModelSerializer):
                 "visible",
                 "images",
                 "reserved_by",
-                "eradication_datetime",
+                "eradication_date",
                 "eradicator_name",
                 "eradication_duration",
                 "eradication_persons",
@@ -276,7 +276,7 @@ class ObservationSerializer(serializers.ModelSerializer):
             "modified_by",
             "created_by",
             "reserved_by",
-            "eradication_datetime",
+            "eradication_date",
             "eradicator_name",
             "eradication_result",
             "eradication_product",
@@ -303,7 +303,7 @@ class ObservationSerializer(serializers.ModelSerializer):
             "wn_created_datetime",
             "reserved_datetime",
             "observation_datetime",
-            "eradication_datetime",
+            "eradication_date",
         ]
         for field in datetime_fields:
             if data.get(field):

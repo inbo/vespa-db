@@ -231,7 +231,7 @@ export const useVespaStore = defineStore('vespaStore', {
         async markObservationAsEradicated(observationId) {
             try {
                 const response = await ApiService.patch(`/observations/${observationId}/`, {
-                    eradication_datetime: new Date().toISOString()
+                    eradication_date: new Date().toISOString()
                 });
                 if (response.status === 200) {
                     this.selectedObservation = response.data;
@@ -248,7 +248,7 @@ export const useVespaStore = defineStore('vespaStore', {
         async markObservationAsNotEradicated(observationId) {
             try {
                 const response = await ApiService.patch(`/observations/${observationId}/`, {
-                    eradication_datetime: null
+                    eradication_date: null
                 });
                 if (response.status === 200) {
                     this.selectedObservation = response.data;
@@ -282,7 +282,7 @@ export const useVespaStore = defineStore('vespaStore', {
         },
         async updateObservation(observation) {
             observation.observation_datetime = this.formatToISO8601(observation.observation_datetime);
-            observation.eradication_datetime = this.formatToISO8601(observation.eradication_datetime);
+            observation.eradication_date = this.formatToISO8601(observation.eradication_date);
 
             try {
                 const response = await ApiService.patch(`/observations/${observation.id}/`, observation);

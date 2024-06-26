@@ -1,9 +1,13 @@
 <template>
     <div v-if="isVisible" class="modal-overlay">
-        <div class="modal-content">
-            <h5>{{ title }}</h5>
-            <p>{{ message }}</p>
-            <button @click="closeModal" class="btn btn-success">OK</button>
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-11 col-sm-8 col-md-6 col-lg-5 col-xl-4 modal-content">
+                    <h5>{{ title }}</h5>
+                    <p>{{ message }}</p>
+                    <button @click="closeModal" class="btn btn-success">OK</button>
+                </div>
+            </div>
         </div>
     </div>
 </template>

@@ -353,7 +353,7 @@ export const useVespaStore = defineStore('vespaStore', {
                     const errorMsg = error.response.data.error;
                     if (Array.isArray(errorMsg)) {
                         this.error = errorMsg.join(', ');
-                    } else if (errorMsg.includes("Invalid username or password")) {
+                    } else if (errorMsg.startsWith("Invalid username or password")) {
                         this.error = "Ongeldige gebruikersnaam of wachtwoord.";
                     } else {
                         this.error = errorMsg;

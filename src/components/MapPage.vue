@@ -166,6 +166,7 @@ export default {
             }),
           ],
         });
+        vespaStore.isDetailsPaneOpen = true;
       } else {
         map.value = L.map('map', {
           center: [50.8503, 4.3517],
@@ -181,7 +182,6 @@ export default {
 
       vespaStore.map = map.value;
     });
-
 
     return {
       isDetailsPaneOpen,
@@ -200,38 +200,3 @@ export default {
   },
 };
 </script>
-
-<style scoped>
-.map-legend {
-  font-family: Arial, sans-serif;
-  font-size: 14px;
-  background: white;
-  padding: 10px;
-  border-radius: 5px;
-  position: absolute;
-  bottom: 10px;
-  left: 10px;
-  z-index: 1000;
-}
-
-.legend-icon {
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  margin-right: 8px;
-  border-radius: 50%;
-  vertical-align: middle;
-}
-
-.bg-green {
-  background-color: green;
-}
-
-.bg-grey {
-  background-color: grey;
-}
-
-.bg-orange {
-  background-color: orange;
-}
-</style>

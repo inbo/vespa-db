@@ -38,7 +38,7 @@ export default {
     align-items: center;
     justify-content: center;
     background: rgba(0, 0, 0, 0.5);
-    z-index: 1000;
+    z-index: 2000;
 }
 
 .modal-content {

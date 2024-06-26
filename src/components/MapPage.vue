@@ -8,13 +8,13 @@
       <div id="map" class="h-100"></div>
       <div class="map-legend" v-if="map">
         <div>
-          <span class="legend-icon bg-green"></span> Bestreden
+          <span class="legend-icon bg-green"></span> Bestreden nest
         </div>
         <div>
-          <span class="legend-icon bg-grey"></span> Gereserveerd
+          <span class="legend-icon bg-grey"></span> Gereserveerd nest
         </div>
         <div>
-          <span class="legend-icon bg-orange"></span> Standaard
+          <span class="legend-icon bg-orange"></span> Gerapporteerd nest
         </div>
       </div>
       <div class="filter-panel"

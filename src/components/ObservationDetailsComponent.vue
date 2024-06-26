@@ -419,19 +419,18 @@ export default {
         };
 
         const eradicationProductEnum = {
-            "Permas-D": "Permas-D",
+            "permas_d": "Permas-D",
             "vloeibare_stikstof": "vloeibare stikstof",
-            "Vespa_Ficam_D": "Vespa Ficam D",
-            "Topscore_PAL": "Topscore_PAL",
-            "ether_aceton_ethyl_acetate": "Ether/aceton/ethyl acetate",
-            "diatomeeënaarde": "diatomeeënaarde",
+            "vespa_ficam_d": "Vespa Ficam D",
+            "topscore_pal": "Topscore_PAL",
+            "diatomeeenaarde": "diatomeeenaarde",
             "andere": "andere"
         };
 
         const eradicationMethodEnum = {
             "diepvries": "Diepvries",
             "telescoopsteel": "Telescoopsteel",
-            "afsluitbaar_potje/doos": "Afsluitbaar potje/doos",
+            "doos": "Doos",
             "vloeistofverstuiver": "Vloeistofverstuiver",
             "poederverstuiver": "Poederverstuiver"
         };
@@ -443,10 +442,10 @@ export default {
         };
 
         const eradicationProblemsEnum = {
-            "stinging": "Steken",
-            "nest_falling": "Nest gevallen",
-            "dizziness": "Duizeligheid",
-            "poison_projection": "Gif projectie"
+            "steken": "Steken",
+            "nest_gevallen": "Nest gevallen",
+            "duizeligheid": "Duizeligheid",
+            "gif_spuiten": "Gif spuiten",
         };
 
         const editableFields = [

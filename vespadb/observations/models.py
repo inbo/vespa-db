@@ -77,7 +77,7 @@ class EradicationMethodEnum(models.TextChoices):
 
     FREEZER = "diepvries", _("Diepvries")
     TELESCOPIC_STEM = "telescoopsteel", _("Telescoopsteel")
-    LOCKABLE_JAR_BOX = "afsluitbaar potje/doos", _("Afsluitbaar potje/doos")
+    LOCKABLE_JAR_BOX = "doos", _("doos")
     LIQUID_SPRAYER = "vloeistofverstuiver", _("Vloeistofverstuiver")
     POWDER_SPRAYER = "poederverstuiver", _("Poederverstuiver")
 
@@ -103,32 +103,31 @@ class EradicationProblemsEnum(models.TextChoices):
     """Enum for the result of the eradication."""
 
     STINGING = (
-        "stinging",
+        "steken",
         _("Steken"),
     )
     NEST_FALLING = (
-        "nest_falling",
+        "nest_gevallen",
         _("Nest gevallen"),
     )
     DIZZINESS = (
-        "dizziness",
+        "duizeligheid",
         _("Duizeligheid"),
     )
     POISON_PROJECTION = (
-        "poison_projection",
-        _("Gif projectie"),
+        "gif_spuiten",
+        _("Gif Spuiten"),
     )
 
 
 class EradicationProductEnum(models.TextChoices):
     """Enum for the product used for the eradication."""
 
-    PERMAS_D = "Permas-D", _("Permas-D")
+    PERMAS_D = "permas_d", _("Permas-D")
     LIQUID_NITROGEN = "vloeibare_stikstof", _("Vloeibare stikstof")
-    VESPA_FICAM_D = "Vespa_Ficam_D", _("Vespa Ficam D")
-    TOPSCORE_PAL = "Topscore_PAL", _("Topscore PAL")
-    ETHER_ACETONE_ETHYL_ACETATE = "ether_aceton_ethyl_acetate", _("Ether/aceton/ethyl acetate")
-    DIATOMACEOUS_EARTH = "diatomeeënaarde", _("Diatomeeënaarde")
+    VESPA_FICAM_D = "vespa_ficam_d", _("Vespa Ficam D")
+    TOPSCORE_PAL = "topscore_pal", _("Topscore PAL")
+    DIATOMACEOUS_EARTH = "diatomeeenaarde", _("Diatomeeenaarde")
     OTHER = "andere", _("Andere")
 
 

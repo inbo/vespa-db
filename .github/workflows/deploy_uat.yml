@@ -40,3 +40,17 @@ jobs:
         run: |
           docker build --build-arg ${{ secrets.FRONTEND_DOCKER_BUILD_ARGS }} -t $REGISTRY/$REPOSITORY:$IMAGE_TAG -f Dockerfile.frontend .
           docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
+
+      - name: Setup AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
+          role-to-assume: ${{ secrets.AWS_DEPLOYMENT_ROLE }}
+      - name: Deploy new backend task
+        run: |
+          aws ecs update-service --cluster ${{ secrets.AWS_ECS_CLUSTER }} --service ${{ secrets.AWS_ECS_DJANGO_SERVICE }} --force-new-deployment
+      - name: Deploy new backend task
+        run: |
+          aws ecs update-service --cluster ${{ secrets.AWS_ECS_CLUSTER }} --service ${{ secrets.AWS_ECS_NODE_SERVICE }} --force-new-deployment

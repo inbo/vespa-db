@@ -6,8 +6,10 @@
         <i class="fas fa-sliders-h"></i> Filters
       </button>
       <div id="map" class="h-100"></div>
-      <Loader v-if="loadingObservations" />
-      <div class="map-legend" v-if="map">
+      <div class="loading-screen" v-if="loadingObservations">
+        Observaties laden...
+      </div>
+      <div class="map-legend" v-if="map && !loadingObservations">
         <div>
           <span class="legend-icon bg-reported"></span> Gerapporteerd
         </div>
@@ -43,14 +45,12 @@ import { useRouter } from 'vue-router';
 import FilterComponent from './FilterComponent.vue';
 import NavbarComponent from './NavbarComponent.vue';
 import ObservationDetailsComponent from './ObservationDetailsComponent.vue';
-import Loader from './Loader.vue';
 
 export default {
   components: {
     NavbarComponent,
     FilterComponent,
     ObservationDetailsComponent,
-    Loader,
   },
   setup() {
     const vespaStore = useVespaStore();
@@ -142,6 +142,7 @@ export default {
       },
       { deep: true }
     );
+
     onMounted(async () => {
       vespaStore.markerClusterGroup = L.markerClusterGroup({
         spiderfyOnMaxZoom: false,
@@ -225,3 +226,19 @@ export default {
   },
 };
 </script>
+
+<style>
+.loading-screen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(255, 255, 255, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 1.5rem;
+  z-index: 1000;
+}
+</style>

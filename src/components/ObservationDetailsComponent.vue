@@ -486,23 +486,6 @@ export default {
             }).format(date);
         };
 
-        const formatDateTime = (isoString, defaultValue = "") => {
-            if (!isoString) {
-                return defaultValue;
-            }
-            const date = new Date(isoString);
-            if (isNaN(date.getTime())) {
-                return defaultValue;
-            }
-            return new Intl.DateTimeFormat('nl-NL', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit'
-            }).format(date);
-        };
-
         const formatToDatetimeLocal = (isoString) => {
             if (!isoString) return '';
             const date = new Date(isoString);
@@ -601,8 +584,6 @@ export default {
             if (!vespaStore.user.personal_data_access) {
                 return false;
             }
-            console.log('user municipalities:', vespaStore.user.municipalities);
-            console.log('observation municipality:', selectedObservation.value?.municipality_name);
             const userMunicipalities = vespaStore.user.municipalities;
             const observationMunicipality = selectedObservation.value?.municipality_name;
             return userMunicipalities.includes(observationMunicipality);

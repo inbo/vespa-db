@@ -2,8 +2,8 @@ name: Deploy UAT
 
 on:
   push:
-    # branches:
-    #   - development
+    branches:
+      - development
 
 jobs:
   deploy:

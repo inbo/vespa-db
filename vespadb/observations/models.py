@@ -172,8 +172,12 @@ class Municipality(models.Model):
     length = models.FloatField(blank=True, null=True, help_text="Length of the municipality boundary")
     surface = models.FloatField(blank=True, null=True, help_text="Surface area of the municipality")
     province = models.ForeignKey(
-        Province, on_delete=models.SET_NULL, null=True, blank=True, related_name="municipalities",
-        help_text="Province to which the municipality belongs"
+        Province,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="municipalities",
+        help_text="Province to which the municipality belongs",
     )
 
     class Meta:
@@ -216,15 +220,31 @@ class Observation(models.Model):
 
     wn_notes = models.TextField(blank=True, null=True, help_text="Notes about the observation")
     wn_admin_notes = models.TextField(blank=True, null=True, help_text="Admin notes about the observation")
-    wn_validation_status = models.CharField(max_length=50, choices=ValidationStatusEnum.choices, blank=True, null=True, help_text="Validation status of the observation")
+    wn_validation_status = models.CharField(
+        max_length=50,
+        choices=ValidationStatusEnum.choices,
+        blank=True,
+        null=True,
+        help_text="Validation status of the observation",
+    )
 
     species = models.IntegerField(help_text="Species of the observed nest")
-    nest_height = models.CharField(max_length=50, choices=NestHeightEnum.choices, blank=True, null=True, help_text="Height of the nest")
-    nest_size = models.CharField(max_length=50, choices=NestSizeEnum.choices, blank=True, null=True, help_text="Size of the nest")
-    nest_location = models.CharField(max_length=50, choices=NestLocationEnum.choices, blank=True, null=True, help_text="Location of the nest")
-    nest_type = models.CharField(max_length=50, choices=NestTypeEnum.choices, blank=True, null=True, help_text="Type of the nest")
+    nest_height = models.CharField(
+        max_length=50, choices=NestHeightEnum.choices, blank=True, null=True, help_text="Height of the nest"
+    )
+    nest_size = models.CharField(
+        max_length=50, choices=NestSizeEnum.choices, blank=True, null=True, help_text="Size of the nest"
+    )
+    nest_location = models.CharField(
+        max_length=50, choices=NestLocationEnum.choices, blank=True, null=True, help_text="Location of the nest"
+    )
+    nest_type = models.CharField(
+        max_length=50, choices=NestTypeEnum.choices, blank=True, null=True, help_text="Type of the nest"
+    )
 
-    observer_phone_number = models.CharField(max_length=20, blank=True, null=True, help_text="Phone number of the observer")
+    observer_phone_number = models.CharField(
+        max_length=20, blank=True, null=True, help_text="Phone number of the observer"
+    )
     observer_email = models.EmailField(blank=True, null=True, help_text="Email of the observer")
     observer_received_email = models.BooleanField(default=False, help_text="Flag indicating if observer received email")
     observer_name = models.CharField(max_length=255, blank=True, null=True, help_text="Name of the observer")
@@ -234,40 +254,109 @@ class Observation(models.Model):
     admin_notes = models.TextField(blank=True, null=True, help_text="Admin notes for the observation")
 
     modified_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, related_name="modified_observations", on_delete=models.SET_NULL, null=True, help_text="User who last modified the observation"
+        settings.AUTH_USER_MODEL,
+        related_name="modified_observations",
+        on_delete=models.SET_NULL,
+        null=True,
+        help_text="User who last modified the observation",
     )
     created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, related_name="created_observations", on_delete=models.SET_NULL, null=True, help_text="User who created the observation"
+        settings.AUTH_USER_MODEL,
+        related_name="created_observations",
+        on_delete=models.SET_NULL,
+        null=True,
+        help_text="User who created the observation",
     )
-    wn_modified_datetime = models.DateTimeField(blank=True, null=True, help_text="Datetime when the observation was modified in the source system")
-    wn_created_datetime = models.DateTimeField(blank=True, null=True, help_text="Datetime when the observation was created in the source system")
+    wn_modified_datetime = models.DateTimeField(
+        blank=True, null=True, help_text="Datetime when the observation was modified in the source system"
+    )
+    wn_created_datetime = models.DateTimeField(
+        blank=True, null=True, help_text="Datetime when the observation was created in the source system"
+    )
     visible = models.BooleanField(default=True, help_text="Flag indicating if the observation is visible")
-    images = models.JSONField(default=list, blank=True, null=True, help_text="List of images associated with the observation")
+    images = models.JSONField(
+        default=list, blank=True, null=True, help_text="List of images associated with the observation"
+    )
 
     reserved_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, related_name="reserved_observations", on_delete=models.SET_NULL, null=True, blank=True, help_text="User who reserved the observation"
+        settings.AUTH_USER_MODEL,
+        related_name="reserved_observations",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="User who reserved the observation",
     )
-    reserved_datetime = models.DateTimeField(blank=True, null=True, help_text="Datetime when the observation was reserved")
+    reserved_datetime = models.DateTimeField(
+        blank=True, null=True, help_text="Datetime when the observation was reserved"
+    )
 
     eradication_date = models.DateTimeField(blank=True, null=True, help_text="Date when the nest was eradicated")
-    eradicator_name = models.CharField(max_length=255, blank=True, null=True, help_text="Name of the person who eradicated the nest")
-    eradication_duration = models.CharField(max_length=50, blank=True, null=True, help_text="Duration of the eradication")
-    eradication_persons = models.IntegerField(blank=True, null=True, help_text="Number of persons involved in the eradication")
-    eradication_result = models.CharField(max_length=50, choices=EradicationResultEnum.choices, blank=True, null=True, help_text="Result of the eradication")
-    eradication_product = models.CharField(max_length=50, choices=EradicationProductEnum.choices, blank=True, null=True, help_text="Product used for the eradication")
-    eradication_method = models.CharField(max_length=50, choices=EradicationMethodEnum.choices, blank=True, null=True, help_text="Method used for the eradication")
-    eradication_aftercare = models.CharField(max_length=50, choices=EradicationAfterCareEnum.choices, blank=True, null=True, help_text="Aftercare result of the eradication")
-    eradication_problems = models.CharField(max_length=50, choices=EradicationProblemsEnum.choices, blank=True, null=True, help_text="Problems encountered during the eradication")
+    eradicator_name = models.CharField(
+        max_length=255, blank=True, null=True, help_text="Name of the person who eradicated the nest"
+    )
+    eradication_duration = models.CharField(
+        max_length=50, blank=True, null=True, help_text="Duration of the eradication"
+    )
+    eradication_persons = models.IntegerField(
+        blank=True, null=True, help_text="Number of persons involved in the eradication"
+    )
+    eradication_result = models.CharField(
+        max_length=50,
+        choices=EradicationResultEnum.choices,
+        blank=True,
+        null=True,
+        help_text="Result of the eradication",
+    )
+    eradication_product = models.CharField(
+        max_length=50,
+        choices=EradicationProductEnum.choices,
+        blank=True,
+        null=True,
+        help_text="Product used for the eradication",
+    )
+    eradication_method = models.CharField(
+        max_length=50,
+        choices=EradicationMethodEnum.choices,
+        blank=True,
+        null=True,
+        help_text="Method used for the eradication",
+    )
+    eradication_aftercare = models.CharField(
+        max_length=50,
+        choices=EradicationAfterCareEnum.choices,
+        blank=True,
+        null=True,
+        help_text="Aftercare result of the eradication",
+    )
+    eradication_problems = models.CharField(
+        max_length=50,
+        choices=EradicationProblemsEnum.choices,
+        blank=True,
+        null=True,
+        help_text="Problems encountered during the eradication",
+    )
     eradication_notes = models.TextField(blank=True, null=True, help_text="Notes about the eradication")
 
     municipality = models.ForeignKey(
-        Municipality, on_delete=models.SET_NULL, null=True, blank=True, related_name="observations", help_text="Municipality where the observation was made"
+        Municipality,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="observations",
+        help_text="Municipality where the observation was made",
     )
     province = models.ForeignKey(
-        Province, on_delete=models.SET_NULL, null=True, blank=True, related_name="observations", help_text="Province where the observation was made"
+        Province,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="observations",
+        help_text="Province where the observation was made",
     )
     anb = models.BooleanField(default=False, help_text="Flag indicating if the observation is in ANB area")
-    public_domain = models.BooleanField(blank=True, null=True, help_text="Flag indicating if the observation is in the public domain")
+    public_domain = models.BooleanField(
+        blank=True, null=True, help_text="Flag indicating if the observation is in the public domain"
+    )
 
     def __str__(self) -> str:
         """Return the string representation of the model."""

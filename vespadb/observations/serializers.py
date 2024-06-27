@@ -119,7 +119,11 @@ class ObservationSerializer(serializers.ModelSerializer):
         fields = "__all__"
         extra_kwargs = {
             "id": {"read_only": True, "help_text": "Unique ID for the observation."},
-            "wn_id": {"required": False, "allow_null": True, "help_text": "Unique ID for the observation in the source system."},
+            "wn_id": {
+                "required": False,
+                "allow_null": True,
+                "help_text": "Unique ID for the observation in the source system.",
+            },
             "created_datetime": {"help_text": "Datetime when the observation was created."},
             "modified_datetime": {"help_text": "Datetime when the observation was last modified."},
             "location": {"help_text": "Geographical location of the observation as a point."},
@@ -138,14 +142,27 @@ class ObservationSerializer(serializers.ModelSerializer):
             "observer_name": {"help_text": "Name of the observer."},
             "observation_datetime": {"help_text": "Datetime when the observation was made."},
             "wn_cluster_id": {"required": False, "allow_null": True, "help_text": "Cluster ID of the observation."},
-            "admin_notes": {"required": False, "allow_blank": True, "allow_null": True, "help_text": "Admin notes for the observation."},
+            "admin_notes": {
+                "required": False,
+                "allow_blank": True,
+                "allow_null": True,
+                "help_text": "Admin notes for the observation.",
+            },
             "wn_modified_datetime": {"help_text": "Datetime when the observation was modified in the source system."},
             "wn_created_datetime": {"help_text": "Datetime when the observation was created in the source system."},
             "visible": {"help_text": "Flag indicating if the observation is visible."},
-            "images": {"required": False, "allow_null": True, "help_text": "List of images associated with the observation."},
+            "images": {
+                "required": False,
+                "allow_null": True,
+                "help_text": "List of images associated with the observation.",
+            },
             "reserved_by": {"required": False, "allow_null": True, "help_text": "User who reserved the observation."},
             "reserved_datetime": {"help_text": "Datetime when the observation was reserved."},
-            "eradication_date": {"required": False, "allow_null": True, "help_text": "Date when the nest was eradicated."},
+            "eradication_date": {
+                "required": False,
+                "allow_null": True,
+                "help_text": "Date when the nest was eradicated.",
+            },
             "eradicator_name": {"help_text": "Name of the person who eradicated the nest."},
             "eradication_duration": {"help_text": "Duration of the eradication."},
             "eradication_persons": {"help_text": "Number of persons involved in the eradication."},

@@ -33,9 +33,6 @@ from rest_framework.serializers import BaseSerializer
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_gis.filters import DistanceToPointFilter
 
-from drf_yasg.utils import swagger_auto_schema
-from drf_yasg import openapi
-
 from vespadb.observations.filters import ObservationFilter
 from vespadb.observations.helpers import parse_and_convert_to_utc
 from vespadb.observations.models import Municipality, Observation, Province
@@ -53,7 +50,7 @@ GEOJSON_REDIS_CACHE_EXPIRATION = 900  # 15 minutes
 GET_REDIS_CACHE_EXPIRATION = 86400  # 1 day
 
 
-class ObservationsViewSet(ModelViewSet):
+class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
     """ViewSet for the Observation model."""
 
     queryset = Observation.objects.all()
@@ -145,7 +142,7 @@ class ObservationsViewSet(ModelViewSet):
     @swagger_auto_schema(
         operation_description="Partially update an existing observation.",
         request_body=ObservationSerializer,
-        responses={200: ObservationSerializer}
+        responses={200: ObservationSerializer},
     )
     def partial_update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """
@@ -204,11 +201,11 @@ class ObservationsViewSet(ModelViewSet):
         serializer.save(
             created_by=self.request.user, modified_by=self.request.user, created_datetime=now(), modified_datetime=now()
         )
-        
+
     @swagger_auto_schema(
         operation_description="Create a new observation.",
         request_body=ObservationSerializer,
-        responses={201: ObservationSerializer}
+        responses={201: ObservationSerializer},
     )
     def create(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """
@@ -222,11 +219,8 @@ class ObservationsViewSet(ModelViewSet):
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
-    
-    @swagger_auto_schema(
-        operation_description="Delete an observation by ID.",
-        responses={204: 'No Content'}
-    )
+
+    @swagger_auto_schema(operation_description="Delete an observation by ID.", responses={204: "No Content"})
     def destroy(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """
         Override the destroy method to update the reservation count when an observation is deleted.
@@ -279,7 +273,7 @@ class ObservationsViewSet(ModelViewSet):
     @method_decorator(ratelimit(key="ip", rate="15/m", method="GET", block=True))
     @swagger_auto_schema(
         operation_description="Retrieve a list of observations. Supports filtering and ordering.",
-        responses={200: ObservationSerializer(many=True)}
+        responses={200: ObservationSerializer(many=True)},
     )
     def retrieve_list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """
@@ -311,22 +305,26 @@ class ObservationsViewSet(ModelViewSet):
         operation_description="Retrieve GeoJSON data for observations within a bounding box (bbox).",
         manual_parameters=[
             openapi.Parameter(
-                'bbox',
+                "bbox",
                 openapi.IN_QUERY,
                 description="Bounding box for filtering observations. Format: xmin,ymin,xmax,ymax",
-                type=openapi.TYPE_STRING
+                type=openapi.TYPE_STRING,
             )
         ],
-        responses={200: openapi.Response('GeoJSON data', openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            properties={
-                'type': openapi.Schema(type=openapi.TYPE_STRING),
-                'features': openapi.Schema(
-                    type=openapi.TYPE_ARRAY,
-                    items=openapi.Schema(type=openapi.TYPE_OBJECT)
+        responses={
+            200: openapi.Response(
+                "GeoJSON data",
+                openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "type": openapi.Schema(type=openapi.TYPE_STRING),
+                        "features": openapi.Schema(
+                            type=openapi.TYPE_ARRAY, items=openapi.Schema(type=openapi.TYPE_OBJECT)
+                        ),
+                    },
                 ),
-            }
-        ))}
+            )
+        },
     )
     @method_decorator(ratelimit(key="ip", rate="15/m", method="GET", block=True))
     @action(detail=False, methods=["get"], url_path="dynamic-geojson")
@@ -375,11 +373,7 @@ class ObservationsViewSet(ModelViewSet):
                     "properties": {
                         "id": obs.id,
                         "status": (
-                            "eradicated"
-                            if obs.eradication_date
-                            else "reserved"
-                            if obs.reserved_datetime
-                            else "default"
+                            "eradicated" if obs.eradication_date else "reserved" if obs.reserved_datetime else "default"
                         ),
                     },
                     "geometry": json.loads(obs.point.geojson) if obs.point else None,
@@ -451,20 +445,20 @@ class ObservationsViewSet(ModelViewSet):
 
         # Save valid observations
         return self.save_observations(processed_data)
-    @swagger_auto_schema(
-        operation_description="Retrieve an observation by ID.",
-        responses={200: ObservationSerializer}
-    )
+
+    @swagger_auto_schema(operation_description="Retrieve an observation by ID.", responses={200: ObservationSerializer})
     def retrieve(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """
         Retrieve an observation by its ID.
 
-        Parameters:
+        Parameters
+        ----------
         - request (Request): The incoming HTTP request.
         - *args (Any): Additional positional arguments.
         - **kwargs (Any): Additional keyword arguments.
 
-        Returns:
+        Returns
+        -------
         - Response: A response containing the serialized observation data.
         """
         return super().retrieve(request, *args, **kwargs)
@@ -472,41 +466,24 @@ class ObservationsViewSet(ModelViewSet):
     @swagger_auto_schema(
         operation_description="Update an existing observation.",
         request_body=ObservationSerializer,
-        responses={200: ObservationSerializer}
+        responses={200: ObservationSerializer},
     )
     def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """
         Update an existing observation.
 
-        Parameters:
+        Parameters
+        ----------
         - request (Request): The incoming HTTP request containing the observation data.
         - *args (Any): Additional positional arguments.
         - **kwargs (Any): Additional keyword arguments.
 
-        Returns:
+        Returns
+        -------
         - Response: A response containing the updated serialized observation data.
         """
         return super().update(request, *args, **kwargs)
 
-    @swagger_auto_schema(
-        operation_description="Partially update an existing observation.",
-        request_body=ObservationSerializer,
-        responses={200: ObservationSerializer}
-    )
-    def partial_update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
-        """
-        Partially update an existing observation.
-
-        Parameters:
-        - request (Request): The incoming HTTP request containing the partial observation data.
-        - *args (Any): Additional positional arguments.
-        - **kwargs (Any): Additional keyword arguments.
-
-        Returns:
-        - Response: A response containing the partially updated serialized observation data.
-        """
-        return super().partial_update(request, *args, **kwargs)
-    
     def parse_csv(self, file: InMemoryUploadedFile) -> list[dict[str, Any]]:
         """Parse a CSV file to a list of dictionaries."""
         file.seek(0)

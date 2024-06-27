@@ -8,13 +8,13 @@
       <div id="map" class="h-100"></div>
       <div class="map-legend" v-if="map">
         <div>
-          <span class="legend-icon bg-green"></span> Bestreden nest
+          <span class="legend-icon bg-reported"></span> Gerapporteerd
         </div>
         <div>
-          <span class="legend-icon bg-grey"></span> Gereserveerd nest
+          <span class="legend-icon bg-reserved"></span> Gereserveerd
         </div>
         <div>
-          <span class="legend-icon bg-orange"></span> Gerapporteerd nest
+          <span class="legend-icon bg-eradicated"></span> Bestreden
         </div>
       </div>
       <div class="filter-panel"
@@ -96,6 +96,7 @@ export default {
         await vespaStore.fetchObservationDetails(properties.id);
         vespaStore.isDetailsPaneOpen = true;
         router.push({ path: `/map/observation/${properties.id}` });
+        updateMarkers();
       } catch (error) {
         console.error("Failed to fetch observation details:", error);
       }
@@ -106,6 +107,12 @@ export default {
         const geoJsonLayer = L.geoJSON(vespaStore.observations, {
           pointToLayer: (feature, latlng) => {
             const marker = vespaStore.createCircleMarker(feature, latlng);
+            if (vespaStore.selectedObservation && feature.properties.id === vespaStore.selectedObservation.id) {
+              marker.setStyle({
+                color: '#ea792a',
+                weight: 4
+              });
+            }
             marker.on('click', () => openObservationDetails(feature.properties));
             return marker;
           },
@@ -140,12 +147,27 @@ export default {
         disableClusteringAtZoom: 16,
         iconCreateFunction: (cluster) => {
           return L.divIcon({
-            html: `<div style="background-color: rgba(153,72,0,0.5);"><span>${cluster.getChildCount()}</span></div>`,
+            html: `<div style="background-color: rgba(var(--bs-dark-rgb)); color: white;"><span>${cluster.getChildCount()}</span></div>`,
             className: 'marker-cluster',
             iconSize: L.point(40, 40),
           });
         },
+        polygonOptions: {
+          color: '#ea792a',  // Color of the polygon boundary
+          weight: 2,
+          opacity: 0.5,
+          fillOpacity: 0.2,
+          fillColor: '#ea792a'  // Fill color of the polygon
+        },
+        spiderLegPolylineOptions: {
+          color: '#ea792a',  // Color of the spider legs
+          weight: 1.5,
+          opacity: 0.8,
+        }
       });
+
+
+
       const observationId = router.currentRoute.value.params.id;
 
       if (observationId) {
@@ -200,37 +222,3 @@ export default {
   },
 };
 </script>
-<style scoped>
-.map-legend {
-  font-family: Arial, sans-serif;
-  font-size: 14px;
-  background: white;
-  padding: 10px;
-  border-radius: 5px;
-  position: absolute;
-  bottom: 10px;
-  left: 10px;
-  z-index: 1000;
-}
-
-.legend-icon {
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  margin-right: 8px;
-  border-radius: 50%;
-  vertical-align: middle;
-}
-
-.bg-green {
-  background-color: green;
-}
-
-.bg-grey {
-  background-color: grey;
-}
-
-.bg-orange {
-  background-color: orange;
-}
-</style>

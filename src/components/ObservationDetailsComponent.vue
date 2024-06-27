@@ -15,7 +15,7 @@
             <div class="d-flex justify-content-between mb-3" id="reservation">
                 <button v-if="canReserve && !selectedObservation.reserved_by" class="btn btn-sm btn-outline-primary"
                     @click="reserveObservation">Reserveren</button>
-                <span v-if="selectedObservation.reserved_by">Gereserveerd door {{
+                <span v-if="selectedObservation.reserved_by" class="badge bg-warning">Gereserveerd door {{
                     selectedObservation.reserved_by_first_name }} (nog {{ reservationStatus }})</span>
                 <button v-if="(isUserReserver || canEditAdminFields) && selectedObservation.reserved_by"
                     class="btn btn-sm btn-outline-danger" @click="cancelReservation">Reservatie annuleren</button>

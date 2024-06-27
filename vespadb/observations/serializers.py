@@ -37,7 +37,7 @@ public_read_fields = [
     "modified_by",
     "created_by",
     "province",
-    "eradication_datetime",
+    "eradication_date",
     "municipality",
     "province",
     "images",
@@ -73,7 +73,7 @@ user_read_fields = [
     "images",
     "reserved_by",
     "reserved_datetime",
-    "eradication_datetime",
+    "eradication_date",
     "eradicator_name",
     "eradication_duration",
     "eradication_persons",
@@ -118,14 +118,64 @@ class ObservationSerializer(serializers.ModelSerializer):
         model = Observation
         fields = "__all__"
         extra_kwargs = {
-            "wn_id": {"required": False, "allow_null": True},
-            "wn_cluster_id": {"required": False, "allow_null": True},
-            "eradication_datetime": {"required": False, "allow_null": True},
-            "id": {"read_only": True},
-            "admin_notes": {"required": False, "allow_blank": True, "allow_null": True},
-            "observer_received_email": {"required": False, "allow_null": True},
-            "images": {"required": False, "allow_null": True},
-            "reserved_by": {"required": False, "allow_null": True},
+            "id": {"read_only": True, "help_text": "Unique ID for the observation."},
+            "wn_id": {
+                "required": False,
+                "allow_null": True,
+                "help_text": "Unique ID for the observation in the source system.",
+            },
+            "created_datetime": {"help_text": "Datetime when the observation was created."},
+            "modified_datetime": {"help_text": "Datetime when the observation was last modified."},
+            "location": {"help_text": "Geographical location of the observation as a point."},
+            "source": {"help_text": "Source of the observation."},
+            "wn_notes": {"help_text": "Notes about the observation."},
+            "wn_admin_notes": {"help_text": "Admin notes about the observation."},
+            "wn_validation_status": {"help_text": "Validation status of the observation."},
+            "species": {"help_text": "Species of the observed nest."},
+            "nest_height": {"help_text": "Height of the nest."},
+            "nest_size": {"help_text": "Size of the nest."},
+            "nest_location": {"help_text": "Location of the nest."},
+            "nest_type": {"help_text": "Type of the nest."},
+            "observer_phone_number": {"help_text": "Phone number of the observer."},
+            "observer_email": {"help_text": "Email of the observer."},
+            "observer_received_email": {"help_text": "Flag indicating if observer received email."},
+            "observer_name": {"help_text": "Name of the observer."},
+            "observation_datetime": {"help_text": "Datetime when the observation was made."},
+            "wn_cluster_id": {"required": False, "allow_null": True, "help_text": "Cluster ID of the observation."},
+            "admin_notes": {
+                "required": False,
+                "allow_blank": True,
+                "allow_null": True,
+                "help_text": "Admin notes for the observation.",
+            },
+            "wn_modified_datetime": {"help_text": "Datetime when the observation was modified in the source system."},
+            "wn_created_datetime": {"help_text": "Datetime when the observation was created in the source system."},
+            "visible": {"help_text": "Flag indicating if the observation is visible."},
+            "images": {
+                "required": False,
+                "allow_null": True,
+                "help_text": "List of images associated with the observation.",
+            },
+            "reserved_by": {"required": False, "allow_null": True, "help_text": "User who reserved the observation."},
+            "reserved_datetime": {"help_text": "Datetime when the observation was reserved."},
+            "eradication_date": {
+                "required": False,
+                "allow_null": True,
+                "help_text": "Date when the nest was eradicated.",
+            },
+            "eradicator_name": {"help_text": "Name of the person who eradicated the nest."},
+            "eradication_duration": {"help_text": "Duration of the eradication."},
+            "eradication_persons": {"help_text": "Number of persons involved in the eradication."},
+            "eradication_result": {"help_text": "Result of the eradication."},
+            "eradication_product": {"help_text": "Product used for the eradication."},
+            "eradication_method": {"help_text": "Method used for the eradication."},
+            "eradication_aftercare": {"help_text": "Aftercare result of the eradication."},
+            "eradication_problems": {"help_text": "Problems encountered during the eradication."},
+            "eradication_notes": {"help_text": "Notes about the eradication."},
+            "municipality": {"help_text": "Municipality where the observation was made."},
+            "province": {"help_text": "Province where the observation was made."},
+            "anb": {"help_text": "Flag indicating if the observation is in ANB area."},
+            "public_domain": {"help_text": "Flag indicating if the observation is in the public domain."},
         }
 
     def get_municipality_name(self, obj: Observation) -> str | None:
@@ -134,7 +184,7 @@ class ObservationSerializer(serializers.ModelSerializer):
 
     def get_status(self, obj: Observation) -> str:
         """Determine the status of the observation based on its properties."""
-        if obj.eradication_datetime:
+        if obj.eradication_date:
             return "eradicated"
         if obj.reserved_datetime:
             return "reserved"
@@ -176,7 +226,7 @@ class ObservationSerializer(serializers.ModelSerializer):
             "wn_created_datetime",
             "reserved_datetime",
             "observation_datetime",
-            "eradication_datetime",
+            "eradication_date",
         ]
         for field in datetime_fields:
             if data.get(field):
@@ -209,7 +259,7 @@ class ObservationSerializer(serializers.ModelSerializer):
         """Validate that the user does not exceed the maximum number of allowed reservations."""
         if value:
             current_reservations_count = Observation.objects.filter(
-                reserved_by=value, eradication_datetime__isnull=True
+                reserved_by=value, eradication_date__isnull=True
             ).count()
             if current_reservations_count >= settings.MAX_RESERVATIONS:
                 logger.error(f"User {value.id} exceeded the reservation limit.")
@@ -248,7 +298,7 @@ class ObservationSerializer(serializers.ModelSerializer):
                 "visible",
                 "images",
                 "reserved_by",
-                "eradication_datetime",
+                "eradication_date",
                 "eradicator_name",
                 "eradication_duration",
                 "eradication_persons",
@@ -276,7 +326,7 @@ class ObservationSerializer(serializers.ModelSerializer):
             "modified_by",
             "created_by",
             "reserved_by",
-            "eradication_datetime",
+            "eradication_date",
             "eradicator_name",
             "eradication_result",
             "eradication_product",
@@ -303,7 +353,7 @@ class ObservationSerializer(serializers.ModelSerializer):
             "wn_created_datetime",
             "reserved_datetime",
             "observation_datetime",
-            "eradication_datetime",
+            "eradication_date",
         ]
         for field in datetime_fields:
             if data.get(field):

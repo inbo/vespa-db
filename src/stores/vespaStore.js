@@ -171,22 +171,24 @@ export const useVespaStore = defineStore('vespaStore', {
             }
         },
         createCircleMarker(feature, latlng) {
-            let color = "#FF7800"; // Orange default
+            let fillColor = "rgba(var(--bs-dark-rgb))"; // Default for reported
             if (feature.properties.status === "eradicated") {
-                color = "#00FF00"; // Green
+              fillColor = "rgba(var(--bs-success-rgb))"; // Green for eradicated
             } else if (feature.properties.status === "reserved") {
-                color = "#808080"; // Gray
+              fillColor = "rgba(var(--bs-warning-rgb))"; // Yellow for reserved
             }
             let markerOptions = {
-                radius: 10 + (feature.properties.observations_count || 0) * 0.5,
-                fillColor: color,
-                color: "#000",
-                weight: 1,
-                opacity: 1,
-                fillOpacity: 0.8
+              radius: 10 + (feature.properties.observations_count || 0) * 0.5,
+              fillColor: fillColor,
+              color: "#3c3c3c",
+              weight: 1,
+              opacity: 1,
+              fillOpacity: 0.8,
+              className: feature.properties.id === this.selectedObservation?.id ? 'active-marker' : ''
             };
-            return L.circleMarker(latlng, markerOptions).bindPopup(`Observatie ID: ${feature.properties.id}`);
-        },
+            const marker = L.circleMarker(latlng, markerOptions);
+            return marker;
+          },
         async reserveObservation(observation) {
             if (this.user.reservation_count < 50) {
                 const response = await ApiService.patch(`/observations/${observation.id}/`, {
@@ -231,7 +233,7 @@ export const useVespaStore = defineStore('vespaStore', {
         async markObservationAsEradicated(observationId) {
             try {
                 const response = await ApiService.patch(`/observations/${observationId}/`, {
-                    eradication_datetime: new Date().toISOString()
+                    eradication_date: new Date().toISOString()
                 });
                 if (response.status === 200) {
                     this.selectedObservation = response.data;
@@ -248,7 +250,7 @@ export const useVespaStore = defineStore('vespaStore', {
         async markObservationAsNotEradicated(observationId) {
             try {
                 const response = await ApiService.patch(`/observations/${observationId}/`, {
-                    eradication_datetime: null
+                    eradication_date: null
                 });
                 if (response.status === 200) {
                     this.selectedObservation = response.data;
@@ -265,7 +267,6 @@ export const useVespaStore = defineStore('vespaStore', {
             try {
                 const response = await ApiService.get(`/observations/${observationId}`);
                 if (response.status === 200) {
-                    console.log('Fetched Observation Details:', response.data);
                     this.selectedObservation = response.data;
                 } else {
                     throw new Error('Failed to fetch observation details');
@@ -282,7 +283,7 @@ export const useVespaStore = defineStore('vespaStore', {
         },
         async updateObservation(observation) {
             observation.observation_datetime = this.formatToISO8601(observation.observation_datetime);
-            observation.eradication_datetime = this.formatToISO8601(observation.eradication_datetime);
+            observation.eradication_date = this.formatToISO8601(observation.eradication_date);
 
             try {
                 const response = await ApiService.patch(`/observations/${observation.id}/`, observation);
@@ -353,7 +354,7 @@ export const useVespaStore = defineStore('vespaStore', {
                     const errorMsg = error.response.data.error;
                     if (Array.isArray(errorMsg)) {
                         this.error = errorMsg.join(', ');
-                    } else if (errorMsg.includes("Invalid username or password")) {
+                    } else if (errorMsg.startsWith("Invalid username or password")) {
                         this.error = "Ongeldige gebruikersnaam of wachtwoord.";
                     } else {
                         this.error = errorMsg;

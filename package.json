@@ -23,6 +23,7 @@
   "devDependencies": {
     "@types/bootstrap": "^5.2.10",
     "@types/leaflet.markercluster": "^1.5.4",
+    "@types/lodash": "^4.17.5",
     "@vitejs/plugin-vue": "^5.0.4",
     "eslint": "^9.4.0",
     "eslint-plugin-vue": "^9.26.0",

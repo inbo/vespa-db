@@ -77,7 +77,7 @@ class EradicationMethodEnum(models.TextChoices):
 
     FREEZER = "diepvries", _("Diepvries")
     TELESCOPIC_STEM = "telescoopsteel", _("Telescoopsteel")
-    LOCKABLE_JAR_BOX = "afsluitbaar potje/doos", _("Afsluitbaar potje/doos")
+    LOCKABLE_JAR_BOX = "doos", _("doos")
     LIQUID_SPRAYER = "vloeistofverstuiver", _("Vloeistofverstuiver")
     POWDER_SPRAYER = "poederverstuiver", _("Poederverstuiver")
 
@@ -103,32 +103,31 @@ class EradicationProblemsEnum(models.TextChoices):
     """Enum for the result of the eradication."""
 
     STINGING = (
-        "stinging",
+        "steken",
         _("Steken"),
     )
     NEST_FALLING = (
-        "nest_falling",
+        "nest_gevallen",
         _("Nest gevallen"),
     )
     DIZZINESS = (
-        "dizziness",
+        "duizeligheid",
         _("Duizeligheid"),
     )
     POISON_PROJECTION = (
-        "poison_projection",
-        _("Gif projectie"),
+        "gif_spuiten",
+        _("Gif Spuiten"),
     )
 
 
 class EradicationProductEnum(models.TextChoices):
     """Enum for the product used for the eradication."""
 
-    PERMAS_D = "Permas-D", _("Permas-D")
+    PERMAS_D = "permas_d", _("Permas-D")
     LIQUID_NITROGEN = "vloeibare_stikstof", _("Vloeibare stikstof")
-    VESPA_FICAM_D = "Vespa_Ficam_D", _("Vespa Ficam D")
-    TOPSCORE_PAL = "Topscore_PAL", _("Topscore PAL")
-    ETHER_ACETONE_ETHYL_ACETATE = "ether_aceton_ethyl_acetate", _("Ether/aceton/ethyl acetate")
-    DIATOMACEOUS_EARTH = "diatomeeënaarde", _("Diatomeeënaarde")
+    VESPA_FICAM_D = "vespa_ficam_d", _("Vespa Ficam D")
+    TOPSCORE_PAL = "topscore_pal", _("Topscore PAL")
+    DIATOMACEOUS_EARTH = "diatomeeenaarde", _("Diatomeeenaarde")
     OTHER = "andere", _("Andere")
 
 
@@ -136,15 +135,15 @@ class Province(models.Model):
     """Model voor de Belgische gemeenten met uitgebreide gegevens."""
 
     id = models.AutoField(primary_key=True)
-    name = models.CharField(max_length=255)
-    nis_code = models.CharField(max_length=255)
-    polygon = gis_models.MultiPolygonField(srid=31370)
+    name = models.CharField(max_length=255, help_text="Name of the province")
+    nis_code = models.CharField(max_length=255, help_text="NIS code of the province")
+    polygon = gis_models.MultiPolygonField(srid=31370, help_text="Geographical polygon of the province")
 
-    oidn = models.BigIntegerField(blank=True, null=True)
-    uidn = models.BigIntegerField(blank=True, null=True)
-    terrid = models.BigIntegerField(blank=True, null=True)
-    length = models.FloatField(blank=True, null=True)
-    surface = models.FloatField(blank=True, null=True)
+    oidn = models.BigIntegerField(blank=True, null=True, help_text="OIDN of the province")
+    uidn = models.BigIntegerField(blank=True, null=True, help_text="UIDN of the province")
+    terrid = models.BigIntegerField(blank=True, null=True, help_text="TERRID of the province")
+    length = models.FloatField(blank=True, null=True, help_text="Length of the province boundary")
+    surface = models.FloatField(blank=True, null=True, help_text="Surface area of the province")
 
     class Meta:
         """Meta class for the Province model."""
@@ -161,19 +160,24 @@ class Municipality(models.Model):
     """Model voor de Belgische gemeenten met uitgebreide gegevens."""
 
     id = models.AutoField(primary_key=True)
-    name = models.CharField(max_length=255)
-    nis_code = models.CharField(max_length=255)
-    polygon = gis_models.MultiPolygonField(srid=31370)
+    name = models.CharField(max_length=255, help_text="Name of the municipality")
+    nis_code = models.CharField(max_length=255, help_text="NIS code of the municipality")
+    polygon = gis_models.MultiPolygonField(srid=31370, help_text="Geographical polygon of the municipality")
 
-    oidn = models.BigIntegerField(blank=True, null=True)
-    uidn = models.BigIntegerField(blank=True, null=True)
-    terrid = models.BigIntegerField(blank=True, null=True)
-    datpublbs = models.DateField(blank=True, null=True)
-    numac = models.CharField(max_length=10, blank=True, null=True)
-    length = models.FloatField(blank=True, null=True)
-    surface = models.FloatField(blank=True, null=True)
+    oidn = models.BigIntegerField(blank=True, null=True, help_text="OIDN of the municipality")
+    uidn = models.BigIntegerField(blank=True, null=True, help_text="UIDN of the municipality")
+    terrid = models.BigIntegerField(blank=True, null=True, help_text="TERRID of the municipality")
+    datpublbs = models.DateField(blank=True, null=True, help_text="Publication date of the municipality data")
+    numac = models.CharField(max_length=10, blank=True, null=True, help_text="NUMAC of the municipality")
+    length = models.FloatField(blank=True, null=True, help_text="Length of the municipality boundary")
+    surface = models.FloatField(blank=True, null=True, help_text="Surface area of the municipality")
     province = models.ForeignKey(
-        Province, on_delete=models.SET_NULL, null=True, blank=True, related_name="municipalities"
+        Province,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="municipalities",
+        help_text="Province to which the municipality belongs",
     )
 
     class Meta:
@@ -191,13 +195,13 @@ class ANB(models.Model):
     """Model for the Agentschap voor Natuur en Bos (ANB) domain with detailed data."""
 
     id = models.AutoField(primary_key=True)
-    domain = models.CharField(max_length=255)
-    province = models.CharField(max_length=255)
-    regio = models.CharField(max_length=255, null=True)
-    liberties = models.CharField(max_length=255, null=True)
-    administrator = models.CharField(max_length=255, null=True)
-    contact = models.EmailField(max_length=255, null=True)
-    polygon = gis_models.MultiPolygonField(srid=31370)
+    domain = models.CharField(max_length=255, help_text="Domain of the ANB")
+    province = models.CharField(max_length=255, help_text="Province of the ANB")
+    regio = models.CharField(max_length=255, null=True, help_text="Region of the ANB")
+    liberties = models.CharField(max_length=255, null=True, help_text="Liberties of the ANB")
+    administrator = models.CharField(max_length=255, null=True, help_text="Administrator of the ANB")
+    contact = models.EmailField(max_length=255, null=True, help_text="Contact email of the ANB")
+    polygon = gis_models.MultiPolygonField(srid=31370, help_text="Geographical polygon of the ANB")
 
     def __str__(self) -> str:
         """Return the string representation of the model."""
@@ -208,57 +212,130 @@ class Observation(models.Model):
     """Model for the observation of a Vespa velutina nest."""
 
     id = models.AutoField(primary_key=True)
-    wn_id = models.IntegerField(unique=True, blank=True, null=True)
-    created_datetime = models.DateTimeField(auto_now_add=True)
-    modified_datetime = models.DateTimeField(auto_now=True)
-    location = gis_models.PointField()
-    source = models.CharField(max_length=255, blank=True, null=True)
+    wn_id = models.IntegerField(unique=True, blank=True, null=True, help_text="Unique ID for the observation")
+    created_datetime = models.DateTimeField(auto_now_add=True, help_text="Datetime when the observation was created")
+    modified_datetime = models.DateTimeField(auto_now=True, help_text="Datetime when the observation was last modified")
+    location = gis_models.PointField(help_text="Geographical location of the observation")
+    source = models.CharField(max_length=255, blank=True, null=True, help_text="Source of the observation")
 
-    wn_notes = models.TextField(blank=True, null=True)
-    wn_admin_notes = models.TextField(blank=True, null=True)
-    wn_validation_status = models.CharField(max_length=50, choices=ValidationStatusEnum, blank=True, null=True)
+    wn_notes = models.TextField(blank=True, null=True, help_text="Notes about the observation")
+    wn_admin_notes = models.TextField(blank=True, null=True, help_text="Admin notes about the observation")
+    wn_validation_status = models.CharField(
+        max_length=50,
+        choices=ValidationStatusEnum.choices,
+        blank=True,
+        null=True,
+        help_text="Validation status of the observation",
+    )
 
-    species = models.IntegerField()
-    nest_height = models.CharField(max_length=50, choices=NestHeightEnum, blank=True, null=True)
-    nest_size = models.CharField(max_length=50, choices=NestSizeEnum, blank=True, null=True)
-    nest_location = models.CharField(max_length=50, choices=NestLocationEnum, blank=True, null=True)
-    nest_type = models.CharField(max_length=50, choices=NestTypeEnum, blank=True, null=True)
+    species = models.IntegerField(help_text="Species of the observed nest")
+    nest_height = models.CharField(
+        max_length=50, choices=NestHeightEnum.choices, blank=True, null=True, help_text="Height of the nest"
+    )
+    nest_size = models.CharField(
+        max_length=50, choices=NestSizeEnum.choices, blank=True, null=True, help_text="Size of the nest"
+    )
+    nest_location = models.CharField(
+        max_length=50, choices=NestLocationEnum.choices, blank=True, null=True, help_text="Location of the nest"
+    )
+    nest_type = models.CharField(
+        max_length=50, choices=NestTypeEnum.choices, blank=True, null=True, help_text="Type of the nest"
+    )
 
-    observer_phone_number = models.CharField(max_length=20, blank=True, null=True)
-    observer_email = models.EmailField(blank=True, null=True)
-    observer_received_email = models.BooleanField(default=False)
-    observer_name = models.CharField(max_length=255, blank=True, null=True)
-    observation_datetime = models.DateTimeField()
+    observer_phone_number = models.CharField(
+        max_length=20, blank=True, null=True, help_text="Phone number of the observer"
+    )
+    observer_email = models.EmailField(blank=True, null=True, help_text="Email of the observer")
+    observer_received_email = models.BooleanField(default=False, help_text="Flag indicating if observer received email")
+    observer_name = models.CharField(max_length=255, blank=True, null=True, help_text="Name of the observer")
+    observation_datetime = models.DateTimeField(help_text="Datetime when the observation was made")
 
-    wn_cluster_id = models.IntegerField(blank=True, null=True)
-    admin_notes = models.TextField(blank=True, null=True)
+    wn_cluster_id = models.IntegerField(blank=True, null=True, help_text="Cluster ID of the observation")
+    admin_notes = models.TextField(blank=True, null=True, help_text="Admin notes for the observation")
 
     modified_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, related_name="modified_observations", on_delete=models.SET_NULL, null=True
+        settings.AUTH_USER_MODEL,
+        related_name="modified_observations",
+        on_delete=models.SET_NULL,
+        null=True,
+        help_text="User who last modified the observation",
     )
     created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, related_name="created_observations", on_delete=models.SET_NULL, null=True
+        settings.AUTH_USER_MODEL,
+        related_name="created_observations",
+        on_delete=models.SET_NULL,
+        null=True,
+        help_text="User who created the observation",
     )
-    wn_modified_datetime = models.DateTimeField(blank=True, null=True)
-    wn_created_datetime = models.DateTimeField(blank=True, null=True)
-    visible = models.BooleanField(default=True)
-    images = models.JSONField(default=list, blank=True, null=True)
+    wn_modified_datetime = models.DateTimeField(
+        blank=True, null=True, help_text="Datetime when the observation was modified in the source system"
+    )
+    wn_created_datetime = models.DateTimeField(
+        blank=True, null=True, help_text="Datetime when the observation was created in the source system"
+    )
+    visible = models.BooleanField(default=True, help_text="Flag indicating if the observation is visible")
+    images = models.JSONField(
+        default=list, blank=True, null=True, help_text="List of images associated with the observation"
+    )
 
     reserved_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, related_name="reserved_observations", on_delete=models.SET_NULL, null=True, blank=True
+        settings.AUTH_USER_MODEL,
+        related_name="reserved_observations",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="User who reserved the observation",
     )
-    reserved_datetime = models.DateTimeField(blank=True, null=True)
+    reserved_datetime = models.DateTimeField(
+        blank=True, null=True, help_text="Datetime when the observation was reserved"
+    )
 
-    eradication_datetime = models.DateTimeField(blank=True, null=True)
-    eradicator_name = models.CharField(max_length=255, blank=True, null=True)
-    eradication_duration = models.TimeField(blank=True, null=True)
-    eradication_persons = models.IntegerField(blank=True, null=True)
-    eradication_result = models.CharField(max_length=50, choices=EradicationResultEnum, blank=True, null=True)
-    eradication_product = models.CharField(max_length=50, choices=EradicationProductEnum, blank=True, null=True)
-    eradication_method = models.CharField(max_length=50, choices=EradicationMethodEnum, blank=True, null=True)
-    eradication_aftercare = models.CharField(max_length=50, choices=EradicationAfterCareEnum, blank=True, null=True)
-    eradication_problems = models.CharField(max_length=50, choices=EradicationProblemsEnum, blank=True, null=True)
-    eradication_notes = models.TextField(blank=True, null=True)
+    eradication_date = models.DateTimeField(blank=True, null=True, help_text="Date when the nest was eradicated")
+    eradicator_name = models.CharField(
+        max_length=255, blank=True, null=True, help_text="Name of the person who eradicated the nest"
+    )
+    eradication_duration = models.CharField(
+        max_length=50, blank=True, null=True, help_text="Duration of the eradication"
+    )
+    eradication_persons = models.IntegerField(
+        blank=True, null=True, help_text="Number of persons involved in the eradication"
+    )
+    eradication_result = models.CharField(
+        max_length=50,
+        choices=EradicationResultEnum.choices,
+        blank=True,
+        null=True,
+        help_text="Result of the eradication",
+    )
+    eradication_product = models.CharField(
+        max_length=50,
+        choices=EradicationProductEnum.choices,
+        blank=True,
+        null=True,
+        help_text="Product used for the eradication",
+    )
+    eradication_method = models.CharField(
+        max_length=50,
+        choices=EradicationMethodEnum.choices,
+        blank=True,
+        null=True,
+        help_text="Method used for the eradication",
+    )
+    eradication_aftercare = models.CharField(
+        max_length=50,
+        choices=EradicationAfterCareEnum.choices,
+        blank=True,
+        null=True,
+        help_text="Aftercare result of the eradication",
+    )
+    eradication_problems = models.CharField(
+        max_length=50,
+        choices=EradicationProblemsEnum.choices,
+        blank=True,
+        null=True,
+        help_text="Problems encountered during the eradication",
+    )
+    eradication_notes = models.TextField(blank=True, null=True, help_text="Notes about the eradication")
 
     municipality = models.ForeignKey(
         Municipality,
@@ -266,6 +343,7 @@ class Observation(models.Model):
         null=True,
         blank=True,
         related_name="observations",
+        help_text="Municipality where the observation was made",
     )
     province = models.ForeignKey(
         Province,
@@ -273,13 +351,16 @@ class Observation(models.Model):
         null=True,
         blank=True,
         related_name="observations",
+        help_text="Province where the observation was made",
     )
-    anb = models.BooleanField(default=False)
-    public_domain = models.BooleanField(blank=True, null=True)
+    anb = models.BooleanField(default=False, help_text="Flag indicating if the observation is in ANB area")
+    public_domain = models.BooleanField(
+        blank=True, null=True, help_text="Flag indicating if the observation is in the public domain"
+    )
 
     def __str__(self) -> str:
         """Return the string representation of the model."""
-        return f"Observation {self.id} - location: {self.location} - eradicated: {self.eradication_datetime}"
+        return f"Observation {self.id} - location: {self.location} - eradicated: {self.eradication_date}"
 
     def save(self, *args: Any, **kwargs: Any) -> None:
         """

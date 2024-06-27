@@ -37,7 +37,7 @@
                                     <td>{{ observation.municipality_name }}</td>
                                     <td>{{ formatDate(observation.created_datetime) }}</td>
                                     <td>{{ formatDate(observation.observation_datetime) }}</td>
-                                    <td>{{ formatDate(observation.eradication_datetime, 'Onbestreden') }}</td>
+                                    <td>{{ formatDate(observation.eradication_date, 'Onbestreden') }}</td>
                                     <td>{{ observation.species }}</td>
                                 </tr>
                             </tbody>
@@ -94,7 +94,7 @@ export default {
             { text: 'Gemeente', value: 'municipality_name' },
             { text: 'Aangemaakt', value: 'created_datetime' },
             { text: 'Observatie tijdstip', value: 'observation_datetime' },
-            { text: 'Bestreden tijdstip', value: 'eradication_datetime' },
+            { text: 'Bestreden tijdstip', value: 'eradication_date' },
             { text: 'Soorten', value: 'species' }
         ]);
         const sortBy = ref(null);

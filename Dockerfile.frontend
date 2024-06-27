@@ -23,7 +23,7 @@ COPY . ./
 RUN echo "Contents of /app after copying frontend files:" && ls -la /app
 
 # Set environment variable via build argument
-ARG VITE_APP_API_URL
+ARG VITE_APP_API_URL=http://localhost:8001
 ENV VITE_APP_API_URL=$VITE_APP_API_URL
 
 # Build the application using the specified config

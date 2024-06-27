@@ -54,7 +54,7 @@ export default {
 
     const formattedError = computed(() => {
       if (!error.value) return null;
-      if (error.value.includes("Invalid username or password")) {
+      if (error.value.startsWith("Invalid username or password")) {
         return "Ongeldige gebruikersnaam of wachtwoord.";
       }
       if (error.value.includes("Vul aub alle velden in")) {

@@ -75,10 +75,10 @@ def audit_user_reservations() -> None:
     logger.info("Starting audit of user reservations")
 
     # Get all users with their actual reservation count from Observation table,
-    # excluding observations where eradication_datetime is set
+    # excluding observations where eradication_date is set
     actual_counts = (
         Observation.objects.filter(
-            eradication_datetime__isnull=True  # Only include active reservations
+            eradication_date__isnull=True  # Only include active reservations
         )
         .values("reserved_by")
         .annotate(actual_count=Count("id"))

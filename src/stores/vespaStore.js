@@ -74,7 +74,7 @@ export const useVespaStore = defineStore('vespaStore', {
             }
         },
         async getObservationsGeoJson() {
-            this.loading = true;
+            this.loadingObservations = true;
             let filterQuery = this.createFilterQuery();
             if (!this.filters.min_observation_date && !this.isLoggedIn) {
                 const defaultMinDate = new Date('April 1, 2021').toISOString();
@@ -92,7 +92,7 @@ export const useVespaStore = defineStore('vespaStore', {
                 console.error('Error fetching observations:', error.message);
                 this.error = error.message || 'Failed to fetch observations';
             } finally {
-                this.loading = false;
+                this.loadingObservations = false;
             }
         },
         createFilterQuery() {
@@ -173,22 +173,22 @@ export const useVespaStore = defineStore('vespaStore', {
         createCircleMarker(feature, latlng) {
             let fillColor = "rgba(var(--bs-dark-rgb))"; // Default for reported
             if (feature.properties.status === "eradicated") {
-              fillColor = "rgba(var(--bs-success-rgb))"; // Green for eradicated
+                fillColor = "rgba(var(--bs-success-rgb))"; // Green for eradicated
             } else if (feature.properties.status === "reserved") {
-              fillColor = "rgba(var(--bs-warning-rgb))"; // Yellow for reserved
+                fillColor = "rgba(var(--bs-warning-rgb))"; // Yellow for reserved
             }
             let markerOptions = {
-              radius: 10 + (feature.properties.observations_count || 0) * 0.5,
-              fillColor: fillColor,
-              color: "#3c3c3c",
-              weight: 1,
-              opacity: 1,
-              fillOpacity: 0.8,
-              className: feature.properties.id === this.selectedObservation?.id ? 'active-marker' : ''
+                radius: 10 + (feature.properties.observations_count || 0) * 0.5,
+                fillColor: fillColor,
+                color: "#3c3c3c",
+                weight: 1,
+                opacity: 1,
+                fillOpacity: 0.8,
+                className: feature.properties.id === this.selectedObservation?.id ? 'active-marker' : ''
             };
             const marker = L.circleMarker(latlng, markerOptions);
             return marker;
-          },
+        },
         async reserveObservation(observation) {
             if (this.user.reservation_count < 50) {
                 const response = await ApiService.patch(`/observations/${observation.id}/`, {

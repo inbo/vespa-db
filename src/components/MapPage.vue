@@ -6,10 +6,10 @@
         <i class="fas fa-sliders-h"></i> Filters
       </button>
       <div id="map" class="h-100"></div>
-      <div class="loading-screen" v-if="loadingObservations">
+      <div class="loading-screen" v-if="isMapLoading">
         Observaties laden...
       </div>
-      <div class="map-legend" v-if="map && !loadingObservations">
+      <div class="map-legend" v-if="map && !isMapLoading">
         <div>
           <span class="legend-icon bg-reported"></span> Gerapporteerd
         </div>
@@ -63,6 +63,7 @@ export default {
     const isFilterPaneOpen = ref(false);
     const error = computed(() => vespaStore.error);
     const loadingObservations = computed(() => vespaStore.loadingObservations);
+    const isMapLoading = ref(true);
 
     const formattedError = computed(() => {
       if (!error.value) return null;
@@ -124,6 +125,7 @@ export default {
         vespaStore.markerClusterGroup.clearLayers();
         vespaStore.markerClusterGroup.addLayer(geoJsonLayer);
         map.value.addLayer(vespaStore.markerClusterGroup);
+        isMapLoading.value = false;
       });
     };
 
@@ -206,6 +208,8 @@ export default {
       }
 
       vespaStore.map = map.value;
+      await vespaStore.getObservationsGeoJson();
+      updateMarkers();
     });
 
     return {
@@ -222,6 +226,7 @@ export default {
       cancelEdit,
       formattedError,
       loadingObservations,
+      isMapLoading
     };
   },
 };

@@ -64,6 +64,7 @@
 import { useVespaStore } from '@/stores/vespaStore';
 import { DateTime } from 'luxon';
 import { computed, onMounted, ref, watch } from 'vue';
+import debounce from 'lodash/debounce';
 
 export default {
   setup() {
@@ -105,7 +106,7 @@ export default {
     const menu1 = ref(false);
     const menu2 = ref(false);
 
-    const emitFilterUpdate = () => {
+    const emitFilterUpdate = debounce(() => {
       const minDateCET = minDate.value ? DateTime.fromJSDate(minDate.value).setZone('Europe/Paris').toFormat('yyyy-MM-dd\'T\'HH:mm:ss') : null;
       const maxDateCET = maxDate.value ? DateTime.fromJSDate(maxDate.value).setZone('Europe/Paris').toFormat('yyyy-MM-dd\'T\'HH:mm:ss') : null;
 
@@ -119,7 +120,7 @@ export default {
         max_observation_date: maxDateCET,
         visible: visibleActief.value
       });
-    };
+    }, 300);
 
     const toggleMenu1 = () => {
       menu1.value = !menu1.value;

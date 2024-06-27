@@ -6,6 +6,7 @@
         <i class="fas fa-sliders-h"></i> Filters
       </button>
       <div id="map" class="h-100"></div>
+      <Loader v-if="loadingObservations" />
       <div class="map-legend" v-if="map">
         <div>
           <span class="legend-icon bg-reported"></span> Gerapporteerd
@@ -42,12 +43,14 @@ import { useRouter } from 'vue-router';
 import FilterComponent from './FilterComponent.vue';
 import NavbarComponent from './NavbarComponent.vue';
 import ObservationDetailsComponent from './ObservationDetailsComponent.vue';
+import Loader from './Loader.vue';
 
 export default {
   components: {
     NavbarComponent,
     FilterComponent,
     ObservationDetailsComponent,
+    Loader,
   },
   setup() {
     const vespaStore = useVespaStore();
@@ -59,6 +62,7 @@ export default {
     const isDetailsPaneOpen = computed(() => vespaStore.isDetailsPaneOpen);
     const isFilterPaneOpen = ref(false);
     const error = computed(() => vespaStore.error);
+    const loadingObservations = computed(() => vespaStore.loadingObservations);
 
     const formattedError = computed(() => {
       if (!error.value) return null;
@@ -216,6 +220,7 @@ export default {
       confirmUpdate,
       cancelEdit,
       formattedError,
+      loadingObservations,
     };
   },
 };

@@ -138,7 +138,6 @@ export default {
       },
       { deep: true }
     );
-
     onMounted(async () => {
       vespaStore.markerClusterGroup = L.markerClusterGroup({
         spiderfyOnMaxZoom: false,
@@ -153,20 +152,23 @@ export default {
           });
         },
         polygonOptions: {
-          color: '#ea792a',  // Color of the polygon boundary
+          color: '#ea792a',
           weight: 2,
           opacity: 0.5,
           fillOpacity: 0.2,
-          fillColor: '#ea792a'  // Fill color of the polygon
+          fillColor: '#ea792a'
         },
         spiderLegPolylineOptions: {
-          color: '#ea792a',  // Color of the spider legs
+          color: '#ea792a',
           weight: 1.5,
           opacity: 0.8,
         }
       });
 
-
+      const tileLayerOptions = {
+        attribution: 'Map data © OpenStreetMap contributors',
+        maxZoom: 19,
+      };
 
       const observationId = router.currentRoute.value.params.id;
 
@@ -181,11 +183,9 @@ export default {
         map.value = L.map('map', {
           center: [latitude, longitude],
           zoom: 16,
-          maxZoom: 20,
+          maxZoom: 19,
           layers: [
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-              attribution: 'Map data © OpenStreetMap contributors',
-            }),
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', tileLayerOptions),
           ],
         });
         vespaStore.isDetailsPaneOpen = true;
@@ -193,11 +193,9 @@ export default {
         map.value = L.map('map', {
           center: [50.8503, 4.3517],
           zoom: 9,
-          maxZoom: 20,
+          maxZoom: 19,
           layers: [
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-              attribution: 'Map data © OpenStreetMap contributors',
-            }),
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', tileLayerOptions),
           ],
         });
       }

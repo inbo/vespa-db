@@ -1,17 +1,20 @@
 <template>
-  <nav class="navbar navbar-expand-lg navbar-dark bg-success">
+  <nav class="navbar navbar-expand-lg navbar-light bg-light">
     <div class="container-fluid">
-      <router-link to="/" class="navbar-brand" active-class="active">VespaDB</router-link>
+      <a class="navbar-brand d-flex align-items-center" href="/">
+        <img class="me-3" src="../assets/logo.png" alt="Vespa-Watch">
+        Vespa-Watch
+      </a>
       <div class="d-flex align-items-center">
         <!-- View Mode Toggle -->
         <div class="btn-group me-2" role="group">
-          <router-link to="/map" class="btn btn-outline-light" active-class="active" aria-current="page">Map</router-link>
-          <router-link to="/table" class="btn btn-outline-light" active-class="active">Tabel</router-link>
+          <router-link to="/map" class="btn btn-outline-dark" active-class="active" aria-current="page">Map</router-link>
+          <router-link to="/table" class="btn btn-outline-dark" active-class="active">Tabel</router-link>
         </div>
 
-        <!-- Export Toggle (Hidden on Small Devices) -->
-        <div class="btn-group me-2 d-none d-lg-inline-flex">
-          <button type="button" class="btn btn-outline-light dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+        <!-- Export Toggle (Hidden on Medium Devices and below) -->
+        <div class="btn-group me-2 d-md-inline-flex">
+          <button type="button" class="btn btn-outline-dark dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
             Export
           </button>
           <ul class="dropdown-menu">
@@ -23,7 +26,7 @@
         <!-- User Login/Logout -->
         <span v-if="isLoggedIn && !loadingAuth" class="navbar-text">
           <div class="btn-group">
-            <button type="button" class="btn btn-outline-light dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+            <button type="button" class="btn btn-outline-dark dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
               {{ username }}
             </button>
             <ul class="dropdown-menu dropdown-menu-end">
@@ -32,7 +35,7 @@
             </ul>
           </div>
         </span>
-        <router-link v-if="!isLoggedIn && !loadingAuth" to="/login" class="btn btn-outline-light" active-class="active">Inloggen</router-link>
+        <router-link v-if="!isLoggedIn && !loadingAuth" to="/login" class="btn btn-outline-dark" active-class="active">Inloggen</router-link>
         <span v-if="loadingAuth" class="navbar-text">Loading...</span> <!-- Placeholder while loading -->
       </div>
     </div>

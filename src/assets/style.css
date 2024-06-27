@@ -84,3 +84,16 @@
     stroke: #ea792a;
     stroke-width: 4;
 }
+
+.navbar {
+    background-color: white !important;
+    border-bottom: 1px solid #e9ecef;
+
+    .navbar-brand {
+        font-weight: bold;
+
+        img {
+            height: 30px;
+        }
+    }
+}

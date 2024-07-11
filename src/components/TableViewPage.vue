@@ -65,7 +65,6 @@
         </div>
     </div>
 </template>
-
 <script>
 import { useVespaStore } from '@/stores/vespaStore';
 import { computed, ref, watch, onMounted } from 'vue';
@@ -163,10 +162,12 @@ export default {
         };
 
         watch(() => vespaStore.filters, (newFilters) => {
-            vespaStore.getObservations();
+            vespaStore.getObservations(1, 25, sortBy.value, sortOrder.value);
         }, { deep: true });
 
-        onMounted(() => {
+        onMounted(async () => {
+            if (!vespaStore.municipalitiesFetched) await vespaStore.fetchMunicipalities();
+            if (!vespaStore.provincesFetched) await vespaStore.fetchProvinces();
             vespaStore.getObservations();
         });
 

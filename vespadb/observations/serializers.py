@@ -57,8 +57,6 @@ user_read_fields = [
     "modified_datetime",
     "location",
     "source",
-    "wn_notes",
-    "wn_admin_notes",
     "species",
     "nest_height",
     "nest_size",
@@ -101,8 +99,13 @@ conditional_fields = [
     "observer_name",
 ]
 
+# Fields that require special permissions (admins or specific user permissions)
+admin_or_special_permission_fields = [
+    "wn_validation_status",
+    "wn_notes",
+]
 
-# Observation serializersclass ObservationSerializer(serializers.ModelSerializer):
+
 class ObservationSerializer(serializers.ModelSerializer):
     """Serializer for the full details of an Observation model instance."""
 
@@ -244,9 +247,9 @@ class ObservationSerializer(serializers.ModelSerializer):
                     and instance.municipality
                     and instance.municipality.id in user_municipality_ids
                 ):
-                    fields_to_include = set(user_read_fields + conditional_fields)
+                    fields_to_include = set(user_read_fields + conditional_fields + admin_or_special_permission_fields)
                 else:
-                    fields_to_include = set(user_read_fields)
+                    fields_to_include = set(user_read_fields + conditional_fields)
                 # Filter the data to include only the permitted fields
                 filtered_data = {field: data[field] for field in fields_to_include if field in data}
                 return filtered_data

@@ -156,9 +156,9 @@ export default {
       emitFilterUpdate();
     }, { deep: true });
 
-    onMounted(() => {
-      vespaStore.fetchMunicipalities();
-      vespaStore.fetchProvinces();
+    onMounted(async () => {
+      if (!vespaStore.municipalitiesFetched) await vespaStore.fetchMunicipalities();
+      if (!vespaStore.provincesFetched) await vespaStore.fetchProvinces();
     });
 
     return {

@@ -237,16 +237,19 @@
                                             target="_blank">Waarnemingen.be</a></p>
                                 </div>
                             </div>
-                            <div class="row mb-2">
-                                <label class="col-4 col-form-label">Validatiestatus</label>
-                                <div class="col-8">
-                                    <p class="form-control-plaintext">{{ selectedObservation.wn_validation_status }}</p>
+                            <div v-if="canViewContactInfo">
+                                <div class="row mb-2">
+                                    <label class="col-4 col-form-label">Validatiestatus</label>
+                                    <div class="col-8">
+                                        <p class="form-control-plaintext">{{ selectedObservation.wn_validation_status }}
+                                        </p>
+                                    </div>
                                 </div>
-                            </div>
-                            <div class="row mb-2">
-                                <label class="col-4 col-form-label">Opmerking validator</label>
-                                <div class="col-8">
-                                    <p class="form-control-plaintext">{{ selectedObservation.wn_notes }}</p>
+                                <div class="row mb-2">
+                                    <label class="col-4 col-form-label">Opmerking validator</label>
+                                    <div class="col-8">
+                                        <p class="form-control-plaintext">{{ selectedObservation.wn_notes }}</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>

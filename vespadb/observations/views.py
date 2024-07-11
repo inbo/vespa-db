@@ -41,6 +41,7 @@ from vespadb.observations.serializers import (
     ObservationSerializer,
     ProvinceSerializer,
 )
+from vespadb.observations.cache import invalidate_geojson_cache, invalidate_observation_cache
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -137,8 +138,11 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         user = self.request.user
         if not user.is_staff and ("admin_notes" in self.request.data or "observer_received_email" in self.request.data):
             raise PermissionDenied("You do not have permission to modify admin fields.")
-        serializer.save(modified_by=self.request.user, modified_datetime=now())
-
+        instance = serializer.save(modified_by=self.request.user, modified_datetime=now())
+        # Invalidate the caches
+        invalidate_observation_cache(instance.id)
+        invalidate_geojson_cache()
+        
     @swagger_auto_schema(
         operation_description="Partially update an existing observation.",
         request_body=ObservationSerializer,
@@ -243,10 +247,14 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             if reserved_by:
                 reserved_by.reservation_count -= 1
                 reserved_by.save(update_fields=["reservation_count"])
+            # Invalidate the caches
+            invalidate_observation_cache(observation.id)
+            invalidate_geojson_cache()
             return response
         except Exception as e:
             logger.exception("Error during delete operation")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
     def get_paginated_response(self, data: list[dict[str, Any]]) -> Response:
         """
@@ -376,7 +384,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                             "eradicated" if obs.eradication_date else "reserved" if obs.reserved_datetime else "default"
                         ),
                     },
-                    "geometry": json.loads(obs.point.geojson) if obs.point else None,
+                    "geometry": json.loads(obs.location.geojson) if obs.location else None,
                 }
                 for obs in queryset
             ]

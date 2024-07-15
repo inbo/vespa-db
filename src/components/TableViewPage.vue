@@ -11,12 +11,7 @@
             </div>
             <div class="container mt-4">
                 <div>
-                    <div v-if="loading" class="text-center">
-                        <div class="spinner-border text-primary" role="status">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
-                    </div>
-                    <div v-else-if="table_observations.length > 0" class="table-responsive">
+                    <div v-if="table_observations.length > 0" class="table-responsive">
                         <table class="table table-hover table-sm">
                             <thead class="table-light">
                                 <tr>
@@ -68,126 +63,153 @@
 
 <script>
 import { useVespaStore } from '@/stores/vespaStore';
-import { computed, ref, watch, onMounted } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import FilterComponent from './FilterComponent.vue';
 import NavbarComponent from './NavbarComponent.vue';
 import ObservationDetailsComponent from './ObservationDetailsComponent.vue';
 
 export default {
-    components: {
-        NavbarComponent,
-        FilterComponent,
-        ObservationDetailsComponent,
-    },
-    setup() {
-        const vespaStore = useVespaStore();
-        const router = useRouter();
-        const isFilterPaneOpen = ref(false);
-        const loading = computed(() => vespaStore.loadingObservations);
-        const totalObservations = computed(() => vespaStore.totalObservations);
-        const nextPage = computed(() => vespaStore.nextPage);
-        const previousPage = computed(() => vespaStore.previousPage);
-        const table_observations = computed(() => vespaStore.table_observations);
-        const tableHeaders = ref([
-            { text: 'ID', value: 'id' },
-            { text: 'Gemeente', value: 'municipality_name' },
-            { text: 'Aangemaakt', value: 'created_datetime' },
-            { text: 'Observatie tijdstip', value: 'observation_datetime' },
-            { text: 'Bestreden tijdstip', value: 'eradication_date' },
-            { text: 'Soorten', value: 'species' }
-        ]);
-        const sortBy = ref(null);
-        const sortOrder = ref('asc');
-        const isDetailsPaneOpen = computed(() => vespaStore.isDetailsPaneOpen);
+  components: {
+    NavbarComponent,
+    FilterComponent,
+    ObservationDetailsComponent,
+  },
+  setup() {
+    const vespaStore = useVespaStore();
+    const router = useRouter();
+    const isFilterPaneOpen = ref(false);
+    const loading = computed(() => vespaStore.loadingObservations);
+    const totalObservations = computed(() => vespaStore.totalObservations);
+    const nextPage = computed(() => vespaStore.nextPage);
+    const previousPage = computed(() => vespaStore.previousPage);
+    const table_observations = computed(() => vespaStore.table_observations);
+    const tableHeaders = ref([
+      { text: 'ID', value: 'id' },
+      { text: 'Gemeente', value: 'municipality_name' },
+      { text: 'Aangemaakt', value: 'created_datetime' },
+      { text: 'Observatie tijdstip', value: 'observation_datetime' },
+      { text: 'Bestreden tijdstip', value: 'eradication_date' },
+      { text: 'Soorten', value: 'species' }
+    ]);
+    const sortBy = ref(null);
+    const sortOrder = ref('asc');
+    const isDetailsPaneOpen = computed(() => vespaStore.isDetailsPaneOpen);
 
-        const formatDate = (isoString, defaultValue = "") => {
-            if (!isoString) {
-                return defaultValue;
-            }
-            const date = new Date(isoString);
-            if (isNaN(date.getTime())) {
-                return defaultValue;
-            }
-            return new Intl.DateTimeFormat('nl-NL', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit'
-            }).format(date);
-        };
+    const formatDate = (isoString, defaultValue = "") => {
+      if (!isoString) {
+        return defaultValue;
+      }
+      const date = new Date(isoString);
+      if (isNaN(date.getTime())) {
+        return defaultValue;
+      }
+      return new Intl.DateTimeFormat('nl-NL', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(date);
+    };
 
-        const toggleFilterPane = () => {
-            isFilterPaneOpen.value = !isFilterPaneOpen.value;
-        };
+    const toggleFilterPane = () => {
+      isFilterPaneOpen.value = !isFilterPaneOpen.value;
+    };
 
-        const toggleSort = (field) => {
-            if (sortBy.value === field) {
-                sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc';
-            } else {
-                sortBy.value = field;
-                sortOrder.value = 'asc';
-            }
-            vespaStore.getObservations(1, 25, sortBy.value, sortOrder.value);
-        };
+    const toggleSort = (field) => {
+      if (sortBy.value === field) {
+        sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc';
+      } else {
+        sortBy.value = field;
+        sortOrder.value = 'asc';
+      }
+      vespaStore.getObservations(1, 25, sortBy.value, sortOrder.value);
+    };
 
-        const fetchPage = (direction) => {
-            let url;
-            if (direction === 'next' && nextPage.value) {
-                url = nextPage.value;
-            } else if (direction === 'prev' && previousPage.value) {
-                url = previousPage.value;
-            }
-            if (url) {
-                const pageParams = new URLSearchParams(url.split('?')[1]);
-                vespaStore.getObservations(pageParams.get('page'), pageParams.get('page_size'));
-            }
-        };
+    const fetchPage = (direction) => {
+      let url;
+      if (direction === 'next' && nextPage.value) {
+        url = nextPage.value;
+      } else if (direction === 'prev' && previousPage.value) {
+        url = previousPage.value;
+      }
+      if (url) {
+        const pageParams = new URLSearchParams(url.split('?')[1]);
+        vespaStore.getObservations(pageParams.get('page'), pageParams.get('page_size'), sortBy.value, sortOrder.value);
+      }
+    };
 
-        const openObservationDetails = async (observation) => {
-            try {
-                await vespaStore.fetchObservationDetails(observation.id);
-                vespaStore.isDetailsPaneOpen = true;
-                router.push({ path: `/table/observation/${observation.id}` });
-            } catch (error) {
-                console.error("Failed to fetch observation details:", error);
-            }
-        };
+    const openObservationDetails = async (observation) => {
+      try {
+        await vespaStore.fetchObservationDetails(observation.id);
+        vespaStore.isDetailsPaneOpen = true;
+        router.push({ path: `/table/observation/${observation.id}` });
+      } catch (error) {
+        console.error("Failed to fetch observation details:", error);
+      }
+    };
 
-        const toggleDetailsPane = () => {
-            vespaStore.isDetailsPaneOpen = !vespaStore.isDetailsPaneOpen;
-            if (!vespaStore.isDetailsPaneOpen) {
-                router.push({ path: '/table' });
-            }
-        };
+    const toggleDetailsPane = () => {
+      vespaStore.isDetailsPaneOpen = !vespaStore.isDetailsPaneOpen;
+      if (!vespaStore.isDetailsPaneOpen) {
+        router.push({ path: '/table' });
+      }
+    };
 
-        watch(() => vespaStore.filters, (newFilters) => {
-            vespaStore.getObservations();
-        }, { deep: true });
+    // Watch route changes to close the details panel
+    watch(
+      () => router.currentRoute.value,
+      (newRoute, oldRoute) => {
+        if (newRoute.path !== oldRoute.path && vespaStore.isDetailsPaneOpen) {
+          vespaStore.isDetailsPaneOpen = false;
+        }
+      }
+    );
 
-        onMounted(() => {
-            vespaStore.getObservations();
+    watch(() => vespaStore.filters, (newFilters, oldFilters) => {
+      const currentFilters = JSON.stringify(newFilters);
+      const lastAppliedFilters = vespaStore.lastAppliedFilters;
+
+      if (currentFilters !== lastAppliedFilters) {
+        vespaStore.getObservations(1, 25, sortBy.value, sortOrder.value).then(() => {
+          vespaStore.getObservationsGeoJson();
         });
+      }
+    }, { deep: true });
 
-        return {
-            table_observations,
-            loading,
-            fetchPage,
-            nextPage,
-            previousPage,
-            totalObservations,
-            tableHeaders,
-            toggleSort,
-            toggleFilterPane,
-            isFilterPaneOpen,
-            sortBy,
-            sortOrder,
-            formatDate,
-            openObservationDetails,
-            isDetailsPaneOpen,
-            toggleDetailsPane
-        };
-    }
+    onMounted(async () => {
+      if (!vespaStore.municipalitiesFetched) await vespaStore.fetchMunicipalities();
+      if (!vespaStore.provincesFetched) await vespaStore.fetchProvinces();
+
+      if (vespaStore.lastAppliedFilters === null || vespaStore.lastAppliedFilters === 'null') {
+        vespaStore.setLastAppliedFilters();
+      }
+
+      // Avoid calling getObservations if data is already loaded with the same filters
+      if (vespaStore.table_observations.length === 0 || JSON.stringify(vespaStore.filters) !== JSON.stringify(vespaStore.lastAppliedFilters)) {
+        vespaStore.getObservations(1, 25, sortBy.value, sortOrder.value);
+      }
+    });
+
+    return {
+      table_observations,
+      loading,
+      fetchPage,
+      nextPage,
+      previousPage,
+      totalObservations,
+      tableHeaders,
+      toggleSort,
+      toggleFilterPane,
+      isFilterPaneOpen,
+      sortBy,
+      sortOrder,
+      formatDate,
+      openObservationDetails,
+      isDetailsPaneOpen,
+      toggleDetailsPane
+    };
+  }
 };
 </script>

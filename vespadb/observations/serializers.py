@@ -57,8 +57,6 @@ user_read_fields = [
     "modified_datetime",
     "location",
     "source",
-    "wn_notes",
-    "wn_admin_notes",
     "species",
     "nest_height",
     "nest_size",
@@ -101,8 +99,13 @@ conditional_fields = [
     "observer_name",
 ]
 
+# Fields that require special permissions (admins or specific user permissions)
+admin_or_special_permission_fields = [
+    "wn_validation_status",
+    "wn_notes",
+]
 
-# Observation serializersclass ObservationSerializer(serializers.ModelSerializer):
+
 class ObservationSerializer(serializers.ModelSerializer):
     """Serializer for the full details of an Observation model instance."""
 
@@ -244,9 +247,9 @@ class ObservationSerializer(serializers.ModelSerializer):
                     and instance.municipality
                     and instance.municipality.id in user_municipality_ids
                 ):
-                    fields_to_include = set(user_read_fields + conditional_fields)
+                    fields_to_include = set(user_read_fields + conditional_fields + admin_or_special_permission_fields)
                 else:
-                    fields_to_include = set(user_read_fields)
+                    fields_to_include = set(user_read_fields + conditional_fields)
                 # Filter the data to include only the permitted fields
                 filtered_data = {field: data[field] for field in fields_to_include if field in data}
                 return filtered_data
@@ -256,7 +259,7 @@ class ObservationSerializer(serializers.ModelSerializer):
         return {field: data[field] for field in public_read_fields if field in data}
 
     def validate_reserved_by(self, value: VespaUser) -> VespaUser:
-        """Validate that the user does not exceed the maximum number of allowed reservations."""
+        """Validate that the user does not exceed the maximum number of allowed reservations and has permission to reserve in the specified municipality."""
         if value:
             current_reservations_count = Observation.objects.filter(
                 reserved_by=value, eradication_date__isnull=True
@@ -266,6 +269,12 @@ class ObservationSerializer(serializers.ModelSerializer):
                 raise ValidationError(
                     f"This user has already reached the maximum number of reservations ({settings.MAX_RESERVATIONS})."
                 )
+            request = self.context.get("request")
+            if request and not request.user.is_staff:
+                observation_municipality = self.instance.municipality if self.instance else None
+                user_municipality_ids = request.user.municipalities.values_list("id", flat=True)
+                if observation_municipality and observation_municipality.id not in user_municipality_ids:
+                    raise ValidationError("You do not have permission to reserve nests in this municipality.")
         return value
 
     def update(self, instance: Observation, validated_data: dict[Any, Any]) -> Observation:
@@ -330,7 +339,10 @@ class ObservationSerializer(serializers.ModelSerializer):
             "eradicator_name",
             "eradication_result",
             "eradication_product",
+            "eradication_method",
+            "eradication_problems",
             "eradication_notes",
+            "eradication_aftercare",
             "images",
         ]
 

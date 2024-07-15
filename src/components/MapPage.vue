@@ -34,7 +34,6 @@
     </div>
   </div>
 </template>
-
 <script>
 import { useVespaStore } from '@/stores/vespaStore';
 import 'leaflet.markercluster';
@@ -64,6 +63,8 @@ export default {
     const error = computed(() => vespaStore.error);
     const loadingObservations = computed(() => vespaStore.loadingObservations);
     const isMapLoading = ref(true);
+    const filtersUpdated = ref(false);
+    const isFetchingGeoJson = ref(false); // Flag to prevent multiple calls
 
     const formattedError = computed(() => {
       if (!error.value) return null;
@@ -101,14 +102,25 @@ export default {
         await vespaStore.fetchObservationDetails(properties.id);
         vespaStore.isDetailsPaneOpen = true;
         router.push({ path: `/map/observation/${properties.id}` });
-        updateMarkers();
       } catch (error) {
         console.error("Failed to fetch observation details:", error);
       }
     };
 
-    const updateMarkers = () => {
-      vespaStore.getObservationsGeoJson().then((geoJson) => {
+    function debounce(func, wait) {
+      let timeout;
+      return function (...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+      };
+    }
+
+    const updateMarkers = debounce(async () => {
+      if (isFetchingGeoJson.value) return; // Prevent multiple calls
+      isFetchingGeoJson.value = true;
+
+      try {
+        await vespaStore.getObservationsGeoJson();
         const geoJsonLayer = L.geoJSON(vespaStore.observations, {
           pointToLayer: (feature, latlng) => {
             const marker = vespaStore.createCircleMarker(feature, latlng);
@@ -125,9 +137,14 @@ export default {
         vespaStore.markerClusterGroup.clearLayers();
         vespaStore.markerClusterGroup.addLayer(geoJsonLayer);
         map.value.addLayer(vespaStore.markerClusterGroup);
+        filtersUpdated.value = false;
+      } catch (error) {
+        console.error('Error updating markers:', error);
+      } finally {
+        isFetchingGeoJson.value = false;
         isMapLoading.value = false;
-      });
-    };
+      }
+    }, 300);
 
     const clearAndUpdateMarkers = () => {
       if (vespaStore.markerClusterGroup) {
@@ -140,12 +157,26 @@ export default {
     watch(
       () => vespaStore.filters,
       (newFilters) => {
+        filtersUpdated.value = true;
         clearAndUpdateMarkers();
       },
       { deep: true }
     );
 
+    // Watch route changes to close the details panel
+    watch(
+      () => router.currentRoute.value,
+      (newRoute, oldRoute) => {
+        if (newRoute.path !== oldRoute.path && vespaStore.isDetailsPaneOpen) {
+          vespaStore.isDetailsPaneOpen = false;
+        }
+      }
+    );
+
     onMounted(async () => {
+      if (!vespaStore.municipalitiesFetched) await vespaStore.fetchMunicipalities();
+      if (!vespaStore.provincesFetched) await vespaStore.fetchProvinces();
+
       vespaStore.markerClusterGroup = L.markerClusterGroup({
         spiderfyOnMaxZoom: false,
         showCoverageOnHover: true,
@@ -208,8 +239,11 @@ export default {
       }
 
       vespaStore.map = map.value;
-      await vespaStore.getObservationsGeoJson();
+      if (vespaStore.lastAppliedFilters === null || vespaStore.lastAppliedFilters === 'null') {
+          vespaStore.setLastAppliedFilters();
+      }
       updateMarkers();
+      vespaStore.getObservations(1, 25).catch(error => console.error('Error fetching observations:', error));
     });
 
     return {
@@ -231,7 +265,6 @@ export default {
   },
 };
 </script>
-
 <style>
 .loading-screen {
   position: absolute;

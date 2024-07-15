@@ -33,6 +33,7 @@ from rest_framework.serializers import BaseSerializer
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_gis.filters import DistanceToPointFilter
 
+from vespadb.observations.cache import invalidate_geojson_cache, invalidate_observation_cache
 from vespadb.observations.filters import ObservationFilter
 from vespadb.observations.helpers import parse_and_convert_to_utc
 from vespadb.observations.models import Municipality, Observation, Province
@@ -137,7 +138,17 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         user = self.request.user
         if not user.is_staff and ("admin_notes" in self.request.data or "observer_received_email" in self.request.data):
             raise PermissionDenied("You do not have permission to modify admin fields.")
-        serializer.save(modified_by=self.request.user, modified_datetime=now())
+
+        # Ensure user has permission to reserve in the specified municipality
+        if "reserved_by" in self.request.data:
+            observation = self.get_object()
+            user_municipality_ids = user.municipalities.values_list("id", flat=True)
+            if observation.municipality and observation.municipality.id not in user_municipality_ids:
+                raise PermissionDenied("You do not have permission to reserve nests in this municipality.")
+
+        instance = serializer.save(modified_by=user, modified_datetime=now())
+        invalidate_observation_cache(instance.id)
+        invalidate_geojson_cache()
 
     @swagger_auto_schema(
         operation_description="Partially update an existing observation.",
@@ -243,6 +254,9 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             if reserved_by:
                 reserved_by.reservation_count -= 1
                 reserved_by.save(update_fields=["reservation_count"])
+            # Invalidate the caches
+            invalidate_observation_cache(observation.id)
+            invalidate_geojson_cache()
             return response
         except Exception as e:
             logger.exception("Error during delete operation")
@@ -376,7 +390,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                             "eradicated" if obs.eradication_date else "reserved" if obs.reserved_datetime else "default"
                         ),
                     },
-                    "geometry": json.loads(obs.point.geojson) if obs.point else None,
+                    "geometry": json.loads(obs.location.geojson) if obs.location else None,
                 }
                 for obs in queryset
             ]

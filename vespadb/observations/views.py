@@ -33,6 +33,7 @@ from rest_framework.serializers import BaseSerializer
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_gis.filters import DistanceToPointFilter
 
+from vespadb.observations.cache import invalidate_geojson_cache, invalidate_observation_cache
 from vespadb.observations.filters import ObservationFilter
 from vespadb.observations.helpers import parse_and_convert_to_utc
 from vespadb.observations.models import Municipality, Observation, Province
@@ -41,7 +42,6 @@ from vespadb.observations.serializers import (
     ObservationSerializer,
     ProvinceSerializer,
 )
-from vespadb.observations.cache import invalidate_geojson_cache, invalidate_observation_cache
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -138,18 +138,18 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         user = self.request.user
         if not user.is_staff and ("admin_notes" in self.request.data or "observer_received_email" in self.request.data):
             raise PermissionDenied("You do not have permission to modify admin fields.")
-        
+
         # Ensure user has permission to reserve in the specified municipality
-        if 'reserved_by' in self.request.data:
+        if "reserved_by" in self.request.data:
             observation = self.get_object()
-            user_municipality_ids = user.municipalities.values_list('id', flat=True)
+            user_municipality_ids = user.municipalities.values_list("id", flat=True)
             if observation.municipality and observation.municipality.id not in user_municipality_ids:
                 raise PermissionDenied("You do not have permission to reserve nests in this municipality.")
-        
+
         instance = serializer.save(modified_by=user, modified_datetime=now())
         invalidate_observation_cache(instance.id)
         invalidate_geojson_cache()
-        
+
     @swagger_auto_schema(
         operation_description="Partially update an existing observation.",
         request_body=ObservationSerializer,
@@ -261,7 +261,6 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         except Exception as e:
             logger.exception("Error during delete operation")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
     def get_paginated_response(self, data: list[dict[str, Any]]) -> Response:
         """

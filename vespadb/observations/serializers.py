@@ -269,10 +269,10 @@ class ObservationSerializer(serializers.ModelSerializer):
                 raise ValidationError(
                     f"This user has already reached the maximum number of reservations ({settings.MAX_RESERVATIONS})."
                 )
-            request = self.context.get('request')
+            request = self.context.get("request")
             if request and not request.user.is_staff:
                 observation_municipality = self.instance.municipality if self.instance else None
-                user_municipality_ids = request.user.municipalities.values_list('id', flat=True)
+                user_municipality_ids = request.user.municipalities.values_list("id", flat=True)
                 if observation_municipality and observation_municipality.id not in user_municipality_ids:
                     raise ValidationError("You do not have permission to reserve nests in this municipality.")
         return value

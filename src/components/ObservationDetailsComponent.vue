@@ -13,8 +13,14 @@
             </h3>
 
             <div class="d-flex justify-content-between mb-3" id="reservation">
-                <button v-if="canReserve && !selectedObservation.reserved_by" class="btn btn-sm btn-outline-primary"
-                    @click="reserveObservation">Reserveren</button>
+                <button
+                    v-if="canReserve && !selectedObservation.reserved_by"
+                    class="btn btn-sm btn-outline-primary"
+                    @click="reserveObservation"
+                    :disabled="!isAuthorizedToReserve"
+                >
+                    Reserveren
+                </button>
                 <span v-if="selectedObservation.reserved_by" class="badge bg-warning">Gereserveerd door {{
                     selectedObservation.reserved_by_first_name }} (nog {{ reservationStatus }})</span>
                 <button v-if="(isUserReserver || canEditAdminFields) && selectedObservation.reserved_by"
@@ -24,6 +30,9 @@
             <div v-if="isLoggedIn && canEdit" class="mb-3" id="edit">
                 <button class="btn btn-sm btn-outline-success" @click="confirmUpdate">Wijzigingen opslaan</button>
             </div>
+            <div v-if="successMessage" class="alert alert-success alert-dismissible fade show" role="alert">
+                {{ successMessage }}
+            </div>
 
             <div class="accordion accordion-flush mb-3" id="sections">
                 <section class="accordion-item">
@@ -31,8 +40,7 @@
                         <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
                             data-bs-target="#eradication" aria-expanded="false" aria-controls="eradication">
                             <strong>Bestrijding</strong>
-                            <span class="badge bg-danger ms-2">{{ selectedObservation.eradication_date ? 'Bestreden'
-                                : 'Niet bestreden' }}</span>
+                            <span :class="['badge ms-2', eradicationStatusClass]">{{ eradicationStatusText }}</span>
                         </button>
                     </h4>
                     <div id="eradication" class="accordion-collapse collapse" aria-labelledby="eradication-header"
@@ -90,8 +98,7 @@
                                     <select v-if="selectedObservation.eradication_method !== undefined"
                                         v-model="editableObservation.eradication_method" class="form-select"
                                         :disabled="!canEdit">
-                                        <option v-for="(label, value) in eradicationMethodEnum" :key="value"
-                                            :value="value">{{ label }}</option>
+                                        <option v-for="(label, value) in eradicationMethodEnum" :key="value" :value="value">{{ label }}</option>
                                     </select>
                                 </div>
                             </div>
@@ -112,8 +119,7 @@
                                     <select v-if="selectedObservation.eradication_aftercare !== undefined"
                                         v-model="editableObservation.eradication_aftercare" class="form-select"
                                         :disabled="!canEdit">
-                                        <option v-for="(label, value) in eradicationAfterCareEnum" :key="value"
-                                            :value="value">{{ label }}</option>
+                                        <option v-for="(label, value) in eradicationAfterCareEnum" :key="value" :value="value">{{ label }}</option>
                                     </select>
                                 </div>
                             </div>
@@ -123,8 +129,7 @@
                                     <select v-if="selectedObservation.eradication_problems !== undefined"
                                         v-model="editableObservation.eradication_problems" class="form-select"
                                         :disabled="!canEdit">
-                                        <option v-for="(label, value) in eradicationProblemsEnum" :key="value"
-                                            :value="value">{{ label }}</option>
+                                        <option v-for="(label, value) in eradicationProblemsEnum" :key="value" :value="value">{{ label }}</option>
                                     </select>
                                 </div>
                             </div>
@@ -377,6 +382,12 @@ export default {
         const isLoggedIn = computed(() => vespaStore.isLoggedIn);
         const canEdit = computed(() => isLoggedIn.value && vespaStore.canEditObservation(selectedObservation.value));
         const canEditAdminFields = computed(() => isLoggedIn.value && vespaStore.isAdmin);
+        const successMessage = ref('');
+
+        const isAuthorizedToReserve = computed(() => {
+            const observationMunicipality = selectedObservation.value?.municipality_name;
+            return vespaStore.userMunicipalities.includes(observationMunicipality);
+        });
 
         const editableObservation = ref({});
 
@@ -471,8 +482,27 @@ export default {
             "eradication_notes",
             "visible",
             "wn_cluster_id",
-            "public_domain"
+            "public_domain",
+            "eradication_aftercare",
         ];
+
+        const eradicationStatusText = computed(() => {
+            const result = selectedObservation.value?.eradication_result;
+            if (result === 'successful') {
+                return 'Bestreden';
+            } else {
+                return 'Niet bestreden';
+            }
+        });
+
+        const eradicationStatusClass = computed(() => {
+            const result = selectedObservation.value?.eradication_result;
+            if (result === 'successful') {
+                return 'bg-success';
+            } else {
+                return 'bg-danger';
+            }
+        });
 
         const formatDate = (isoString, defaultValue = "") => {
             if (!isoString) {
@@ -561,13 +591,14 @@ export default {
                     id: selectedObservation.value.id,
                     ...updatedObservation
                 });
-
-                if (patch_response && patch_response.data) {
-                    vespaStore.selectedObservation = patch_response.data;
-                    isEditing.value = false;
+                
+                if (patch_response) {
+                    successMessage.value = 'Wijzigingen opgeslagen';
+                    setTimeout(() => successMessage.value = '', 4000);
                 }
             } catch (error) {
                 console.error('Fout bij het bijwerken van de observatie:', error);
+                successMessage.value = ''; 
             }
         };
 
@@ -602,6 +633,9 @@ export default {
 
         const cancelReservation = async () => {
             await vespaStore.cancelReservation(selectedObservation.value);
+        };
+        const clearSuccessMessage = () => {
+            successMessage.value = '';
         };
 
         watch(() => vespaStore.selectedObservation, (newVal) => {
@@ -639,7 +673,13 @@ export default {
             formatDate,
             getEnumLabel,
             eradicationProductEnum,
-            canViewContactInfo
+            canViewContactInfo,
+            isAuthorizedToReserve,
+            selectedObservation,
+            eradicationStatusText,
+            eradicationStatusClass,
+            successMessage,
+            clearSuccessMessage
         };
     }
 };

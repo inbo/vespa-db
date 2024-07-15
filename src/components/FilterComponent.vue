@@ -62,9 +62,9 @@
 
 <script>
 import { useVespaStore } from '@/stores/vespaStore';
+import debounce from 'lodash/debounce';
 import { DateTime } from 'luxon';
 import { computed, onMounted, ref, watch } from 'vue';
-import debounce from 'lodash/debounce';
 
 export default {
   setup() {
@@ -84,7 +84,6 @@ export default {
       { name: 'actief primair nest', value: 'actief_primair_nest' },
       { name: 'actief secundair nest', value: 'actief_secundair_nest' },
       { name: 'inactief/leeg nest', value: 'inactief_leeg_nest' },
-      { name: 'potentieel nest (meer info nodig)', value: 'potentieel_nest' },
     ]);
     const nestStatus = ref([
       { name: 'Bestreden', value: 'eradicated' },

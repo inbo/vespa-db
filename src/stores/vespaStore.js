@@ -37,7 +37,7 @@ export const useVespaStore = defineStore('vespaStore', {
             max_observation_date: null,
             visible: true,
         },
-        lastAppliedFilters: null,  // Track the last applied filters
+        lastAppliedFilters: null,
         isDetailsPaneOpen: false,
         user: {},
         userMunicipalities: [],
@@ -56,13 +56,13 @@ export const useVespaStore = defineStore('vespaStore', {
     actions: {
         async getObservations(page = 1, page_size = 25, sortBy = null, sortOrder = 'asc') {
             const currentFilters = JSON.stringify(this.filters);
-
-            // Check if data needs to be reloaded
-            if (this.table_observations.length > 0 && currentFilters === this.lastAppliedFilters) return;
-
+            if (this.table_observations.length > 0 && currentFilters === this.lastAppliedFilters) {
+                return Promise.resolve();
+            }
             this.loadingObservations = true;
             const orderQuery = sortBy ? `&ordering=${sortOrder === 'asc' ? '' : '-'}${sortBy}` : '';
             const filterQuery = this.createFilterQuery();
+
             try {
                 const response = await ApiService.get(`/observations?${filterQuery}${orderQuery}&page=${page}&page_size=${page_size}`);
                 if (response.status === 200) {
@@ -70,13 +70,15 @@ export const useVespaStore = defineStore('vespaStore', {
                     this.totalObservations = response.data.total;
                     this.nextPage = response.data.next;
                     this.previousPage = response.data.previous;
-                    this.lastAppliedFilters = currentFilters;  // Update the last applied filters
+                    this.setLastAppliedFilters();
+                    return Promise.resolve();
                 } else {
                     throw new Error(`Network response was not ok, status code: ${response.status}`);
                 }
             } catch (error) {
                 console.error('There has been a problem with your fetch operation:', error);
                 this.error = error.message || 'Failed to fetch observations';
+                return Promise.reject(error);
             } finally {
                 this.loadingObservations = false;
             }
@@ -98,7 +100,7 @@ export const useVespaStore = defineStore('vespaStore', {
                 const response = await ApiService.get(`/observations/dynamic-geojson?${filterQuery}`);
                 if (response.status === 200) {
                     this.observations = response.data.features;
-                    this.lastAppliedFilters = currentFilters;  // Update the last applied filters
+                    this.setLastAppliedFilters();
                 } else {
                     throw new Error(`Network response was not ok, status code: ${response.status}`);
                 }
@@ -159,10 +161,7 @@ export const useVespaStore = defineStore('vespaStore', {
         },
         async applyFilters(filters) {
             this.filters = { ...this.filters, ...filters };
-            this.table_observations = [];  // Reset data to force reload
-            this.observations = [];        // Reset data to force reload
-            this.lastAppliedFilters = null; // Reset last applied filters to ensure reloading
-            await this.getObservations();
+            //await this.getObservations();
         },
         async fetchProvinces() {
             if (this.provincesFetched) return;  // Skip fetching if data is already available
@@ -450,5 +449,11 @@ export const useVespaStore = defineStore('vespaStore', {
                 return false;
             }
         },
+        setLastAppliedFilters() {
+            const currentFilters = JSON.stringify(this.filters);
+            if (this.lastAppliedFilters !== currentFilters) {
+                this.lastAppliedFilters = currentFilters;
+            }
+        }
     },
 });

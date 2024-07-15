@@ -102,7 +102,6 @@ export default {
         await vespaStore.fetchObservationDetails(properties.id);
         vespaStore.isDetailsPaneOpen = true;
         router.push({ path: `/map/observation/${properties.id}` });
-        //updateMarkers();
       } catch (error) {
         console.error("Failed to fetch observation details:", error);
       }
@@ -145,7 +144,7 @@ export default {
         isFetchingGeoJson.value = false;
         isMapLoading.value = false;
       }
-    }, 300); // Wait 300 milliseconds before calling the function
+    }, 300);
 
     const clearAndUpdateMarkers = () => {
       if (vespaStore.markerClusterGroup) {
@@ -162,6 +161,16 @@ export default {
         clearAndUpdateMarkers();
       },
       { deep: true }
+    );
+
+    // Watch route changes to close the details panel
+    watch(
+      () => router.currentRoute.value,
+      (newRoute, oldRoute) => {
+        if (newRoute.path !== oldRoute.path && vespaStore.isDetailsPaneOpen) {
+          vespaStore.isDetailsPaneOpen = false;
+        }
+      }
     );
 
     onMounted(async () => {
@@ -230,7 +239,11 @@ export default {
       }
 
       vespaStore.map = map.value;
+      if (vespaStore.lastAppliedFilters === null || vespaStore.lastAppliedFilters === 'null') {
+          vespaStore.setLastAppliedFilters();
+      }
       updateMarkers();
+      vespaStore.getObservations(1, 25).catch(error => console.error('Error fetching observations:', error));
     });
 
     return {

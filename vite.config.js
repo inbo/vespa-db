@@ -21,7 +21,6 @@ export default defineConfig(({ mode }) => {
       Vue({
         template: { transformAssetUrls }
       }),
-      // https://github.com/vuetifyjs/vuetify-loader/tree/master/packages/vite-plugin#readme
       Vuetify(),
       Components(),
       ViteFonts({
@@ -56,6 +55,16 @@ export default defineConfig(({ mode }) => {
         '.tsx',
         '.vue',
       ],
+    },
+    build: {
+      outDir: 'dist',
+      rollupOptions: {
+        output: {
+          entryFileNames: 'assets/[name].[hash].js',
+          chunkFileNames: 'assets/[name].[hash].js',
+          assetFileNames: 'assets/[name].[hash].[ext]'
+        }
+      }
     },
     server: {
       port: 3000,

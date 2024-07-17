@@ -158,14 +158,11 @@ export default {
       if (newObservation && oldObservation && newObservation.id !== oldObservation.id) {
           const oldMarker = vespaStore.markerClusterGroup.getLayers().find(marker => marker.feature.properties.id === oldObservation.id);
           if (oldMarker) {
-              console.log("Updating old marker for:", oldObservation.id);
-              console.log("Status of old marker: ", oldMarker.feature.properties.status);
               vespaStore.updateMarkerColor(oldObservation.id, vespaStore.getColorByStatus(oldMarker.feature.properties.status), vespaStore.getColorByStatus(oldMarker.feature.properties.status), 1, '');
           }
 
           const newMarker = vespaStore.markerClusterGroup.getLayers().find(marker => marker.feature.properties.id === newObservation.id);
           if (newMarker) {
-              console.log("Updating new marker for:", newObservation.id);
               vespaStore.updateMarkerColor(newObservation.id, vespaStore.getColorByStatus(newMarker.feature.properties.status), '#ea792a', 4, 'active-marker');
           }
       }

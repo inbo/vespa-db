@@ -214,7 +214,7 @@ export const useVespaStore = defineStore('vespaStore', {
                 });
                 if (response.status === 200) {
                     this.selectedObservation = { ...this.selectedObservation, ...response.data };
-                    this.updateMarkerColor(observation.id, '#FF7800');
+                    this.updateMarkerColor(observation.id, '#ffc107');
                     await this.authCheck();
                 } else {
                     throw new Error('Failed to reserve the observation');
@@ -224,12 +224,9 @@ export const useVespaStore = defineStore('vespaStore', {
             }
         },
         updateMarkerColor(observationId, fillColor, edgeColor = fillColor, weight = 4, className = '') {
-            console.log(`updateMarkerColor called for ${observationId} with fillColor ${fillColor}, edgeColor ${edgeColor}, weight ${weight}, className ${className}`);
             const markers = this.markerClusterGroup.getLayers();
             markers.forEach((marker) => {
                 if (marker.feature.properties.id === observationId) {
-                    console.log(`Marker updated for ${observationId}`);
-                    console.log("Current style before update:", marker.options);
                     marker.setStyle({
                         fillColor: fillColor,
                         color: edgeColor, // Use color for stroke
@@ -240,7 +237,6 @@ export const useVespaStore = defineStore('vespaStore', {
                     } else {
                         marker._path.classList.remove('active-marker');
                     }
-                    console.log("New style after update:", marker.options);
                 }
             });
         },
@@ -253,7 +249,7 @@ export const useVespaStore = defineStore('vespaStore', {
                 const response = await ApiService.patch(`/observations/${observation.id}/`, updatedObservation);
                 if (response.status === 200) {
                     this.selectedObservation = { ...this.selectedObservation, ...response.data };
-                    this.updateMarkerColor(observation.id, '#FF7800');
+                    this.updateMarkerColor(observation.id, '#212529');
                 } else {
                     throw new Error('Failed to cancel the reservation');
                 }

@@ -213,8 +213,9 @@ export const useVespaStore = defineStore('vespaStore', {
                     reserved_by: this.user.id
                 });
                 if (response.status === 200) {
+                    console.log('Observation reserved:', response.data);
                     this.selectedObservation = { ...this.selectedObservation, ...response.data };
-                    this.updateMarkerColor(observation.id, '#ffc107');
+                    this.updateMarkerColor(observation.id, '#ffc107', '#ffc107', 4);
                     await this.authCheck();
                 } else {
                     throw new Error('Failed to reserve the observation');
@@ -229,7 +230,7 @@ export const useVespaStore = defineStore('vespaStore', {
                 if (marker.feature.properties.id === observationId) {
                     marker.setStyle({
                         fillColor: fillColor,
-                        color: edgeColor, // Use color for stroke
+                        color: edgeColor,
                         weight: weight
                     });
                     if (className) {
@@ -249,46 +250,12 @@ export const useVespaStore = defineStore('vespaStore', {
                 const response = await ApiService.patch(`/observations/${observation.id}/`, updatedObservation);
                 if (response.status === 200) {
                     this.selectedObservation = { ...this.selectedObservation, ...response.data };
-                    this.updateMarkerColor(observation.id, '#212529');
+                    this.updateMarkerColor(observation.id, '#212529', '#212529', 1);
                 } else {
                     throw new Error('Failed to cancel the reservation');
                 }
             } catch (error) {
                 console.error('Error canceling the reservation:', error);
-            }
-        },
-        async markObservationAsEradicated(observationId) {
-            try {
-                const response = await ApiService.patch(`/observations/${observationId}/`, {
-                    eradication_date: new Date().toISOString()
-                });
-                if (response.status === 200) {
-                    this.selectedObservation = response.data;
-                    this.updateMarkerColor(observationId, '#00FF00');
-                    return response.data;
-                } else {
-                    throw new Error('Failed to mark observation as eradicated');
-                }
-            } catch (error) {
-                console.error('Error marking observation as eradicated:', error);
-                throw error;
-            }
-        },
-        async markObservationAsNotEradicated(observationId) {
-            try {
-                const response = await ApiService.patch(`/observations/${observationId}/`, {
-                    eradication_date: null
-                });
-                if (response.status === 200) {
-                    this.selectedObservation = response.data;
-                    this.updateMarkerColor(observationId, '#000000');
-                    return response.data;
-                } else {
-                    throw new Error('Failed to mark observation as not eradicated');
-                }
-            } catch (error) {
-                console.error('Error marking observation as not eradicated:', error);
-                throw error;
             }
         },
         async fetchObservationDetails(observationId) {
@@ -461,11 +428,12 @@ export const useVespaStore = defineStore('vespaStore', {
             }
         },
         getColorByStatus(status) {
+            console.log('status:', status);
             if (status === 'eradicated') {
                 return '#198754';
             } else if (status === 'reserved') {
                 return '#ffc107';
-            } else if (status === 'unsuccessful' || status === 'untreated' || status === 'unknown') {
+            } else if (status === 'default') {
                 return '#212529';
             }
             return '#212529';

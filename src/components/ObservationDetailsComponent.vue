@@ -14,7 +14,7 @@
 
             <div class="d-flex justify-content-between mb-3" id="reservation">
                 <button v-if="canReserve && !selectedObservation.reserved_by" class="btn btn-sm btn-outline-primary"
-                    @click="reserveObservation" :disabled="!isAuthorizedToReserve">
+                    @click="reserveObservation" :disabled="!isAuthorizedToReserve || isObservationSuccessful">
                     Reserveren
                 </button>
                 <span v-if="selectedObservation.reserved_by" class="badge bg-warning">Gereserveerd door {{
@@ -390,9 +390,14 @@ export default {
         });
 
         const editableObservation = ref({});
+        const isObservationSuccessful = computed(() => {
+            return selectedObservation.value?.eradication_result === 'successful';
+        });
 
         const canReserve = computed(() => {
-            return isLoggedIn.value && (!selectedObservation.value?.reserved_by || selectedObservation.value.reserved_by === vespaStore.user.username);
+            return isLoggedIn.value && 
+                (!selectedObservation.value?.reserved_by || selectedObservation.value.reserved_by === vespaStore.user.username) &&
+                !isObservationSuccessful.value;
         });
 
         const isUserReserver = computed(() => {
@@ -595,7 +600,7 @@ export default {
                 if (patch_response) {
                     successMessage.value = 'Wijzigingen opgeslagen';
                     setTimeout(() => successMessage.value = '', 4000);
-                    emit('updateMarkerColor', selectedObservation.value.id, vespaStore.getColorByStatus(patch_response.eradication_result));
+                    emit('updateMarkerColor', selectedObservation.value.id, vespaStore.getColorByStatus(patch_response.eradication_result),'#ea792a', 4, 'active-marker');
                 }
             } catch (error) {
                 console.error('Fout bij het bijwerken van de observatie:', error);
@@ -679,7 +684,8 @@ export default {
             eradicationStatusText,
             eradicationStatusClass,
             successMessage,
-            clearSuccessMessage
+            clearSuccessMessage,
+            isObservationSuccessful
         };
     }
 };

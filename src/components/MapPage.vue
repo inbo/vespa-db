@@ -155,19 +155,19 @@ export default {
     }, 300);
 
     watch(selectedObservation, (newObservation, oldObservation) => {
-      if (newObservation && oldObservation && newObservation.id !== oldObservation.id) {
-          const oldMarker = vespaStore.markerClusterGroup.getLayers().find(marker => marker.feature.properties.id === oldObservation.id);
-          if (oldMarker) {
-              vespaStore.updateMarkerColor(oldObservation.id, vespaStore.getColorByStatus(oldMarker.feature.properties.status), vespaStore.getColorByStatus(oldMarker.feature.properties.status), 1, '');
-          }
+        if (newObservation && oldObservation && newObservation.id !== oldObservation.id) {
+            const oldMarker = vespaStore.markerClusterGroup.getLayers().find(marker => marker.feature.properties.id === oldObservation.id);
+            if (oldMarker) {
+                // Hou de huidige kleur van de oude marker
+                vespaStore.updateMarkerColor(oldObservation.id, oldMarker.options.fillColor, oldMarker.options.fillColor, 1, '');
+            }
 
-          const newMarker = vespaStore.markerClusterGroup.getLayers().find(marker => marker.feature.properties.id === newObservation.id);
-          if (newMarker) {
-              vespaStore.updateMarkerColor(newObservation.id, vespaStore.getColorByStatus(newMarker.feature.properties.status), '#ea792a', 4, 'active-marker');
-          }
-      }
-  });
-
+            const newMarker = vespaStore.markerClusterGroup.getLayers().find(marker => marker.feature.properties.id === newObservation.id);
+            if (newMarker) {
+                vespaStore.updateMarkerColor(newObservation.id, newMarker.options.fillColor, '#ea792a', 4, 'active-marker');
+            }
+        }
+    });
     const clearAndUpdateMarkers = () => {
       if (vespaStore.markerClusterGroup) {
         vespaStore.markerClusterGroup.clearLayers();
@@ -177,6 +177,8 @@ export default {
     };
 
     const updateMarkerColor = (observationId, fillColor, edgeColor, weight) => {
+      console.log('updateMarkerColor with fillcolor', fillColor);
+      console.log('updateMarkerColor with edgeColor', edgeColor);
       vespaStore.updateMarkerColor(observationId, fillColor, edgeColor, weight);
     };
 

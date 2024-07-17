@@ -158,16 +158,6 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
     def partial_update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """
         Handle partial updates to an observation, especially for changes to 'reserved_by'.
-
-        Parameters
-        ----------
-            request (Request): The incoming HTTP request.
-            *args (Any): Additional positional arguments.
-            **kwargs (Any): Additional keyword arguments.
-
-        Returns
-        -------
-            Response: The HTTP response with the partial update result.
         """
         data = request.data.copy()
 

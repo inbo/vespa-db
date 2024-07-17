@@ -194,17 +194,12 @@ export const useVespaStore = defineStore('vespaStore', {
             }
         },
         createCircleMarker(feature, latlng) {
-            let fillColor = "rgba(var(--bs-dark-rgb))"; // Default for reported
-            if (feature.properties.status === "eradicated") {
-                fillColor = "rgba(var(--bs-success-rgb))"; // Green for eradicated
-            } else if (feature.properties.status === "reserved") {
-                fillColor = "rgba(var(--bs-warning-rgb))"; // Yellow for reserved
-            }
+            let fillColor = this.getColorByStatus(feature.properties.status);
             let markerOptions = {
                 radius: 10 + (feature.properties.observations_count || 0) * 0.5,
                 fillColor: fillColor,
-                color: "#3c3c3c",
-                weight: 1,
+                color: feature.properties.id === this.selectedObservation?.id ? '#ea792a' : '#3c3c3c',
+                weight: feature.properties.id === this.selectedObservation?.id ? 4 : 1,
                 opacity: 1,
                 fillOpacity: 0.8,
                 className: feature.properties.id === this.selectedObservation?.id ? 'active-marker' : ''
@@ -228,11 +223,24 @@ export const useVespaStore = defineStore('vespaStore', {
                 alert('You have reached the maximum number of reservations.');
             }
         },
-        updateMarkerColor(observationId, color) {
+        updateMarkerColor(observationId, fillColor, edgeColor = fillColor, weight = 4, className = '') {
+            console.log(`updateMarkerColor called for ${observationId} with fillColor ${fillColor}, edgeColor ${edgeColor}, weight ${weight}, className ${className}`);
             const markers = this.markerClusterGroup.getLayers();
             markers.forEach((marker) => {
                 if (marker.feature.properties.id === observationId) {
-                    marker.setStyle({ fillColor: color });
+                    console.log(`Marker updated for ${observationId}`);
+                    console.log("Current style before update:", marker.options);
+                    marker.setStyle({
+                        fillColor: fillColor,
+                        color: edgeColor, // Use color for stroke
+                        weight: weight
+                    });
+                    if (className) {
+                        marker._path.classList.add(className);
+                    } else {
+                        marker._path.classList.remove('active-marker');
+                    }
+                    console.log("New style after update:", marker.options);
                 }
             });
         },
@@ -277,6 +285,7 @@ export const useVespaStore = defineStore('vespaStore', {
                 });
                 if (response.status === 200) {
                     this.selectedObservation = response.data;
+                    this.updateMarkerColor(observationId, '#000000');
                     return response.data;
                 } else {
                     throw new Error('Failed to mark observation as not eradicated');
@@ -454,6 +463,16 @@ export const useVespaStore = defineStore('vespaStore', {
             if (this.lastAppliedFilters !== currentFilters) {
                 this.lastAppliedFilters = currentFilters;
             }
-        }
+        },
+        getColorByStatus(status) {
+            if (status === 'eradicated') {
+                return '#198754';
+            } else if (status === 'reserved') {
+                return '#ffc107';
+            } else if (status === 'unsuccessful' || status === 'untreated' || status === 'unknown') {
+                return '#212529';
+            }
+            return '#212529';
+        },
     },
 });

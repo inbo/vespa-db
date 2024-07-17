@@ -11,7 +11,7 @@ from rest_framework import serializers
 from rest_framework.request import Request
 
 from vespadb.observations.helpers import parse_and_convert_to_cet, parse_and_convert_to_utc
-from vespadb.observations.models import Municipality, Observation, Province
+from vespadb.observations.models import Municipality, Observation, Province, EradicationResultEnum
 from vespadb.observations.utils import get_municipality_from_coordinates
 from vespadb.users.models import VespaUser
 
@@ -280,6 +280,20 @@ class ObservationSerializer(serializers.ModelSerializer):
     def update(self, instance: Observation, validated_data: dict[Any, Any]) -> Observation:
         """Update method to handle observation reservations."""
         user = self.context["request"].user
+
+        # Eradication result logic
+        eradication_result = validated_data.get('eradication_result')
+        if eradication_result == EradicationResultEnum.SUCCESSFUL:
+            validated_data['reserved_datetime'] = None
+            validated_data['reserved_by'] = None
+            validated_data['eradication_date'] = timezone.now()
+        elif eradication_result in [
+            EradicationResultEnum.UNSUCCESSFUL,
+            EradicationResultEnum.UNTREATED,
+            EradicationResultEnum.UNKNOWN,
+        ]:
+            validated_data['eradication_date'] = None
+
         if not user.is_staff:
             # Non-admins cannot update admin_notes and observer_received_email fields
             validated_data.pop("admin_notes", None)
@@ -294,7 +308,7 @@ class ObservationSerializer(serializers.ModelSerializer):
         if not user.is_staff and instance.reserved_by and instance.reserved_by != user:
             raise serializers.ValidationError("You cannot edit an observation reserved by another user.")
 
-        # Allow admins to update follwowing fields
+        # Allow admins to update following fields
         if user.is_staff:
             allowed_admin_fields = [
                 "location",

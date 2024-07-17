@@ -26,7 +26,7 @@
       </div>
       <div class="details-panel"
         :class="{ 'd-none': !isDetailsPaneOpen, 'd-block': isDetailsPaneOpen, 'col-12': true, 'col-md-6': true, 'col-lg-4': true }">
-        <ObservationDetailsComponent />
+        <ObservationDetailsComponent @updateMarkerColor="updateMarkerColor" />
       </div>
       <div v-if="formattedError" class="alert alert-danger position-absolute top-0 start-50 translate-middle-x mt-2">
         {{ formattedError }}
@@ -34,6 +34,7 @@
     </div>
   </div>
 </template>
+
 <script>
 import { useVespaStore } from '@/stores/vespaStore';
 import 'leaflet.markercluster';
@@ -124,13 +125,9 @@ export default {
         const geoJsonLayer = L.geoJSON(vespaStore.observations, {
           pointToLayer: (feature, latlng) => {
             const marker = vespaStore.createCircleMarker(feature, latlng);
-            if (vespaStore.selectedObservation && feature.properties.id === vespaStore.selectedObservation.id) {
-              marker.setStyle({
-                color: '#ea792a',
-                weight: 4
-              });
-            }
-            marker.on('click', () => openObservationDetails(feature.properties));
+            marker.on('click', () => {
+              openObservationDetails(feature.properties);
+            });
             return marker;
           },
         });
@@ -138,6 +135,17 @@ export default {
         vespaStore.markerClusterGroup.addLayer(geoJsonLayer);
         map.value.addLayer(vespaStore.markerClusterGroup);
         filtersUpdated.value = false;
+
+        // Update the selected marker style
+        if (selectedObservation.value) {
+          const selectedMarker = vespaStore.markerClusterGroup.getLayers().find(marker => marker.feature.properties.id === selectedObservation.value.id);
+          if (selectedMarker) {
+            selectedMarker.setStyle({
+              color: '#ea792a',
+              weight: 4
+            });
+          }
+        }
       } catch (error) {
         console.error('Error updating markers:', error);
       } finally {
@@ -146,12 +154,33 @@ export default {
       }
     }, 300);
 
+    watch(selectedObservation, (newObservation, oldObservation) => {
+      if (newObservation && oldObservation && newObservation.id !== oldObservation.id) {
+          const oldMarker = vespaStore.markerClusterGroup.getLayers().find(marker => marker.feature.properties.id === oldObservation.id);
+          if (oldMarker) {
+              console.log("Updating old marker for:", oldObservation.id);
+              console.log("Status of old marker: ", oldMarker.feature.properties.status);
+              vespaStore.updateMarkerColor(oldObservation.id, vespaStore.getColorByStatus(oldMarker.feature.properties.status), vespaStore.getColorByStatus(oldMarker.feature.properties.status), 1, '');
+          }
+
+          const newMarker = vespaStore.markerClusterGroup.getLayers().find(marker => marker.feature.properties.id === newObservation.id);
+          if (newMarker) {
+              console.log("Updating new marker for:", newObservation.id);
+              vespaStore.updateMarkerColor(newObservation.id, vespaStore.getColorByStatus(newMarker.feature.properties.status), '#ea792a', 4, 'active-marker');
+          }
+      }
+  });
+
     const clearAndUpdateMarkers = () => {
       if (vespaStore.markerClusterGroup) {
         vespaStore.markerClusterGroup.clearLayers();
       }
       vespaStore.observations = [];
       updateMarkers();
+    };
+
+    const updateMarkerColor = (observationId, fillColor, edgeColor, weight) => {
+      vespaStore.updateMarkerColor(observationId, fillColor, edgeColor, weight);
     };
 
     watch(
@@ -163,11 +192,10 @@ export default {
       { deep: true }
     );
 
-    // Watch route changes to close the details panel
     watch(
       () => router.currentRoute.value,
       (newRoute, oldRoute) => {
-        if (newRoute.path !== oldRoute.path && vespaStore.isDetailsPaneOpen) {
+        if (newRoute.path !== oldRoute.path && !newRoute.path.includes('/observation/')) {
           vespaStore.isDetailsPaneOpen = false;
         }
       }
@@ -227,6 +255,7 @@ export default {
           ],
         });
         vespaStore.isDetailsPaneOpen = true;
+        updateMarkers();
       } else {
         map.value = L.map('map', {
           center: [50.8503, 4.3517],
@@ -240,10 +269,27 @@ export default {
 
       vespaStore.map = map.value;
       if (vespaStore.lastAppliedFilters === null || vespaStore.lastAppliedFilters === 'null') {
-          vespaStore.setLastAppliedFilters();
+        vespaStore.setLastAppliedFilters();
       }
       updateMarkers();
       vespaStore.getObservations(1, 25).catch(error => console.error('Error fetching observations:', error));
+    });
+
+    watch(selectedObservation, (newObservation, oldObservation) => {
+      const markers = vespaStore.markerClusterGroup.getLayers();
+      markers.forEach(marker => {
+        if (marker.feature.properties.id === newObservation?.id) {
+          marker.setStyle({
+            color: '#ea792a',
+            weight: 4
+          });
+        } else if (marker.feature.properties.id === oldObservation?.id) {
+          marker.setStyle({
+            color: '#3c3c3c',
+            weight: 1
+          });
+        }
+      });
     });
 
     return {
@@ -260,7 +306,8 @@ export default {
       cancelEdit,
       formattedError,
       loadingObservations,
-      isMapLoading
+      isMapLoading,
+      updateMarkerColor
     };
   },
 };

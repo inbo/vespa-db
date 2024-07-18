@@ -275,21 +275,19 @@ export default {
     });
 
     watch(selectedObservation, (newObservation, oldObservation) => {
-      const markers = vespaStore.markerClusterGroup.getLayers();
-      markers.forEach(marker => {
-        if (marker.feature.properties.id === newObservation?.id) {
-          marker.setStyle({
-            color: '#ea792a',
-            weight: 4
-          });
-        } else if (marker.feature.properties.id === oldObservation?.id) {
-          marker.setStyle({
-            color: '#3c3c3c',
-            weight: 1
-          });
-        }
-      });
-    });
+      if (newObservation && oldObservation && newObservation.id !== oldObservation.id) {
+          const oldMarker = vespaStore.markerClusterGroup.getLayers().find(marker => marker.feature.properties.id === oldObservation.id);
+          if (oldMarker) {
+              vespaStore.updateMarkerColor(oldObservation.id, oldMarker.options.fillColor, oldMarker.options.fillColor, 1, '');
+          }
+
+          const newMarker = vespaStore.markerClusterGroup.getLayers().find(marker => marker.feature.properties.id === newObservation.id);
+          if (newMarker) {
+              vespaStore.updateMarkerColor(newObservation.id, newMarker.options.fillColor, '#ea792a', 4, 'active-marker');
+          }
+      }
+  });
+
 
     return {
       isDetailsPaneOpen,

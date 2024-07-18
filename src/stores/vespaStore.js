@@ -56,9 +56,6 @@ export const useVespaStore = defineStore('vespaStore', {
     actions: {
         async getObservations(page = 1, page_size = 25, sortBy = null, sortOrder = 'asc') {
             const currentFilters = JSON.stringify(this.filters);
-            if (this.table_observations.length > 0 && currentFilters === this.lastAppliedFilters) {
-                return Promise.resolve();
-            }
             this.loadingObservations = true;
             const orderQuery = sortBy ? `&ordering=${sortOrder === 'asc' ? '' : '-'}${sortBy}` : '';
             const filterQuery = this.createFilterQuery();
@@ -239,6 +236,10 @@ export const useVespaStore = defineStore('vespaStore', {
             const markers = this.markerClusterGroup.getLayers();
             markers.forEach((marker) => {
                 if (marker.feature.properties.id === observationId) {
+                    if (this.selectedObservation.eradication_result === 'successful') {
+                        fillColor = '#198754';
+                        edgeColor = '#198754';
+                    }
                     marker.setStyle({
                         fillColor: fillColor,
                         color: edgeColor,

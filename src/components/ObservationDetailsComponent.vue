@@ -615,7 +615,9 @@ export default {
                 if (patch_response) {
                     successMessage.value = 'Wijzigingen opgeslagen';
                     setTimeout(() => successMessage.value = '', 4000);
-                    emit('updateMarkerColor', selectedObservation.value.id, vespaStore.getColorByStatus(patch_response.eradication_result),'#ea792a', 4, 'active-marker');
+
+                    const colorByResult = vespaStore.getColorByStatus(patch_response.eradication_result);
+                    emit('updateMarkerColor', selectedObservation.value.id, colorByResult, colorByResult, 4, 'active-marker');
                 }
             } catch (error) {
                 console.error('Fout bij het bijwerken van de observatie:', error);

@@ -36,7 +36,7 @@ from rest_framework_gis.filters import DistanceToPointFilter
 from vespadb.observations.cache import invalidate_geojson_cache, invalidate_observation_cache
 from vespadb.observations.filters import ObservationFilter
 from vespadb.observations.helpers import parse_and_convert_to_utc
-from vespadb.observations.models import Municipality, Observation, Province, EradicationResultEnum
+from vespadb.observations.models import Municipality, Observation, Province
 from vespadb.observations.serializers import (
     MunicipalitySerializer,
     ObservationSerializer,
@@ -150,16 +150,14 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         instance = serializer.save(modified_by=user, modified_datetime=now())
         invalidate_observation_cache(instance.id)
         invalidate_geojson_cache()
-        
+
     @swagger_auto_schema(
         operation_description="Partially update an existing observation.",
         request_body=ObservationSerializer,
         responses={200: ObservationSerializer},
     )
     def partial_update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
-        """
-        Handle partial updates to an observation, especially for changes to 'reserved_by'.
-        """
+        """Handle partial updates to an observation, especially for changes to 'reserved_by'."""
         data = request.data.copy()
 
         # Convert datetime fields to UTC if present
@@ -377,7 +375,11 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                     "type": "Feature",
                     "properties": {
                         "id": obs.id,
-                        "status": "eradicated" if obs.eradication_result == "successful" else "reserved" if obs.reserved_by else "default",
+                        "status": "eradicated"
+                        if obs.eradication_result == "successful"
+                        else "reserved"
+                        if obs.reserved_by
+                        else "default",
                     },
                     "geometry": json.loads(obs.location.geojson) if obs.location else None,
                 }

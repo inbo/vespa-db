@@ -13,12 +13,8 @@
             </h3>
 
             <div class="d-flex justify-content-between mb-3" id="reservation">
-                <button
-                    v-if="canReserve && !selectedObservation.reserved_by"
-                    class="btn btn-sm btn-outline-primary"
-                    @click="reserveObservation"
-                    :disabled="!isAuthorizedToReserve"
-                >
+                <button v-if="canReserve && !selectedObservation.reserved_by" class="btn btn-sm btn-outline-primary"
+                    @click="reserveObservation" :disabled="!isAuthorizedToReserve || isObservationSuccessful">
                     Reserveren
                 </button>
                 <span v-if="selectedObservation.reserved_by" class="badge bg-warning">Gereserveerd door {{
@@ -32,6 +28,9 @@
             </div>
             <div v-if="successMessage" class="alert alert-success alert-dismissible fade show" role="alert">
                 {{ successMessage }}
+            </div>
+            <div v-if="errorMessage" class="alert alert-danger alert-dismissible fade show" role="alert">
+                {{ errorMessage }}
             </div>
 
             <div class="accordion accordion-flush mb-3" id="sections">
@@ -87,6 +86,7 @@
                                     <select v-if="selectedObservation.eradication_result !== undefined"
                                         v-model="editableObservation.eradication_result" class="form-select"
                                         :disabled="!canEdit">
+                                        <option :value="null">Geen</option>
                                         <option v-for="(label, value) in eradicationResultEnum" :key="value"
                                             :value="value">{{ label }}</option>
                                     </select>
@@ -98,7 +98,9 @@
                                     <select v-if="selectedObservation.eradication_method !== undefined"
                                         v-model="editableObservation.eradication_method" class="form-select"
                                         :disabled="!canEdit">
-                                        <option v-for="(label, value) in eradicationMethodEnum" :key="value" :value="value">{{ label }}</option>
+                                        <option :value="null">Geen</option>
+                                        <option v-for="(label, value) in eradicationMethodEnum" :key="value"
+                                            :value="value">{{ label }}</option>
                                     </select>
                                 </div>
                             </div>
@@ -108,6 +110,7 @@
                                     <select v-if="selectedObservation.eradication_product !== undefined"
                                         v-model="editableObservation.eradication_product" class="form-select"
                                         :disabled="!canEdit">
+                                        <option :value="null">Geen</option>
                                         <option v-for="(label, value) in eradicationProductEnum" :key="value"
                                             :value="value">{{ label }}</option>
                                     </select>
@@ -119,7 +122,9 @@
                                     <select v-if="selectedObservation.eradication_aftercare !== undefined"
                                         v-model="editableObservation.eradication_aftercare" class="form-select"
                                         :disabled="!canEdit">
-                                        <option v-for="(label, value) in eradicationAfterCareEnum" :key="value" :value="value">{{ label }}</option>
+                                        <option :value="null">Geen</option>
+                                        <option v-for="(label, value) in eradicationAfterCareEnum" :key="value"
+                                            :value="value">{{ label }}</option>
                                     </select>
                                 </div>
                             </div>
@@ -129,7 +134,9 @@
                                     <select v-if="selectedObservation.eradication_problems !== undefined"
                                         v-model="editableObservation.eradication_problems" class="form-select"
                                         :disabled="!canEdit">
-                                        <option v-for="(label, value) in eradicationProblemsEnum" :key="value" :value="value">{{ label }}</option>
+                                        <option :value="null">Geen</option>
+                                        <option v-for="(label, value) in eradicationProblemsEnum" :key="value"
+                                            :value="value">{{ label }}</option>
                                     </select>
                                 </div>
                             </div>
@@ -190,6 +197,7 @@
                                     <select v-if="selectedObservation.nest_type !== undefined"
                                         v-model="editableObservation.nest_type" class="form-select"
                                         :disabled="!canEdit">
+                                        <option :value="null">Geen</option>
                                         <option v-for="(label, value) in nestTypeEnum" :key="value" :value="value">{{
                                             label }}</option>
                                     </select>
@@ -201,6 +209,7 @@
                                     <select v-if="selectedObservation.nest_location !== undefined"
                                         v-model="editableObservation.nest_location" class="form-select"
                                         :disabled="!canEdit">
+                                        <option :value="null">Geen</option>
                                         <option v-for="(label, value) in nestLocationEnum" :key="value" :value="value">
                                             {{ label }}</option>
                                     </select>
@@ -212,6 +221,7 @@
                                     <select v-if="selectedObservation.nest_size !== undefined"
                                         v-model="editableObservation.nest_size" class="form-select"
                                         :disabled="!canEdit">
+                                        <option :value="null">Geen</option>
                                         <option v-for="(label, value) in nestSizeEnum" :key="value" :value="value">{{
                                             label }}</option>
                                     </select>
@@ -223,6 +233,7 @@
                                     <select v-if="selectedObservation.nest_height !== undefined"
                                         v-model="editableObservation.nest_height" class="form-select"
                                         :disabled="!canEdit">
+                                        <option :value="null">Geen</option>
                                         <option v-for="(label, value) in nestHeightEnum" :key="value" :value="value">{{
                                             label }}</option>
                                     </select>
@@ -369,12 +380,13 @@
         </div>
     </div>
 </template>
+
 <script>
 import { useVespaStore } from '@/stores/vespaStore';
 import { computed, ref, watch } from 'vue';
 
 export default {
-    emits: ['closeDetails'],
+    emits: ['closeDetails', 'updateMarkerColor'],
     setup(props, { emit }) {
         const vespaStore = useVespaStore();
         const selectedObservation = computed(() => vespaStore.selectedObservation);
@@ -383,16 +395,23 @@ export default {
         const canEdit = computed(() => isLoggedIn.value && vespaStore.canEditObservation(selectedObservation.value));
         const canEditAdminFields = computed(() => isLoggedIn.value && vespaStore.isAdmin);
         const successMessage = ref('');
+        const errorMessage = ref('');
 
         const isAuthorizedToReserve = computed(() => {
+            if (vespaStore.isAdmin) return true;
             const observationMunicipality = selectedObservation.value?.municipality_name;
             return vespaStore.userMunicipalities.includes(observationMunicipality);
         });
 
         const editableObservation = ref({});
+        const isObservationSuccessful = computed(() => {
+            return selectedObservation.value?.eradication_result === 'successful';
+        });
 
         const canReserve = computed(() => {
-            return isLoggedIn.value && (!selectedObservation.value?.reserved_by || selectedObservation.value.reserved_by === vespaStore.user.username);
+            return isLoggedIn.value && 
+                (!selectedObservation.value?.reserved_by || selectedObservation.value.reserved_by === vespaStore.user.username) &&
+                !isObservationSuccessful.value;
         });
 
         const isUserReserver = computed(() => {
@@ -446,12 +465,13 @@ export default {
             "telescoopsteel": "Telescoopsteel",
             "doos": "Doos",
             "vloeistofverstuiver": "Vloeistofverstuiver",
-            "poederverstuiver": "Poederverstuiver"
+            "poederverstuiver": "Poederverstuiver",
+            "stofzuiger": "Stofzuiger",
         };
 
         const eradicationAfterCareEnum = {
             "nest_volledig_verwijderd": "Nest volledig verwijderd",
-            "nest_gedeeltelijk_verwijderd": "Nest gedeeltelijk verwijderd",
+            "nest_gedeeltelijk verwijderd": "Nest gedeeltelijk verwijderd",
             "nest_laten_hangen": "Nest laten hangen"
         };
 
@@ -591,14 +611,15 @@ export default {
                     id: selectedObservation.value.id,
                     ...updatedObservation
                 });
-                
+
                 if (patch_response) {
                     successMessage.value = 'Wijzigingen opgeslagen';
                     setTimeout(() => successMessage.value = '', 4000);
+                    emit('updateMarkerColor', selectedObservation.value.id, vespaStore.getColorByStatus(patch_response.eradication_result),'#ea792a', 4, 'active-marker');
                 }
             } catch (error) {
                 console.error('Fout bij het bijwerken van de observatie:', error);
-                successMessage.value = ''; 
+                successMessage.value = '';
             }
         };
 
@@ -624,10 +645,13 @@ export default {
         });
 
         const reserveObservation = async () => {
-            if (!selectedObservation.value.reserved_by) {
+            if (vespaStore.user.reservation_count < 50) {
                 await vespaStore.reserveObservation(selectedObservation.value);
             } else {
-                alert('Deze observatie is al gereserveerd.');
+                errorMessage.value = 'U heeft het maximum aantal reserveringen bereikt.';
+                setTimeout(() => {
+                errorMessage.value = '';
+                }, 4000);
             }
         };
 
@@ -675,11 +699,12 @@ export default {
             eradicationProductEnum,
             canViewContactInfo,
             isAuthorizedToReserve,
-            selectedObservation,
             eradicationStatusText,
             eradicationStatusClass,
             successMessage,
-            clearSuccessMessage
+            clearSuccessMessage,
+            isObservationSuccessful,
+            errorMessage
         };
     }
 };

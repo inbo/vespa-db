@@ -142,9 +142,10 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         # Ensure user has permission to reserve in the specified municipality
         if "reserved_by" in self.request.data:
             observation = self.get_object()
-            user_municipality_ids = user.municipalities.values_list("id", flat=True)
-            if observation.municipality and observation.municipality.id not in user_municipality_ids:
-                raise PermissionDenied("You do not have permission to reserve nests in this municipality.")
+            if not user.is_staff:
+                user_municipality_ids = user.municipalities.values_list("id", flat=True)
+                if observation.municipality and observation.municipality.id not in user_municipality_ids:
+                    raise PermissionDenied("You do not have permission to reserve nests in this municipality.")
 
         instance = serializer.save(modified_by=user, modified_datetime=now())
         invalidate_observation_cache(instance.id)
@@ -156,19 +157,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         responses={200: ObservationSerializer},
     )
     def partial_update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
-        """
-        Handle partial updates to an observation, especially for changes to 'reserved_by'.
-
-        Parameters
-        ----------
-            request (Request): The incoming HTTP request.
-            *args (Any): Additional positional arguments.
-            **kwargs (Any): Additional keyword arguments.
-
-        Returns
-        -------
-            Response: The HTTP response with the partial update result.
-        """
+        """Handle partial updates to an observation, especially for changes to 'reserved_by'."""
         data = request.data.copy()
 
         # Convert datetime fields to UTC if present
@@ -386,9 +375,11 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                     "type": "Feature",
                     "properties": {
                         "id": obs.id,
-                        "status": (
-                            "eradicated" if obs.eradication_date else "reserved" if obs.reserved_datetime else "default"
-                        ),
+                        "status": "eradicated"
+                        if obs.eradication_result == "successful"
+                        else "reserved"
+                        if obs.reserved_by
+                        else "default",
                     },
                     "geometry": json.loads(obs.location.geojson) if obs.location else None,
                 }

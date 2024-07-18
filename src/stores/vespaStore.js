@@ -143,7 +143,7 @@ export const useVespaStore = defineStore('vespaStore', {
             }
 
             if (this.filters.max_observation_date) {
-                params['max_observation_datetime'] = this.formatDateWithoutTime(this.filters.max_observation_date);
+                params['max_observation_datetime'] = this.formatDateWithEndOfDayTime(this.filters.max_observation_date);
             }
 
             return Object.entries(params).map(([key, value]) => `${key}=${encodeURIComponent(value)}`).join('&');
@@ -158,6 +158,17 @@ export const useVespaStore = defineStore('vespaStore', {
             if (day.length < 2) day = '0' + day;
 
             return [year, month, day].join('-');
+        },
+        formatDateWithEndOfDayTime(date) {
+            const d = new Date(date);
+            let month = '' + (d.getMonth() + 1);
+            let day = '' + d.getDate();
+            const year = d.getFullYear();
+
+            if (month.length < 2) month = '0' + month;
+            if (day.length < 2) day = '0' + day;
+
+            return `${[year, month, day].join('-')} 23:59:59`;
         },
         async applyFilters(filters) {
             this.filters = { ...this.filters, ...filters };
@@ -194,17 +205,12 @@ export const useVespaStore = defineStore('vespaStore', {
             }
         },
         createCircleMarker(feature, latlng) {
-            let fillColor = "rgba(var(--bs-dark-rgb))"; // Default for reported
-            if (feature.properties.status === "eradicated") {
-                fillColor = "rgba(var(--bs-success-rgb))"; // Green for eradicated
-            } else if (feature.properties.status === "reserved") {
-                fillColor = "rgba(var(--bs-warning-rgb))"; // Yellow for reserved
-            }
+            let fillColor = this.getColorByStatus(feature.properties.status);
             let markerOptions = {
                 radius: 10 + (feature.properties.observations_count || 0) * 0.5,
                 fillColor: fillColor,
-                color: "#3c3c3c",
-                weight: 1,
+                color: feature.properties.id === this.selectedObservation?.id ? '#ea792a' : '#3c3c3c',
+                weight: feature.properties.id === this.selectedObservation?.id ? 4 : 1,
                 opacity: 1,
                 fillOpacity: 0.8,
                 className: feature.properties.id === this.selectedObservation?.id ? 'active-marker' : ''
@@ -218,8 +224,9 @@ export const useVespaStore = defineStore('vespaStore', {
                     reserved_by: this.user.id
                 });
                 if (response.status === 200) {
+                    console.log('Observation reserved:', response.data);
                     this.selectedObservation = { ...this.selectedObservation, ...response.data };
-                    this.updateMarkerColor(observation.id, '#FF7800');
+                    this.updateMarkerColor(observation.id, '#ffc107', '#ffc107', 4);
                     await this.authCheck();
                 } else {
                     throw new Error('Failed to reserve the observation');
@@ -228,11 +235,20 @@ export const useVespaStore = defineStore('vespaStore', {
                 alert('You have reached the maximum number of reservations.');
             }
         },
-        updateMarkerColor(observationId, color) {
+        updateMarkerColor(observationId, fillColor, edgeColor = fillColor, weight = 4, className = '') {
             const markers = this.markerClusterGroup.getLayers();
             markers.forEach((marker) => {
                 if (marker.feature.properties.id === observationId) {
-                    marker.setStyle({ fillColor: color });
+                    marker.setStyle({
+                        fillColor: fillColor,
+                        color: edgeColor,
+                        weight: weight
+                    });
+                    if (className) {
+                        marker._path.classList.add(className);
+                    } else {
+                        marker._path.classList.remove('active-marker');
+                    }
                 }
             });
         },
@@ -245,45 +261,12 @@ export const useVespaStore = defineStore('vespaStore', {
                 const response = await ApiService.patch(`/observations/${observation.id}/`, updatedObservation);
                 if (response.status === 200) {
                     this.selectedObservation = { ...this.selectedObservation, ...response.data };
-                    this.updateMarkerColor(observation.id, '#FF7800');
+                    this.updateMarkerColor(observation.id, '#212529', '#212529', 1);
                 } else {
                     throw new Error('Failed to cancel the reservation');
                 }
             } catch (error) {
                 console.error('Error canceling the reservation:', error);
-            }
-        },
-        async markObservationAsEradicated(observationId) {
-            try {
-                const response = await ApiService.patch(`/observations/${observationId}/`, {
-                    eradication_date: new Date().toISOString()
-                });
-                if (response.status === 200) {
-                    this.selectedObservation = response.data;
-                    this.updateMarkerColor(observationId, '#00FF00');
-                    return response.data;
-                } else {
-                    throw new Error('Failed to mark observation as eradicated');
-                }
-            } catch (error) {
-                console.error('Error marking observation as eradicated:', error);
-                throw error;
-            }
-        },
-        async markObservationAsNotEradicated(observationId) {
-            try {
-                const response = await ApiService.patch(`/observations/${observationId}/`, {
-                    eradication_date: null
-                });
-                if (response.status === 200) {
-                    this.selectedObservation = response.data;
-                    return response.data;
-                } else {
-                    throw new Error('Failed to mark observation as not eradicated');
-                }
-            } catch (error) {
-                console.error('Error marking observation as not eradicated:', error);
-                throw error;
             }
         },
         async fetchObservationDetails(observationId) {
@@ -379,8 +362,7 @@ export const useVespaStore = defineStore('vespaStore', {
             }
         },
         async authCheck() {
-            this.loadingAuth = true; // Start loading
-            this.loading = true;
+            this.loadingAuth = true;
             try {
                 const response = await ApiService.get("/auth-check");
                 const data = response.data;
@@ -398,9 +380,9 @@ export const useVespaStore = defineStore('vespaStore', {
             } catch (error) {
                 this.error = error;
                 this.isLoggedIn = false;
+                this.isAdmin = false;
             } finally {
                 this.loadingAuth = false;
-                this.loading = false;
             }
         },
         async logout() {
@@ -454,6 +436,17 @@ export const useVespaStore = defineStore('vespaStore', {
             if (this.lastAppliedFilters !== currentFilters) {
                 this.lastAppliedFilters = currentFilters;
             }
-        }
+        },
+        getColorByStatus(status) {
+            console.log('status:', status);
+            if (status === 'eradicated') {
+                return '#198754';
+            } else if (status === 'reserved') {
+                return '#ffc107';
+            } else if (status === 'default') {
+                return '#212529';
+            }
+            return '#212529';
+        },
     },
 });

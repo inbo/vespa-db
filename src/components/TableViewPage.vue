@@ -89,6 +89,8 @@ export default {
     const sortBy = ref(null);
     const sortOrder = ref('asc');
     const isDetailsPaneOpen = computed(() => vespaStore.isDetailsPaneOpen);
+    const page = ref(1);
+    const pageSize = ref(25);
 
     const formatDate = (isoString, defaultValue = "") => {
       if (!isoString) {
@@ -118,20 +120,16 @@ export default {
         sortBy.value = field;
         sortOrder.value = 'asc';
       }
-      vespaStore.getObservations(1, 25, sortBy.value, sortOrder.value);
+      vespaStore.getObservations(page.value, pageSize.value, sortBy.value, sortOrder.value);
     };
 
     const fetchPage = (direction) => {
-      let url;
       if (direction === 'next' && nextPage.value) {
-        url = nextPage.value;
+        page.value++;
       } else if (direction === 'prev' && previousPage.value) {
-        url = previousPage.value;
+        page.value--;
       }
-      if (url) {
-        const pageParams = new URLSearchParams(url.split('?')[1]);
-        vespaStore.getObservations(pageParams.get('page'), pageParams.get('page_size'), sortBy.value, sortOrder.value);
-      }
+      vespaStore.getObservations(page.value, pageSize.value, sortBy.value, sortOrder.value);
     };
 
     const openObservationDetails = async (observation) => {
@@ -166,7 +164,7 @@ export default {
       const lastAppliedFilters = vespaStore.lastAppliedFilters;
 
       if (currentFilters !== lastAppliedFilters) {
-        vespaStore.getObservations(1, 25, sortBy.value, sortOrder.value).then(() => {
+        vespaStore.getObservations(page.value, pageSize.value, sortBy.value, sortOrder.value).then(() => {
           vespaStore.getObservationsGeoJson();
         });
       }
@@ -182,7 +180,7 @@ export default {
 
       // Avoid calling getObservations if data is already loaded with the same filters
       if (vespaStore.table_observations.length === 0 || JSON.stringify(vespaStore.filters) !== JSON.stringify(vespaStore.lastAppliedFilters)) {
-        vespaStore.getObservations(1, 25, sortBy.value, sortOrder.value);
+        vespaStore.getObservations(page.value, pageSize.value, sortBy.value, sortOrder.value);
       }
     });
 

@@ -14,7 +14,6 @@ logger = logging.getLogger(__name__)
 class UserType(Enum):
     """User Type Enum."""
 
-    ADMIN = "admin"
     REGULAR = "regular"
     SYNC = "sync"
     IMPORT = "import"

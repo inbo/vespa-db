@@ -143,7 +143,7 @@ export const useVespaStore = defineStore('vespaStore', {
             }
 
             if (this.filters.max_observation_date) {
-                params['max_observation_datetime'] = this.formatDateWithoutTime(this.filters.max_observation_date);
+                params['max_observation_datetime'] = this.formatDateWithEndOfDayTime(this.filters.max_observation_date);
             }
 
             return Object.entries(params).map(([key, value]) => `${key}=${encodeURIComponent(value)}`).join('&');
@@ -158,6 +158,17 @@ export const useVespaStore = defineStore('vespaStore', {
             if (day.length < 2) day = '0' + day;
 
             return [year, month, day].join('-');
+        },
+        formatDateWithEndOfDayTime(date) {
+            const d = new Date(date);
+            let month = '' + (d.getMonth() + 1);
+            let day = '' + d.getDate();
+            const year = d.getFullYear();
+
+            if (month.length < 2) month = '0' + month;
+            if (day.length < 2) day = '0' + day;
+
+            return `${[year, month, day].join('-')} 23:59:59`;
         },
         async applyFilters(filters) {
             this.filters = { ...this.filters, ...filters };
@@ -351,8 +362,7 @@ export const useVespaStore = defineStore('vespaStore', {
             }
         },
         async authCheck() {
-            this.loadingAuth = true; // Start loading
-            this.loading = true;
+            this.loadingAuth = true;
             try {
                 const response = await ApiService.get("/auth-check");
                 const data = response.data;
@@ -370,9 +380,9 @@ export const useVespaStore = defineStore('vespaStore', {
             } catch (error) {
                 this.error = error;
                 this.isLoggedIn = false;
+                this.isAdmin = false;
             } finally {
                 this.loadingAuth = false;
-                this.loading = false;
             }
         },
         async logout() {

@@ -80,6 +80,7 @@ class EradicationMethodEnum(models.TextChoices):
     LOCKABLE_JAR_BOX = "doos", _("doos")
     LIQUID_SPRAYER = "vloeistofverstuiver", _("Vloeistofverstuiver")
     POWDER_SPRAYER = "poederverstuiver", _("Poederverstuiver")
+    VACUUM_CLEANER = "stofzuiger", _("Stofzuiger")
 
 
 class EradicationAfterCareEnum(models.TextChoices):

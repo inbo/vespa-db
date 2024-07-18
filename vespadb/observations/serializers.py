@@ -261,6 +261,15 @@ class ObservationSerializer(serializers.ModelSerializer):
     def validate_reserved_by(self, value: VespaUser) -> VespaUser:
         """Validate that the user does not exceed the maximum number of allowed reservations and has permission to reserve in the specified municipality."""
         if value:
+            request = self.context.get("request")
+            
+            # Skip validation for admin users
+            logger.info(f"Request user: {request.user}")
+            logger.info(f"Request user is staff: {request.user.is_staff}")
+            if request and request.user.is_staff:
+                logger.info("return value")
+                return value
+            
             current_reservations_count = Observation.objects.filter(
                 reserved_by=value, eradication_date__isnull=True
             ).count()
@@ -269,12 +278,11 @@ class ObservationSerializer(serializers.ModelSerializer):
                 raise ValidationError(
                     f"This user has already reached the maximum number of reservations ({settings.MAX_RESERVATIONS})."
                 )
-            request = self.context.get("request")
-            if request and not request.user.is_staff:
-                observation_municipality = self.instance.municipality if self.instance else None
-                user_municipality_ids = request.user.municipalities.values_list("id", flat=True)
-                if observation_municipality and observation_municipality.id not in user_municipality_ids:
-                    raise ValidationError("You do not have permission to reserve nests in this municipality.")
+            
+            observation_municipality = self.instance.municipality if self.instance else None
+            user_municipality_ids = request.user.municipalities.values_list("id", flat=True)
+            if observation_municipality and observation_municipality.id not in user_municipality_ids:
+                raise ValidationError("You do not have permission to reserve nests in this municipality.")
         return value
 
     def update(self, instance: Observation, validated_data: dict[Any, Any]) -> Observation:

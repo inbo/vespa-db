@@ -142,14 +142,15 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         # Ensure user has permission to reserve in the specified municipality
         if "reserved_by" in self.request.data:
             observation = self.get_object()
-            user_municipality_ids = user.municipalities.values_list("id", flat=True)
-            if observation.municipality and observation.municipality.id not in user_municipality_ids:
-                raise PermissionDenied("You do not have permission to reserve nests in this municipality.")
+            if not user.is_staff:
+                user_municipality_ids = user.municipalities.values_list("id", flat=True)
+                if observation.municipality and observation.municipality.id not in user_municipality_ids:
+                    raise PermissionDenied("You do not have permission to reserve nests in this municipality.")
 
         instance = serializer.save(modified_by=user, modified_datetime=now())
         invalidate_observation_cache(instance.id)
         invalidate_geojson_cache()
-
+        
     @swagger_auto_schema(
         operation_description="Partially update an existing observation.",
         request_body=ObservationSerializer,

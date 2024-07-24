@@ -182,15 +182,14 @@ class Municipality(models.Model):
     )
 
     class Meta:
-        """Meta class for the Municipality model."""
-
+        """Meta class for the Municipality model."""    
+        verbose_name_plural = "Municipalities"
         unique_together = ("name",)
         ordering = ["name"]
 
     def __str__(self) -> str:
         """Return the string representation of the model."""
         return str(self.name)
-
 
 class ANB(models.Model):
     """Model for the Agentschap voor Natuur en Bos (ANB) domain with detailed data."""

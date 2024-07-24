@@ -194,13 +194,10 @@
                             <div class="row mb-2">
                                 <label class="col-4 col-form-label">Type</label>
                                 <div class="col-8">
-                                    <select v-if="selectedObservation.nest_type !== undefined"
-                                        v-model="editableObservation.nest_type" class="form-select"
-                                        :disabled="!canEdit">
-                                        <option :value="null">Geen</option>
-                                        <option v-for="(label, value) in nestTypeEnum" :key="value" :value="value">{{
-                                            label }}</option>
-                                    </select>
+                                <select v-if="selectedObservation.nest_type !== undefined" v-model="editableObservation.nest_type" class="form-select" :disabled="!canEdit">
+                                    <option :value="null">Geen</option>
+                                    <option v-for="(label, value) in nestTypeEnum" :key="value" :value="value">{{ label }}</option>
+                                </select>
                                 </div>
                             </div>
                             <div class="row mb-2">
@@ -437,11 +434,11 @@ export default {
         };
 
         const nestTypeEnum = {
-            "actief_embryonaal_nest": "actief embryonaal nest",
-            "actief_primair_nest": "actief primair nest",
-            "actief_secundair_nest": "actief secundair nest",
-            "inactief_leeg_nest": "inactief/leeg nest",
-            "potentieel_nest": "potentieel nest"
+            "actief_embryonaal_nest": "Actief embryonaal nest",
+            "actief_primair_nest": "Actief primair nest",
+            "actief_secundair_nest": "Actief secundair nest",
+            "inactief_leeg_nest": "Inactief/leeg nest",
+            "potentieel_nest": "Potentieel nest"
         };
 
         const eradicationResultEnum = {

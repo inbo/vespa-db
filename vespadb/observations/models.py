@@ -44,11 +44,11 @@ class NestLocationEnum(models.TextChoices):
 class NestTypeEnum(models.TextChoices):
     """Enum for the type of the nest."""
 
-    ACTIVE_EMBRYONAL_NEST = "actief_embryonaal_nest", _("actief embryonaal nest")
-    ACTIVE_PRIMARY_NEST = "actief_primair_nest", _("actief primair nest")
-    ACTIVE_SECONDARY_NEST = "actief_secundair_nest", _("actief secundair nest")
-    INACTIVE_EMPTY_NEST = "inactief_leeg_nest", _("inactief/leeg nest")
-    POTENTIAL_NEST = "potentieel_nest", _("potentieel nest")
+    ACTIVE_EMBRYONAL_NEST = "actief_embryonaal_nest", _("Actief embryonaal nest")
+    ACTIVE_PRIMARY_NEST = "actief_primair_nest", _("Actief primair nest")
+    ACTIVE_SECONDARY_NEST = "actief_secundair_nest", _("Actief secundair nest")
+    INACTIVE_EMPTY_NEST = "inactief_leeg_nest", _("Inactief/leeg nest")
+    POTENTIAL_NEST = "potentieel_nest", _("Potentieel nest")
 
 
 class EradicationResultEnum(models.TextChoices):

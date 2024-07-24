@@ -11,13 +11,13 @@
       </div>
       <div class="map-legend" v-if="map && !isMapLoading">
         <div>
-          <span class="legend-icon bg-reported"></span> Gerapporteerd
+          <span class="legend-icon bg-reported"></span> Gerapporteerd nest
         </div>
         <div>
-          <span class="legend-icon bg-reserved"></span> Gereserveerd
+          <span class="legend-icon bg-reserved"></span> Gereserveerd nest
         </div>
         <div>
-          <span class="legend-icon bg-eradicated"></span> Bestreden
+          <span class="legend-icon bg-eradicated"></span> Bestreden nest
         </div>
       </div>
       <div class="filter-panel"

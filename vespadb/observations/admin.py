@@ -16,7 +16,7 @@ from django.urls import path
 from django.utils.timezone import now
 from rest_framework.test import APIRequestFactory
 
-from vespadb.observations.filters import MunicipalityExcludeFilter, ProvinceFilter
+from vespadb.observations.filters import MunicipalityExcludeFilter, ProvinceFilter, ObserverReceivedEmailFilter
 from vespadb.observations.forms import SendEmailForm
 from vespadb.observations.models import Municipality, Observation, Province
 from vespadb.observations.views import ObservationsViewSet
@@ -67,6 +67,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         "reserved_by",
         "created_by",
         "modified_by",
+        ObserverReceivedEmailFilter
     )
     search_fields = ("id", "eradicator_name", "observer_name")
     filter_horizontal = ()

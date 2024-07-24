@@ -14,7 +14,7 @@
 
             <div class="d-flex justify-content-between mb-3" id="reservation">
                 <button v-if="canReserve && !selectedObservation.reserved_by" class="btn btn-sm btn-outline-primary"
-                    @click="reserveObservation" :disabled="!isAuthorizedToReserve || isObservationSuccessful">
+                    @click="reserveObservation">
                     Reserveren
                 </button>
                 <span v-if="selectedObservation.reserved_by" class="badge bg-warning">Gereserveerd door {{

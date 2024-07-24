@@ -128,7 +128,9 @@ class EradicationProductEnum(models.TextChoices):
     LIQUID_NITROGEN = "vloeibare_stikstof", _("Vloeibare stikstof")
     VESPA_FICAM_D = "vespa_ficam_d", _("Vespa Ficam D")
     TOPSCORE_PAL = "topscore_pal", _("Topscore PAL")
-    DIATOMACEOUS_EARTH = "diatomeeenaarde", _("Diatomeeenaarde")
+    DIATOMACEOUS_EARTH = "diatomeeenaarde", _("Diatomeeënaarde")
+    ETHER_ACETONE_ETHYL_ACETATE = "ether_aceton_ethyl_acetate", _("Ether/Aceton/Ethyl Acetate")
+    VESPA = "vespa", _("VESPA")
     OTHER = "andere", _("Andere")
 
 

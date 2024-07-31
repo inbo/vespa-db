@@ -468,6 +468,7 @@ export default {
             "vespa_ficam_d": "Vespa Ficam D",
             "topscore_pal": "Topscore_PAL",
             "diatomeeenaarde": "diatomeeenaarde",
+            "ether_aceton_ethyl_acetate": "ether/aceton/ethyl acetate",
             "andere": "andere"
         };
 

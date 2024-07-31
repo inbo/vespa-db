@@ -439,7 +439,6 @@ export const useVespaStore = defineStore('vespaStore', {
             }
         },
         getColorByStatus(status) {
-            console.log('status:', status);
             if (status === 'eradicated') {
                 return '#198754';
             } else if (status === 'reserved') {

@@ -73,11 +73,11 @@
 }
 
 .bg-reserved {
-    background-color: rgba(var(--bs-warning-rgb));
+    background-color: rgba(var(--v-theme-warning));
 }
 
 .bg-eradicated {
-    background-color: rgba(var(--bs-success-rgb));
+    background-color: rgba(var(--v-theme-success));
 }
 
 .active-marker {

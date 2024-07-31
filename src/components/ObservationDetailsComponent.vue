@@ -14,7 +14,7 @@
 
             <div class="d-flex justify-content-between mb-3" id="reservation">
                 <button v-if="canReserve && !selectedObservation.reserved_by" class="btn btn-sm btn-outline-primary"
-                    @click="reserveObservation" :disabled="!isAuthorizedToReserve || isObservationSuccessful">
+                    @click="reserveObservation">
                     Reserveren
                 </button>
                 <span v-if="selectedObservation.reserved_by" class="badge bg-warning">Gereserveerd door {{
@@ -49,8 +49,11 @@
                                 <label class="col-4 col-form-label">Datum</label>
                                 <div class="col-8">
                                     <input v-if="selectedObservation.eradication_date !== undefined"
-                                        v-model="editableObservation.eradication_date" type="date" class="form-control"
-                                        :readonly="!canEdit" :class="{ 'form-control-plaintext': !canEdit }" />
+                                        v-model="editableObservation.eradication_date"
+                                        type="date"
+                                        class="form-control"
+                                        :readonly="!canEdit"
+                                        :class="{ 'form-control-plaintext': !canEdit }" />
                                 </div>
                             </div>
                             <div class="row mb-2">
@@ -67,7 +70,7 @@
                                 <div class="col-8">
                                     <input v-if="selectedObservation.eradication_duration !== undefined"
                                         v-model="editableObservation.eradication_duration" type="text"
-                                        class="form-control" :readonly="!canEdit" placeholder="bv. 0.5 uur"
+                                        class="form-control" :readonly="!canEdit" placeholder="bv. 0.5 (uur)"
                                         :class="{ 'form-control-plaintext': !canEdit }" />
                                 </div>
                             </div>
@@ -194,13 +197,10 @@
                             <div class="row mb-2">
                                 <label class="col-4 col-form-label">Type</label>
                                 <div class="col-8">
-                                    <select v-if="selectedObservation.nest_type !== undefined"
-                                        v-model="editableObservation.nest_type" class="form-select"
-                                        :disabled="!canEdit">
-                                        <option :value="null">Geen</option>
-                                        <option v-for="(label, value) in nestTypeEnum" :key="value" :value="value">{{
-                                            label }}</option>
-                                    </select>
+                                <select v-if="selectedObservation.nest_type !== undefined" v-model="editableObservation.nest_type" class="form-select" :disabled="!canEdit">
+                                    <option :value="null">Geen</option>
+                                    <option v-for="(label, value) in nestTypeEnum" :key="value" :value="value">{{ label }}</option>
+                                </select>
                                 </div>
                             </div>
                             <div class="row mb-2">
@@ -237,6 +237,15 @@
                                         <option v-for="(label, value) in nestHeightEnum" :key="value" :value="value">{{
                                             label }}</option>
                                     </select>
+                                </div>
+                            </div>
+                            <div class="row mb-2">
+                                <label class="col-4 col-form-label required">Species</label>
+                                <div class="col-8">
+                                    <input v-model="editableObservation.species" type="number" class="form-control" :class="{ 'is-invalid': speciesInvalid && showSpeciesError }" @input="validateSpecies" />
+                                    <div v-if="speciesInvalid && showSpeciesError" class="invalid-feedback">
+                                        Dit veld is verplicht.
+                                    </div>
                                 </div>
                             </div>
                             <div class="row mb-2">
@@ -396,6 +405,8 @@ export default {
         const canEditAdminFields = computed(() => isLoggedIn.value && vespaStore.isAdmin);
         const successMessage = ref('');
         const errorMessage = ref('');
+        const speciesInvalid = ref(false);
+        const showSpeciesError = ref(false);
 
         const isAuthorizedToReserve = computed(() => {
             if (vespaStore.isAdmin) return true;
@@ -437,11 +448,11 @@ export default {
         };
 
         const nestTypeEnum = {
-            "actief_embryonaal_nest": "actief embryonaal nest",
-            "actief_primair_nest": "actief primair nest",
-            "actief_secundair_nest": "actief secundair nest",
-            "inactief_leeg_nest": "inactief/leeg nest",
-            "potentieel_nest": "potentieel nest"
+            "actief_embryonaal_nest": "Actief embryonaal nest",
+            "actief_primair_nest": "Actief primair nest",
+            "actief_secundair_nest": "Actief secundair nest",
+            "inactief_leeg_nest": "Inactief/leeg nest",
+            "potentieel_nest": "Potentieel nest"
         };
 
         const eradicationResultEnum = {
@@ -457,6 +468,7 @@ export default {
             "vespa_ficam_d": "Vespa Ficam D",
             "topscore_pal": "Topscore_PAL",
             "diatomeeenaarde": "diatomeeenaarde",
+            "ether_aceton_ethyl_acetate": "ether/aceton/ethyl acetate",
             "andere": "andere"
         };
 
@@ -504,6 +516,7 @@ export default {
             "wn_cluster_id",
             "public_domain",
             "eradication_aftercare",
+            "species"
         ];
 
         const eradicationStatusText = computed(() => {
@@ -543,6 +556,15 @@ export default {
             if (!isoString) return '';
             const date = new Date(isoString);
             return date.toISOString().slice(0, 16);
+        };
+
+        const formatToDate = (isoString) => {
+            if (!isoString) return '';
+            const date = new Date(isoString);
+            const year = date.getFullYear();
+            const month = ('0' + (date.getMonth() + 1)).slice(-2);
+            const day = ('0' + date.getDate()).slice(-2);
+            return `${year}-${month}-${day}`;
         };
 
         const getEnumLabel = (enumObject, value) => {
@@ -599,11 +621,22 @@ export default {
         };
 
         const confirmUpdate = async () => {
+            showSpeciesError.value = true;
+            validateSpecies();
+            if (speciesInvalid.value) {
+                errorMessage.value = 'Soorten is verplicht.';
+                return;
+            }
+
             const updatedObservation = {};
 
             editableFields.forEach(field => {
                 updatedObservation[field] = editableObservation.value[field];
             });
+
+            if (editableObservation.value.eradication_result) {
+                updatedObservation.eradication_result = 'successful';
+            }
 
             let patch_response;
             try {
@@ -614,6 +647,8 @@ export default {
 
                 if (patch_response) {
                     successMessage.value = 'Wijzigingen opgeslagen';
+                    speciesInvalid.value = false; // Added this line
+                    showSpeciesError.value = false; // Added this line
                     setTimeout(() => successMessage.value = '', 4000);
 
                     const colorByResult = vespaStore.getColorByStatus(patch_response.eradication_result);
@@ -627,11 +662,16 @@ export default {
 
         const cancelEdit = () => {
             isEditing.value = false;
+            showSpeciesError.value = false;
             if (selectedObservation.value) {
                 editableObservation.value = { ...selectedObservation.value };
                 editableObservation.value.observation_datetime = formatToDatetimeLocal(selectedObservation.value.observation_datetime);
                 editableObservation.value.eradication_date = formatToDatetimeLocal(selectedObservation.value.eradication_date);
             }
+        };
+
+        const validateSpecies = () => {
+            speciesInvalid.value = !editableObservation.value.species;
         };
 
         const canViewContactInfo = computed(() => {
@@ -652,7 +692,7 @@ export default {
             } else {
                 errorMessage.value = 'U heeft het maximum aantal reserveringen bereikt.';
                 setTimeout(() => {
-                errorMessage.value = '';
+                    errorMessage.value = '';
                 }, 4000);
             }
         };
@@ -660,6 +700,7 @@ export default {
         const cancelReservation = async () => {
             await vespaStore.cancelReservation(selectedObservation.value);
         };
+
         const clearSuccessMessage = () => {
             successMessage.value = '';
         };
@@ -668,7 +709,7 @@ export default {
             if (newVal) {
                 editableObservation.value = { ...newVal };
                 editableObservation.value.observation_datetime = formatToDatetimeLocal(selectedObservation.value.observation_datetime);
-                editableObservation.value.eradication_date = formatToDatetimeLocal(selectedObservation.value.eradication_date);
+                editableObservation.value.eradication_date = formatToDate(selectedObservation.value.eradication_date);
             }
         }, { immediate: true });
 
@@ -706,7 +747,10 @@ export default {
             successMessage,
             clearSuccessMessage,
             isObservationSuccessful,
-            errorMessage
+            errorMessage,
+            speciesInvalid,
+            validateSpecies,
+            showSpeciesError
         };
     }
 };

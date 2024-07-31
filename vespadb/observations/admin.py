@@ -16,7 +16,7 @@ from django.urls import path
 from django.utils.timezone import now
 from rest_framework.test import APIRequestFactory
 
-from vespadb.observations.filters import MunicipalityExcludeFilter, ProvinceFilter
+from vespadb.observations.filters import MunicipalityExcludeFilter, ObserverReceivedEmailFilter, ProvinceFilter
 from vespadb.observations.forms import SendEmailForm
 from vespadb.observations.models import Municipality, Observation, Province
 from vespadb.observations.views import ObservationsViewSet
@@ -30,8 +30,23 @@ class FileImportForm(forms.Form):
     file = forms.FileField()
 
 
+class ObservationAdminForm(forms.ModelForm):
+    """Custom form for the Observation model."""
+
+    class Meta:
+        """Meta class for the ObservationAdminForm."""
+
+        model = Observation
+        fields = "__all__"
+        widgets = {
+            "eradication_date": forms.DateInput(attrs={"type": "date"}),
+        }
+
+
 class ObservationAdmin(gis_admin.GISModelAdmin):
     """Admin class for Observation model."""
+
+    form = ObservationAdminForm
 
     list_display = (
         "id",
@@ -67,6 +82,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         "reserved_by",
         "created_by",
         "modified_by",
+        ObserverReceivedEmailFilter,
     )
     search_fields = ("id", "eradicator_name", "observer_name")
     filter_horizontal = ()

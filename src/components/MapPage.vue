@@ -11,13 +11,13 @@
       </div>
       <div class="map-legend" v-if="map && !isMapLoading">
         <div>
-          <span class="legend-icon bg-reported"></span> Gerapporteerd
+          <span class="legend-icon bg-reported"></span> Gerapporteerd nest
         </div>
         <div>
-          <span class="legend-icon bg-reserved"></span> Gereserveerd
+          <span class="legend-icon bg-reserved"></span> Gereserveerd nest
         </div>
         <div>
-          <span class="legend-icon bg-eradicated"></span> Bestreden
+          <span class="legend-icon bg-eradicated"></span> Bestreden nest
         </div>
       </div>
       <div class="filter-panel"
@@ -309,18 +309,3 @@ export default {
   },
 };
 </script>
-<style>
-.loading-screen {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(255, 255, 255, 0.8);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-size: 1.5rem;
-  z-index: 1000;
-}
-</style>

@@ -111,7 +111,6 @@ def update_observations(observations_to_update: list[Observation], wn_ids_to_upd
                 if current_value != new_value:
                     setattr(observation, field, new_value)
                     update_needed = True
-
         if update_needed:
             observations_to_bulk_update.append(observation)
 

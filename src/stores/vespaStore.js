@@ -289,8 +289,12 @@ export const useVespaStore = defineStore('vespaStore', {
             return date.toISOString();
         },
         async updateObservation(observation) {
-            observation.observation_datetime = this.formatToISO8601(observation.observation_datetime);
-            observation.eradication_date = this.formatToISO8601(observation.eradication_date);
+            if (observation.observation_datetime) {
+                observation.observation_datetime = this.formatToISO8601(observation.observation_datetime);
+            }
+            if (observation.eradication_date) {
+                observation.eradication_date = this.formatToISO8601(observation.eradication_date);
+            }
 
             try {
                 const response = await ApiService.patch(`/observations/${observation.id}/`, observation);
@@ -439,7 +443,6 @@ export const useVespaStore = defineStore('vespaStore', {
             }
         },
         getColorByStatus(status) {
-            console.log('status:', status);
             if (status === 'eradicated') {
                 return '#198754';
             } else if (status === 'reserved') {

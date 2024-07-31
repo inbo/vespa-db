@@ -73,16 +73,30 @@
 }
 
 .bg-reserved {
-    background-color: rgba(var(--bs-warning-rgb));
+    background-color: rgba(var(--v-theme-warning));
 }
 
 .bg-eradicated {
-    background-color: rgba(var(--bs-success-rgb));
+    background-color: rgba(var(--v-theme-success));
 }
 
 .active-marker {
     stroke: #ea792a;
     stroke-width: 4;
+}
+
+.required::after {
+    content: '*';
+    color: red;
+    margin-left: 4px;
+}
+
+.is-invalid {
+    border-color: #dc3545;
+}
+
+.invalid-feedback {
+    display: block;
 }
 
 .navbar {
@@ -96,4 +110,32 @@
             height: 30px;
         }
     }
+}
+
+.required::after {
+    content: '*';
+    color: red;
+    margin-left: 4px;
+}
+
+.is-invalid {
+    border-color: #dc3545;
+}
+
+.invalid-feedback {
+    display: block;
+}
+
+.loading-screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.5rem;
+    z-index: 1000;
 }

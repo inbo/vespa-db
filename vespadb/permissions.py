@@ -30,6 +30,8 @@ SYSTEM_USER_OBSERVATION_FIELDS_TO_UPDATE = [
     "observation_datetime",
     "wn_cluster_id",
     "wn_modified_datetime",
+    "wn_validation_status",
+    "wn_created_datetime",
     "visible",
     "images",
     "municipality",

@@ -46,15 +46,18 @@
                         data-bs-parent="#sections">
                         <div class="accordion-body">
                             <div class="row mb-2">
-                                <label class="col-4 col-form-label required">Datum</label>
+                                <label class="col-4 col-form-label">Datum</label>
                                 <div class="col-8">
                                     <input v-if="selectedObservation.eradication_date !== undefined"
-                                        v-model="editableObservation.eradication_date" type="date" class="form-control"
-                                        :readonly="!canEdit" :class="{ 'form-control-plaintext': !canEdit }" />
+                                        v-model="editableObservation.eradication_date"
+                                        type="date"
+                                        class="form-control"
+                                        :readonly="!canEdit"
+                                        :class="{ 'form-control-plaintext': !canEdit }" />
                                 </div>
                             </div>
                             <div class="row mb-2">
-                                <label class="col-4 col-form-label required">Uitvoerder</label>
+                                <label class="col-4 col-form-label">Uitvoerder</label>
                                 <div class="col-8">
                                     <input v-if="selectedObservation.eradicator_name !== undefined"
                                         v-model="editableObservation.eradicator_name" type="text"
@@ -63,7 +66,7 @@
                                 </div>
                             </div>
                             <div class="row mb-2">
-                                <label class="col-4 col-form-label required">Duur</label>
+                                <label class="col-4 col-form-label">Duur</label>
                                 <div class="col-8">
                                     <input v-if="selectedObservation.eradication_duration !== undefined"
                                         v-model="editableObservation.eradication_duration" type="text"
@@ -72,7 +75,7 @@
                                 </div>
                             </div>
                             <div class="row mb-2">
-                                <label class="col-4 col-form-label required">Personeel</label>
+                                <label class="col-4 col-form-label">Personeel</label>
                                 <div class="col-8">
                                     <input v-if="selectedObservation.eradication_persons !== undefined"
                                         v-model="editableObservation.eradication_persons" type="number"
@@ -81,7 +84,7 @@
                                 </div>
                             </div>
                             <div class="row mb-2">
-                                <label class="col-4 col-form-label required">Resultaat</label>
+                                <label class="col-4 col-form-label">Resultaat</label>
                                 <div class="col-8">
                                     <select v-if="selectedObservation.eradication_result !== undefined"
                                         v-model="editableObservation.eradication_result" class="form-select"
@@ -554,6 +557,15 @@ export default {
             return date.toISOString().slice(0, 16);
         };
 
+        const formatToDate = (isoString) => {
+            if (!isoString) return '';
+            const date = new Date(isoString);
+            const year = date.getFullYear();
+            const month = ('0' + (date.getMonth() + 1)).slice(-2);
+            const day = ('0' + date.getDate()).slice(-2);
+            return `${year}-${month}-${day}`;
+        };
+
         const getEnumLabel = (enumObject, value) => {
             return enumObject[value] || value;
         };
@@ -696,7 +708,7 @@ export default {
             if (newVal) {
                 editableObservation.value = { ...newVal };
                 editableObservation.value.observation_datetime = formatToDatetimeLocal(selectedObservation.value.observation_datetime);
-                editableObservation.value.eradication_date = formatToDatetimeLocal(selectedObservation.value.eradication_date);
+                editableObservation.value.eradication_date = formatToDate(selectedObservation.value.eradication_date);
             }
         }, { immediate: true });
 
@@ -742,27 +754,3 @@ export default {
     }
 };
 </script>
-
-<style scoped>
-.required::after {
-  content: '*';
-  color: red;
-  margin-left: 4px;
-}
-
-.is-invalid {
-  border-color: #dc3545;
-}
-
-.invalid-feedback {
-  display: block;
-}
-</style>
-
-<style scoped>
-.required::after {
-  content: '*';
-  color: red;
-  margin-left: 4px;
-}
-</style>

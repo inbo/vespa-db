@@ -29,9 +29,17 @@ class FileImportForm(forms.Form):
 
     file = forms.FileField()
 
-
+class ObservationAdminForm(forms.ModelForm):
+    class Meta:
+        model = Observation
+        fields = '__all__'
+        widgets = {
+            'eradication_date': forms.DateInput(attrs={'type': 'date'}),
+        }
+        
 class ObservationAdmin(gis_admin.GISModelAdmin):
     """Admin class for Observation model."""
+    form = ObservationAdminForm
 
     list_display = (
         "id",

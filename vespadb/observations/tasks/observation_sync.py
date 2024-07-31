@@ -111,7 +111,6 @@ def update_observations(observations_to_update: list[Observation], wn_ids_to_upd
                 if current_value != new_value:
                     setattr(observation, field, new_value)
                     update_needed = True
-
         if update_needed:
             observations_to_bulk_update.append(observation)
 
@@ -120,8 +119,7 @@ def update_observations(observations_to_update: list[Observation], wn_ids_to_upd
         Observation.objects.bulk_update(observations_to_bulk_update, FIELDS_TO_UPDATE, batch_size=BATCH_SIZE)
     else:
         logger.info("No updates required for the observations.")
-
-
+        
 def fetch_nest_observations(token: str, cluster_id: int) -> list[int]:
     """Fetch all observation IDs associated with a specific nest cluster."""
     headers = {"Authorization": f"Bearer {token}"}

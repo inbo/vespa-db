@@ -20,6 +20,7 @@ from vespadb.observations.models import (
     NestSizeEnum,
     NestTypeEnum,
     ValidationStatusEnum,
+    Observation
 )
 from vespadb.observations.utils import check_if_point_in_anb_area, get_municipality_from_coordinates
 
@@ -97,7 +98,6 @@ def map_validation_status_to_enum(validation_status: str) -> ValidationStatusEnu
         "U": ValidationStatusEnum.NOT_EVALUABLE_YET,
     }
     return cast(ValidationStatusEnum, validation_status_dict.get(validation_status))
-
 
 def parse_datetime_with_timezone(
     date_str: str, time_str: str = "00:00:00", timezone_str: str = "Europe/Paris"
@@ -195,7 +195,21 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
         and external_data["notes"]
         and any(keyword in external_data["notes"].upper() for keyword in settings.ERADICATION_KEYWORD_LIST)
     ):
-        mapped_data["eradication_date"] = observation_datetime_utc
-        mapped_data["eradicator_name"] = "Gemeld als bestreden"
-
+        if not check_existing_eradication_date(external_data["id"]):
+            mapped_data["eradication_date"] = observation_datetime_utc
+            mapped_data["eradicator_name"] = "Gemeld als bestreden"
+            
     return mapped_data
+
+def check_existing_eradication_date(wn_id: str) -> bool:
+    """
+    Check if the eradication_date is already set for the given wn_id.
+    
+    :param wn_id: The ID of the observation from the external API.
+    :return: True if the eradication_date is already set, False otherwise.
+    """
+    try:
+        observation = Observation.objects.get(wn_id=wn_id)
+        return observation.eradication_date is not None
+    except Observation.DoesNotExist:
+        return False

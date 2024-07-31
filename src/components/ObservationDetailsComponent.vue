@@ -70,7 +70,7 @@
                                 <div class="col-8">
                                     <input v-if="selectedObservation.eradication_duration !== undefined"
                                         v-model="editableObservation.eradication_duration" type="text"
-                                        class="form-control" :readonly="!canEdit" placeholder="bv. 0.5 uur"
+                                        class="form-control" :readonly="!canEdit" placeholder="bv. 0.5 (uur)"
                                         :class="{ 'form-control-plaintext': !canEdit }" />
                                 </div>
                             </div>

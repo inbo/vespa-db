@@ -85,6 +85,20 @@
     stroke-width: 4;
 }
 
+.required::after {
+    content: '*';
+    color: red;
+    margin-left: 4px;
+}
+
+.is-invalid {
+    border-color: #dc3545;
+}
+
+.invalid-feedback {
+    display: block;
+}
+
 .navbar {
     background-color: white !important;
     border-bottom: 1px solid #e9ecef;

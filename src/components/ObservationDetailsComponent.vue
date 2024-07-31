@@ -46,7 +46,7 @@
                         data-bs-parent="#sections">
                         <div class="accordion-body">
                             <div class="row mb-2">
-                                <label class="col-4 col-form-label">Datum</label>
+                                <label class="col-4 col-form-label required">Datum</label>
                                 <div class="col-8">
                                     <input v-if="selectedObservation.eradication_date !== undefined"
                                         v-model="editableObservation.eradication_date" type="date" class="form-control"
@@ -54,7 +54,7 @@
                                 </div>
                             </div>
                             <div class="row mb-2">
-                                <label class="col-4 col-form-label">Uitvoerder</label>
+                                <label class="col-4 col-form-label required">Uitvoerder</label>
                                 <div class="col-8">
                                     <input v-if="selectedObservation.eradicator_name !== undefined"
                                         v-model="editableObservation.eradicator_name" type="text"
@@ -63,7 +63,7 @@
                                 </div>
                             </div>
                             <div class="row mb-2">
-                                <label class="col-4 col-form-label">Duur</label>
+                                <label class="col-4 col-form-label required">Duur</label>
                                 <div class="col-8">
                                     <input v-if="selectedObservation.eradication_duration !== undefined"
                                         v-model="editableObservation.eradication_duration" type="text"
@@ -72,7 +72,7 @@
                                 </div>
                             </div>
                             <div class="row mb-2">
-                                <label class="col-4 col-form-label">Personeel</label>
+                                <label class="col-4 col-form-label required">Personeel</label>
                                 <div class="col-8">
                                     <input v-if="selectedObservation.eradication_persons !== undefined"
                                         v-model="editableObservation.eradication_persons" type="number"
@@ -81,7 +81,7 @@
                                 </div>
                             </div>
                             <div class="row mb-2">
-                                <label class="col-4 col-form-label">Resultaat</label>
+                                <label class="col-4 col-form-label required">Resultaat</label>
                                 <div class="col-8">
                                     <select v-if="selectedObservation.eradication_result !== undefined"
                                         v-model="editableObservation.eradication_result" class="form-select"
@@ -234,6 +234,15 @@
                                         <option v-for="(label, value) in nestHeightEnum" :key="value" :value="value">{{
                                             label }}</option>
                                     </select>
+                                </div>
+                            </div>
+                            <div class="row mb-2">
+                                <label class="col-4 col-form-label required">Species</label>
+                                <div class="col-8">
+                                    <input v-model="editableObservation.species" type="number" class="form-control" :class="{ 'is-invalid': speciesInvalid && showSpeciesError }" @input="validateSpecies" />
+                                    <div v-if="speciesInvalid && showSpeciesError" class="invalid-feedback">
+                                        Dit veld is verplicht.
+                                    </div>
                                 </div>
                             </div>
                             <div class="row mb-2">
@@ -393,6 +402,8 @@ export default {
         const canEditAdminFields = computed(() => isLoggedIn.value && vespaStore.isAdmin);
         const successMessage = ref('');
         const errorMessage = ref('');
+        const speciesInvalid = ref(false);
+        const showSpeciesError = ref(false);
 
         const isAuthorizedToReserve = computed(() => {
             if (vespaStore.isAdmin) return true;
@@ -501,6 +512,7 @@ export default {
             "wn_cluster_id",
             "public_domain",
             "eradication_aftercare",
+            "species"
         ];
 
         const eradicationStatusText = computed(() => {
@@ -596,11 +608,22 @@ export default {
         };
 
         const confirmUpdate = async () => {
+            showSpeciesError.value = true;
+            validateSpecies();
+            if (speciesInvalid.value) {
+                errorMessage.value = 'Soorten is verplicht.';
+                return;
+            }
+
             const updatedObservation = {};
 
             editableFields.forEach(field => {
                 updatedObservation[field] = editableObservation.value[field];
             });
+
+            if (editableObservation.value.eradication_result) {
+                updatedObservation.eradication_result = 'successful';
+            }
 
             let patch_response;
             try {
@@ -611,6 +634,8 @@ export default {
 
                 if (patch_response) {
                     successMessage.value = 'Wijzigingen opgeslagen';
+                    speciesInvalid.value = false; // Added this line
+                    showSpeciesError.value = false; // Added this line
                     setTimeout(() => successMessage.value = '', 4000);
 
                     const colorByResult = vespaStore.getColorByStatus(patch_response.eradication_result);
@@ -624,11 +649,16 @@ export default {
 
         const cancelEdit = () => {
             isEditing.value = false;
+            showSpeciesError.value = false;
             if (selectedObservation.value) {
                 editableObservation.value = { ...selectedObservation.value };
                 editableObservation.value.observation_datetime = formatToDatetimeLocal(selectedObservation.value.observation_datetime);
                 editableObservation.value.eradication_date = formatToDatetimeLocal(selectedObservation.value.eradication_date);
             }
+        };
+
+        const validateSpecies = () => {
+            speciesInvalid.value = !editableObservation.value.species;
         };
 
         const canViewContactInfo = computed(() => {
@@ -649,7 +679,7 @@ export default {
             } else {
                 errorMessage.value = 'U heeft het maximum aantal reserveringen bereikt.';
                 setTimeout(() => {
-                errorMessage.value = '';
+                    errorMessage.value = '';
                 }, 4000);
             }
         };
@@ -657,6 +687,7 @@ export default {
         const cancelReservation = async () => {
             await vespaStore.cancelReservation(selectedObservation.value);
         };
+
         const clearSuccessMessage = () => {
             successMessage.value = '';
         };
@@ -703,8 +734,35 @@ export default {
             successMessage,
             clearSuccessMessage,
             isObservationSuccessful,
-            errorMessage
+            errorMessage,
+            speciesInvalid,
+            validateSpecies,
+            showSpeciesError
         };
     }
 };
 </script>
+
+<style scoped>
+.required::after {
+  content: '*';
+  color: red;
+  margin-left: 4px;
+}
+
+.is-invalid {
+  border-color: #dc3545;
+}
+
+.invalid-feedback {
+  display: block;
+}
+</style>
+
+<style scoped>
+.required::after {
+  content: '*';
+  color: red;
+  margin-left: 4px;
+}
+</style>

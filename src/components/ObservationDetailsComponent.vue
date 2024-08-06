@@ -465,10 +465,11 @@ export default {
         const eradicationProductEnum = {
             "permas_d": "Permas-D",
             "vloeibare_stikstof": "Vloeibare stikstof",
-            "vespa_ficam_d": "Vespa Ficam D",
+            "vespa_ficam_d": "Ficam D",
             "topscore_pal": "Topscore PAL",
-            "diatomeeenaarde": "Diatomeeenaarde",
+            "diatomeeenaarde": "Diatomeeënaarde",
             "ether_aceton_ethyl_acetate": "Ether/aceton/ethyl acetate",
+            "vespa": "Vespa",
             "andere": "Andere"
         };
 

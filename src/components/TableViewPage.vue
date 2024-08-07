@@ -25,12 +25,9 @@
                 </tr>
               </thead>
               <tbody>
-                <tr 
-                  v-for="observation in table_observations" 
-                  :key="observation.id" 
+                <tr v-for="observation in table_observations" :key="observation.id"
                   @click="openObservationDetails(observation)"
-                  :class="{ 'table-row-selected': selectedObservationId === observation.id }"
-                >
+                  :class="{ 'table-row-selected': selectedObservationId === observation.id }">
                   <td>{{ observation.id }}</td>
                   <td>{{ observation.municipality_name }}</td>
                   <td>{{ formatDate(observation.created_datetime) }}</td>
@@ -82,7 +79,7 @@ export default {
     const nextPage = computed(() => vespaStore.nextPage);
     const previousPage = computed(() => vespaStore.previousPage);
     const table_observations = computed(() => vespaStore.table_observations);
-    const selectedObservationId = ref(null);
+    const selectedObservationId = computed(() => vespaStore.selectedObservation?.id || null);
     const tableHeaders = ref([
       { text: 'ID', value: 'id' },
       { text: 'Gemeente', value: 'municipality_name' },
@@ -139,12 +136,11 @@ export default {
 
     const openObservationDetails = async (observation) => {
       try {
-        selectedObservationId.value = observation.id;
         await vespaStore.fetchObservationDetails(observation.id);
         vespaStore.isDetailsPaneOpen = true;
-        router.push({ path: `/table/observation/${observation.id}` });
+        selectedObservationId.value = observation.id;
       } catch (error) {
-        console.error("Failed to fetch observation details:", error);
+        console.error('Failed to fetch observation details:', error);
       }
     };
 

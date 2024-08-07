@@ -127,6 +127,11 @@ export default {
             const marker = vespaStore.createCircleMarker(feature, latlng);
             marker.on('click', () => {
               openObservationDetails(feature.properties);
+              marker.setStyle({
+                fillColor: marker.options.fillColor,
+                color: '#ea792a',
+                weight: 4
+              });
             });
             return marker;
           },
@@ -141,6 +146,7 @@ export default {
           const selectedMarker = vespaStore.markerClusterGroup.getLayers().find(marker => marker.feature.properties.id === selectedObservation.value.id);
           if (selectedMarker) {
             selectedMarker.setStyle({
+              fillColor: fillColor,
               color: '#ea792a',
               weight: 4
             });
@@ -155,18 +161,17 @@ export default {
     }, 300);
 
     watch(selectedObservation, (newObservation, oldObservation) => {
-        if (newObservation && oldObservation && newObservation.id !== oldObservation.id) {
-            const oldMarker = vespaStore.markerClusterGroup.getLayers().find(marker => marker.feature.properties.id === oldObservation.id);
-            if (oldMarker) {
-                // Hou de huidige kleur van de oude marker
-                vespaStore.updateMarkerColor(oldObservation.id, oldMarker.options.fillColor, oldMarker.options.fillColor, 1, '');
-            }
-
-            const newMarker = vespaStore.markerClusterGroup.getLayers().find(marker => marker.feature.properties.id === newObservation.id);
-            if (newMarker) {
-                vespaStore.updateMarkerColor(newObservation.id, newMarker.options.fillColor, '#ea792a', 4, 'active-marker');
-            }
+      if (newObservation && oldObservation && newObservation.id !== oldObservation.id) {
+        const oldMarker = vespaStore.markerClusterGroup.getLayers().find(marker => marker.feature.properties.id === oldObservation.id);
+        if (oldMarker) {
+          vespaStore.updateMarkerColor(oldObservation.id, oldMarker.options.fillColor, oldMarker.options.fillColor, 1, '');
         }
+
+        const newMarker = vespaStore.markerClusterGroup.getLayers().find(marker => marker.feature.properties.id === newObservation.id);
+        if (newMarker) {
+          vespaStore.updateMarkerColor(newObservation.id, newMarker.options.fillColor, '#ea792a', 4, 'active-marker');
+        }
+      }
     });
     const clearAndUpdateMarkers = () => {
       if (vespaStore.markerClusterGroup) {
@@ -177,8 +182,6 @@ export default {
     };
 
     const updateMarkerColor = (observationId, fillColor, edgeColor, weight) => {
-      console.log('updateMarkerColor with fillcolor', fillColor);
-      console.log('updateMarkerColor with edgeColor', edgeColor);
       vespaStore.updateMarkerColor(observationId, fillColor, edgeColor, weight);
     };
 
@@ -273,21 +276,6 @@ export default {
       updateMarkers();
       vespaStore.getObservations(1, 25).catch(error => console.error('Error fetching observations:', error));
     });
-
-    watch(selectedObservation, (newObservation, oldObservation) => {
-      if (newObservation && oldObservation && newObservation.id !== oldObservation.id) {
-          const oldMarker = vespaStore.markerClusterGroup.getLayers().find(marker => marker.feature.properties.id === oldObservation.id);
-          if (oldMarker) {
-              vespaStore.updateMarkerColor(oldObservation.id, oldMarker.options.fillColor, oldMarker.options.fillColor, 1, '');
-          }
-
-          const newMarker = vespaStore.markerClusterGroup.getLayers().find(marker => marker.feature.properties.id === newObservation.id);
-          if (newMarker) {
-              vespaStore.updateMarkerColor(newObservation.id, newMarker.options.fillColor, '#ea792a', 4, 'active-marker');
-          }
-      }
-  });
-
 
     return {
       isDetailsPaneOpen,

@@ -86,9 +86,9 @@ export default {
       { name: 'inactief/leeg nest', value: 'inactief_leeg_nest' },
     ]);
     const nestStatus = ref([
-      { name: 'Bestreden', value: 'eradicated' },
-      { name: 'Gereserveerd', value: 'reserved' },
-      { name: 'Niet bestreden', value: 'open' }
+      { name: 'Bestreden nest', value: 'eradicated' },
+      { name: 'Gereserveerd nest', value: 'reserved' },
+      { name: 'Gerapporteerd nest', value: 'open' }
     ]);
     const anbAreaOptions = ref([
       { name: 'Niet in ANB gebied', value: false },

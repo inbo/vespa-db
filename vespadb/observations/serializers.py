@@ -291,6 +291,7 @@ class ObservationSerializer(serializers.ModelSerializer):
 
         # Eradication result logic
         eradication_result = validated_data.get("eradication_result")
+
         if eradication_result == EradicationResultEnum.SUCCESSFUL:
             validated_data["reserved_datetime"] = None
             validated_data["reserved_by"] = None

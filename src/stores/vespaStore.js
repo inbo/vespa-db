@@ -48,8 +48,14 @@ export const useVespaStore = defineStore('vespaStore', {
             if (state.isAdmin) {
                 return true;
             }
-            const municipalityName = state.municipalities.find(m => m.id === observation.municipality)?.name;
-            return state.isLoggedIn && state.userMunicipalities.includes(municipalityName);
+            const municipalityName = state.municipalities.find(
+                (m) => m.id === observation.municipality
+            )?.name;
+            return (
+                state.isLoggedIn &&
+                state.userMunicipalities.includes(municipalityName) &&
+                !observation.reserved_by
+            );
         },
         canEditAdminFields: (state) => state.isAdmin,
     },
@@ -221,9 +227,8 @@ export const useVespaStore = defineStore('vespaStore', {
                     reserved_by: this.user.id
                 });
                 if (response.status === 200) {
-                    console.log('Observation reserved:', response.data);
                     this.selectedObservation = { ...this.selectedObservation, ...response.data };
-                    this.updateMarkerColor(observation.id, '#ffc107', '#ffc107', 4);
+                    this.updateMarkerColor(observation.id, '#ffc107', '#ea792a', 4);
                     await this.authCheck();
                 } else {
                     throw new Error('Failed to reserve the observation');
@@ -236,10 +241,6 @@ export const useVespaStore = defineStore('vespaStore', {
             const markers = this.markerClusterGroup.getLayers();
             markers.forEach((marker) => {
                 if (marker.feature.properties.id === observationId) {
-                    if (this.selectedObservation.eradication_result === 'successful') {
-                        fillColor = '#198754';
-                        edgeColor = '#198754';
-                    }
                     marker.setStyle({
                         fillColor: fillColor,
                         color: edgeColor,
@@ -300,6 +301,9 @@ export const useVespaStore = defineStore('vespaStore', {
                 const response = await ApiService.patch(`/observations/${observation.id}/`, observation);
                 if (response.status === 200) {
                     this.selectedObservation = response.data;
+
+                    const colorByResult = this.getColorByStatus(response.data.eradication_result);
+                    this.updateMarkerColor(observation.id, colorByResult, '#ea792a', 4, 'active-marker');
                     return response.data;
                 } else {
                     throw new Error('Network response was not ok');
@@ -443,12 +447,12 @@ export const useVespaStore = defineStore('vespaStore', {
             }
         },
         getColorByStatus(status) {
-            if (status === 'eradicated') {
+            if (status === 'successful') {
+                return '#198754';
+            } else if (status === 'eradicated') {
                 return '#198754';
             } else if (status === 'reserved') {
-                return '#ffc107';
-            } else if (status === 'default') {
-                return '#212529';
+                return '#ea792a';
             }
             return '#212529';
         },

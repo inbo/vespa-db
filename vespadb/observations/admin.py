@@ -130,9 +130,18 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
                 file_name = file.name
 
                 if file_name.endswith(".json"):
-                    data = json.load(file)
-                    request.data = {"data": data}
-                    request.content_type = "application/json"
+                    try:
+                        data = json.load(file)
+                        if not isinstance(data, list):
+                            raise TypeError("Invalid JSON format. Expected a list of objects.")
+                        request.data = {"data": data}
+                        request.content_type = "application/json"
+                    except json.JSONDecodeError as e:
+                        self.message_user(request, f"JSON decode error: {e}", level="error")
+                        return redirect("admin:observations_observation_changelist")
+                    except ValueError as e:
+                        self.message_user(request, str(e), level="error")
+                        return redirect("admin:observations_observation_changelist")
                 elif file_name.endswith(".csv"):
                     request.data = {"file": file}
                     request.content_type = "multipart/form-data"

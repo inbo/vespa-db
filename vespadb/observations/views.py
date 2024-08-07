@@ -523,7 +523,12 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         """Validate and convert location data."""
         try:
             if isinstance(location, str):
-                geom = GEOSGeometry(location, srid=4326)
+                if location.startswith("SRID"):
+                    # Extract the actual point from the SRID string
+                    point_str = location.split(";")[1].strip()
+                    geom = GEOSGeometry(point_str, srid=4326)
+                else:
+                    geom = GEOSGeometry(location, srid=4326)
                 logger.info(f"Validated GEOSGeometry: {geom}")
                 return geom.wkt
             raise ValidationError("Invalid location data type")
@@ -536,18 +541,23 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         valid_observations = []
         errors = []
         for data_item in data:
-            cleaned_item = self.clean_data(data_item)
-            serializer = ObservationSerializer(data=cleaned_item)
-            if serializer.is_valid():
-                valid_observations.append(serializer.validated_data)
-            else:
-                errors.append(serializer.errors)
+            try:
+                cleaned_item = self.clean_data(data_item)
+                serializer = ObservationSerializer(data=cleaned_item)
+                if serializer.is_valid():
+                    valid_observations.append(serializer.validated_data)
+                else:
+                    errors.append(serializer.errors)
+            except Exception as e:
+                logger.exception(f"Error processing data item: {data_item} - {e}")
+                errors.append({"error": str(e)})
         return valid_observations, errors
 
     def clean_data(self, data_dict: dict[str, Any]) -> dict[str, Any]:
         """Clean the incoming data and remove empty or None values."""
         logger.info("Original data item: %s", data_dict)
         data_dict.pop("id", None)
+
         datetime_fields = [
             "created_datetime",
             "modified_datetime",
@@ -568,6 +578,12 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                     data_dict[field] = data_dict[field].isoformat()
                 else:
                     data_dict.pop(field, None)
+
+        # Convert empty strings to None for nullable fields
+        nullable_fields = ["reserved_by", "eradication_result", "nest_size", "eradicator_name"]
+        for field in nullable_fields:
+            if not data_dict.get(field):
+                data_dict[field] = None
 
         cleaned_data = {k: v for k, v in data_dict.items() if v not in [None, ""]}  # noqa: PLR6201
         logger.info("Cleaned data item: %s", cleaned_data)

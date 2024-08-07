@@ -49,11 +49,8 @@
                                 <label class="col-4 col-form-label">Datum</label>
                                 <div class="col-8">
                                     <input v-if="selectedObservation.eradication_date !== undefined"
-                                        v-model="editableObservation.eradication_date"
-                                        type="date"
-                                        class="form-control"
-                                        :readonly="!canEdit"
-                                        :class="{ 'form-control-plaintext': !canEdit }" />
+                                        v-model="editableObservation.eradication_date" type="date" class="form-control"
+                                        :readonly="!canEdit" :class="{ 'form-control-plaintext': !canEdit }" />
                                 </div>
                             </div>
                             <div class="row mb-2">
@@ -197,10 +194,13 @@
                             <div class="row mb-2">
                                 <label class="col-4 col-form-label">Type</label>
                                 <div class="col-8">
-                                <select v-if="selectedObservation.nest_type !== undefined" v-model="editableObservation.nest_type" class="form-select" :disabled="!canEdit">
-                                    <option :value="null">Geen</option>
-                                    <option v-for="(label, value) in nestTypeEnum" :key="value" :value="value">{{ label }}</option>
-                                </select>
+                                    <select v-if="selectedObservation.nest_type !== undefined"
+                                        v-model="editableObservation.nest_type" class="form-select"
+                                        :disabled="!canEdit">
+                                        <option :value="null">Geen</option>
+                                        <option v-for="(label, value) in nestTypeEnum" :key="value" :value="value">{{
+                                            label }}</option>
+                                    </select>
                                 </div>
                             </div>
                             <div class="row mb-2">
@@ -242,7 +242,9 @@
                             <div class="row mb-2">
                                 <label class="col-4 col-form-label required">Species</label>
                                 <div class="col-8">
-                                    <input v-model="editableObservation.species" type="number" class="form-control" :class="{ 'is-invalid': speciesInvalid && showSpeciesError }" @input="validateSpecies" />
+                                    <input v-model="editableObservation.species" type="number" class="form-control"
+                                        :class="{ 'is-invalid': speciesInvalid && showSpeciesError }"
+                                        @input="validateSpecies" />
                                     <div v-if="speciesInvalid && showSpeciesError" class="invalid-feedback">
                                         Dit veld is verplicht.
                                     </div>
@@ -420,7 +422,7 @@ export default {
         });
 
         const canReserve = computed(() => {
-            return isLoggedIn.value && 
+            return isLoggedIn.value &&
                 (!selectedObservation.value?.reserved_by || selectedObservation.value.reserved_by === vespaStore.user.username) &&
                 !isObservationSuccessful.value;
         });
@@ -630,37 +632,32 @@ export default {
             }
 
             const updatedObservation = {};
-
-            editableFields.forEach(field => {
+            editableFields.forEach((field) => {
                 updatedObservation[field] = editableObservation.value[field];
             });
 
-            if (editableObservation.value.eradication_result) {
-                updatedObservation.eradication_result = 'successful';
-            }
-
-            let patch_response;
             try {
-                patch_response = await vespaStore.updateObservation({
+                const patch_response = await vespaStore.updateObservation({
                     id: selectedObservation.value.id,
-                    ...updatedObservation
+                    ...updatedObservation,
                 });
 
                 if (patch_response) {
                     successMessage.value = 'Wijzigingen opgeslagen';
-                    speciesInvalid.value = false; // Added this line
-                    showSpeciesError.value = false; // Added this line
-                    setTimeout(() => successMessage.value = '', 4000);
+                    speciesInvalid.value = false;
+                    showSpeciesError.value = false;
+                    setTimeout(() => (successMessage.value = ''), 4000);
 
-                    const colorByResult = vespaStore.getColorByStatus(patch_response.eradication_result);
-                    emit('updateMarkerColor', selectedObservation.value.id, colorByResult, colorByResult, 4, 'active-marker');
+                    // Update marker color based on the eradication result
+                    const eradicationResult = patch_response.eradication_result;
+                    let colorByResult;
                 }
             } catch (error) {
                 console.error('Fout bij het bijwerken van de observatie:', error);
+                errorMessage.value = 'Fout bij het opslaan van de wijzigingen.';
                 successMessage.value = '';
             }
         };
-
         const cancelEdit = () => {
             isEditing.value = false;
             showSpeciesError.value = false;

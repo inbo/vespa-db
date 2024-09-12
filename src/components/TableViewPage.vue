@@ -33,7 +33,6 @@
                   <td>{{ formatDate(observation.created_datetime) }}</td>
                   <td>{{ formatDate(observation.observation_datetime) }}</td>
                   <td>{{ formatDate(observation.eradication_date, 'Onbestreden') }}</td>
-                  <td>{{ observation.species }}</td>
                 </tr>
               </tbody>
             </table>
@@ -86,7 +85,6 @@ export default {
       { text: 'Aangemaakt', value: 'created_datetime' },
       { text: 'Observatie tijdstip', value: 'observation_datetime' },
       { text: 'Bestreden tijdstip', value: 'eradication_date' },
-      { text: 'Soorten', value: 'species' }
     ]);
     const sortBy = ref(null);
     const sortOrder = ref('asc');

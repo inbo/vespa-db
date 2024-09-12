@@ -22,7 +22,7 @@ load_dotenv()
 logger = logging.getLogger("vespadb.observations.tasks")
 
 BATCH_SIZE = 500
-
+NEST_ACTIVITY_IDS = ["3240", "3036", "3241"]
 
 def get_oauth_token() -> str | None:
     """Authenticate with the waarnemingen API to obtain an OAuth2 token."""
@@ -57,6 +57,7 @@ def fetch_observations_page(token: str, modified_since: str, offset: int = 0) ->
             "limit": 100,
             "offset": offset,
             "validation_status": ["P", "J"],
+            "activity": NEST_ACTIVITY_IDS
         }
         response = requests.get(
             "https://waarnemingen.be/api/v1/inbo/vespa-watch/observations/",
@@ -80,14 +81,26 @@ def cache_wn_ids() -> set[str]:
 
 
 def create_observations(observations_to_create: list[Observation]) -> None:
-    """Bulk create observations."""
-    if observations_to_create:
-        Observation.objects.bulk_create(observations_to_create, batch_size=BATCH_SIZE, ignore_conflicts=True)
-        logger.info("Created %s new observations", len(observations_to_create))
+    """Attempt to bulk create observations, and fall back to individual creation on failure."""
+    if not observations_to_create:
+        return
 
+    try:
+        Observation.objects.bulk_create(observations_to_create, batch_size=BATCH_SIZE, ignore_conflicts=True)
+        logger.info("Successfully created %s new observations", len(observations_to_create))
+    except Exception as bulk_error:
+        logger.error("Bulk creation failed: %s", bulk_error)
+        successful_creations = 0
+        for observation in observations_to_create:
+            try:
+                observation.save()
+                successful_creations += 1
+            except Exception as e:
+                logger.error("Failed to create observation with wn_id %s individually: %s", observation.wn_id, e)
+        logger.info("Individually created %s observations after bulk failure", successful_creations)
 
 def update_observations(observations_to_update: list[Observation], wn_ids_to_update: list[str]) -> None:
-    """Update existing observations."""
+    """Update existing observations with bulk update, and fallback to individual updates on failure."""
     observations_update_dict = {obs.wn_id: obs for obs in observations_to_update}
     existing_observations_to_update = Observation.objects.filter(wn_id__in=wn_ids_to_update)
     observations_to_bulk_update = []
@@ -111,14 +124,32 @@ def update_observations(observations_to_update: list[Observation], wn_ids_to_upd
                 if current_value != new_value:
                     setattr(observation, field, new_value)
                     update_needed = True
+
         if update_needed:
             observations_to_bulk_update.append(observation)
-
+    # Attempt to perform a bulk update
     if observations_to_bulk_update:
-        logger.info("Updating %s observations", len(observations_to_bulk_update))
-        Observation.objects.bulk_update(observations_to_bulk_update, FIELDS_TO_UPDATE, batch_size=BATCH_SIZE)
+        try:
+            logger.info("Attempting to bulk update %s observations", len(observations_to_bulk_update))
+            Observation.objects.bulk_update(observations_to_bulk_update, FIELDS_TO_UPDATE, batch_size=BATCH_SIZE)
+            logger.info("Successfully bulk updated %s observations", len(observations_to_bulk_update))
+        except Exception as bulk_error:
+            logger.error("Bulk update failed: %s", bulk_error)
+            logger.info("Falling back to individual updates")
+            successful_updates = 0
+
+            # Fall back to individual updates in case of failure
+            for observation in observations_to_bulk_update:
+                try:
+                    observation.save(update_fields=FIELDS_TO_UPDATE)
+                    successful_updates += 1
+                except Exception as e:
+                    logger.error("Failed to update observation with wn_id %s individually: %s", observation.wn_id, e)
+
+            logger.info("Individually updated %s observations after bulk failure", successful_updates)
     else:
         logger.info("No updates required for the observations.")
+
 
 
 def fetch_nest_observations(token: str, cluster_id: int) -> list[int]:
@@ -266,9 +297,14 @@ def fetch_and_update_observations(self: Task, since_week: int | None = None, dat
                         )
                     )
 
-            with transaction.atomic():  # Ensure that all operations are atomic
-                create_observations(observations_to_create)
-                update_observations(observations_to_update, wn_ids_to_update)
+            # Ensure that the following operations are atomic
+            try:
+                with transaction.atomic():
+                    create_observations(observations_to_create)
+                    update_observations(observations_to_update, wn_ids_to_update)
+            except Exception as e:
+                logger.error("Transaction failed, rolling back: %s", e)
+                # Transaction will be automatically rolled back
 
             if not data.get("next"):
                 break

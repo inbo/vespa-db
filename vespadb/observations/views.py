@@ -5,7 +5,9 @@ import datetime
 import io
 import json
 import logging
-from typing import Any
+from typing import Any, Optional
+from rest_framework.exceptions import NotFound
+from geopy.location import Location
 
 from django.contrib.gis.db.models.functions import Transform
 from django.contrib.gis.geos import GEOSGeometry
@@ -32,6 +34,10 @@ from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_gis.filters import DistanceToPointFilter
+from django.core.paginator import Paginator
+from geopy.geocoders import Nominatim
+from django.views.decorators.http import require_GET
+from geopy.exc import GeocoderTimedOut, GeocoderServiceError
 
 from vespadb.observations.cache import invalidate_geojson_cache, invalidate_observation_cache
 from vespadb.observations.filters import ObservationFilter
@@ -136,13 +142,13 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             The serializer containing the validated data.
         """
         user = self.request.user
-        if not user.is_staff and ("admin_notes" in self.request.data or "observer_received_email" in self.request.data):
+        if not user.is_superuser and ("admin_notes" in self.request.data or "observer_received_email" in self.request.data):
             raise PermissionDenied("You do not have permission to modify admin fields.")
 
         # Ensure user has permission to reserve in the specified municipality
         if "reserved_by" in self.request.data:
             observation = self.get_object()
-            if not user.is_staff:
+            if not user.is_superuser:
                 user_municipality_ids = user.municipalities.values_list("id", flat=True)
                 if observation.municipality and observation.municipality.id not in user_municipality_ids:
                     raise PermissionDenied("You do not have permission to reserve nests in this municipality.")
@@ -466,7 +472,11 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         -------
         - Response: A response containing the serialized observation data.
         """
-        return super().retrieve(request, *args, **kwargs)
+        instance = self.get_object()
+        if not instance.visible:
+            raise NotFound("This observation is not visible.")
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
 
     @swagger_auto_schema(
         operation_description="Update an existing observation.",
@@ -625,8 +635,14 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         queryset = self.filter_queryset(self.get_queryset())
         serializer_class = self.get_serializer_class()
         serializer_context = self.get_serializer_context()
-        serializer = serializer_class(queryset, many=True, context=serializer_context)
-        serialized_data = serializer.data
+        
+        paginator = Paginator(queryset, 1000)
+        serialized_data = []
+        for page_number in paginator.page_range:
+            page = paginator.page(page_number)
+            serializer = serializer_class(page, many=True, context=serializer_context)
+            serialized_data.extend(serializer.data)
+
         if export_format == "json":
             return JsonResponse(serialized_data, safe=False, json_dumps_params={"indent": 2})
         if export_format == "csv":
@@ -640,7 +656,54 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             return response
         return Response({"error": "Unsupported format specified."}, status=status.HTTP_400_BAD_REQUEST)
 
+@require_GET
+def search_address(request: Request) -> JsonResponse:
+    """
+    Search for an address using the Nominatim geocoding service.
 
+    This view function takes a GET request with a 'query' parameter containing
+    the address to search for. It returns the latitude, longitude, and full
+    address of the location if found.
+
+    Parameters:
+    ----------
+    request : django.http.HttpRequest
+        The HTTP request object containing the 'query' parameter in GET data.
+
+    Returns:
+    -------
+    django.http.JsonResponse
+        A JSON response containing either:
+        - On success: latitude, longitude, and full address of the location
+        - On failure: an error message with an appropriate HTTP status code
+
+    Raises:
+    ------
+    No exceptions are raised directly, but various HTTP status codes are returned:
+    - 400: If no query is provided
+    - 404: If the address is not found
+    - 500: For any other exceptions during geocoding
+    """
+    query: str = request.GET.get('query', '')
+    if not query:
+        return JsonResponse({'error': 'No query provided'}, status=400)
+
+    geolocator: Nominatim = Nominatim(user_agent="vespa_db")
+    try:
+        location: Optional[Location] = geolocator.geocode(query)
+        if location:
+            return JsonResponse({
+                'lat': location.latitude,
+                'lon': location.longitude,
+                'address': location.address
+            })
+        else:
+            return JsonResponse({'error': 'Address not found'}, status=404)
+    except (GeocoderTimedOut, GeocoderServiceError) as e:
+        return JsonResponse({'error': f'Geocoding service error: {str(e)}'}, status=503)
+    except Exception as e:
+        return JsonResponse({'error': f'Unexpected error: {str(e)}'}, status=500)
+    
 class MunicipalityViewSet(ReadOnlyModelViewSet):
     """ViewSet for the Municipality model."""
 

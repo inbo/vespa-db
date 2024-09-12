@@ -42,6 +42,7 @@ export const useVespaStore = defineStore('vespaStore', {
         user: {},
         userMunicipalities: [],
         isAdmin: false,
+        loginError: null,
     }),
     getters: {
         canEditObservation: (state) => (observation) => {
@@ -294,9 +295,12 @@ export const useVespaStore = defineStore('vespaStore', {
                 observation.observation_datetime = this.formatToISO8601(observation.observation_datetime);
             }
             if (observation.eradication_date) {
-                observation.eradication_date = this.formatToISO8601(observation.eradication_date);
+                observation.eradication_date = this.formatDateWithoutTime(observation.eradication_date);
+                console.log("transformed date:")
+                console.log(observation.eradication_date);
             }
-
+            console.log("the observation erad date is");
+            console.log(observation.eradication_date);
             try {
                 const response = await ApiService.patch(`/observations/${observation.id}/`, observation);
                 if (response.status === 200) {
@@ -343,6 +347,18 @@ export const useVespaStore = defineStore('vespaStore', {
                 console.error('Error fetching filtered municipalities:', error);
             }
         },
+        async searchAddress(query) {
+            try {
+                const response = await ApiService.get(`/search-address/?query=${encodeURIComponent(query)}`);
+                if (response.status === 200 && response.data) {
+                    return response.data;
+                }
+                return null;
+            } catch (error) {
+                console.error('Error searching address:', error);
+                throw error;
+            }
+        },
         async login({ username, password }) {
             this.loading = true;
             this.error = null;
@@ -356,14 +372,14 @@ export const useVespaStore = defineStore('vespaStore', {
                 if (error.response && error.response.data) {
                     const errorMsg = error.response.data.error;
                     if (Array.isArray(errorMsg)) {
-                        this.error = errorMsg.join(', ');
+                        this.loginError = errorMsg.join(', ');
                     } else if (errorMsg.startsWith("Invalid username or password")) {
-                        this.error = "Ongeldige gebruikersnaam of wachtwoord.";
+                        this.loginError = "Ongeldige gebruikersnaam of wachtwoord.";
                     } else {
-                        this.error = errorMsg;
+                        this.loginError = errorMsg;
                     }
                 } else {
-                    this.error = "Er is een onverwachte fout opgetreden.";
+                    this.loginError = "Er is een onverwachte fout opgetreden.";
                 }
                 this.isLoggedIn = false;
                 this.user = {};
@@ -378,7 +394,7 @@ export const useVespaStore = defineStore('vespaStore', {
                 if (data.isAuthenticated && data.user) {
                     this.user = data.user;
                     this.userMunicipalities = data.user.municipalities;
-                    this.isAdmin = data.user.is_staff;
+                    this.isAdmin = data.user.is_superuser;
                     this.error = "";
                     this.isLoggedIn = true;
                 } else {

@@ -80,10 +80,10 @@ export default {
     const anbAreasActief = ref(null);
     const visibleActief = ref(true);
     const nestType = ref([
-      { name: 'actief embryonaal nest', value: 'actief_embryonaal_nest' },
-      { name: 'actief primair nest', value: 'actief_primair_nest' },
-      { name: 'actief secundair nest', value: 'actief_secundair_nest' },
-      { name: 'inactief/leeg nest', value: 'inactief_leeg_nest' },
+      { name: 'Actief embryonaal nest', value: 'actief_embryonaal_nest' },
+      { name: 'Actief primair nest', value: 'actief_primair_nest' },
+      { name: 'Actief secundair nest', value: 'actief_secundair_nest' },
+      { name: 'Inactief/leeg nest', value: 'inactief_leeg_nest' },
     ]);
     const nestStatus = ref([
       { name: 'Bestreden nest', value: 'eradicated' },

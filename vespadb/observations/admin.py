@@ -3,7 +3,9 @@
 import json
 import logging
 from typing import Any
+from django.contrib.admin import SimpleListFilter
 
+from django.db.models import Q
 from django import forms
 from django.contrib import admin, messages
 from django.contrib.gis import admin as gis_admin
@@ -15,7 +17,10 @@ from django.template.response import TemplateResponse
 from django.urls import path
 from django.utils.timezone import now
 from rest_framework.test import APIRequestFactory
+from django.utils.translation import gettext_lazy as _
+from typing import Optional, Tuple
 
+from vespadb.observations.utils import check_if_point_in_anb_area, get_municipality_from_coordinates
 from vespadb.observations.filters import MunicipalityExcludeFilter, ObserverReceivedEmailFilter, ProvinceFilter
 from vespadb.observations.forms import SendEmailForm
 from vespadb.observations.models import Municipality, Observation, Province
@@ -29,7 +34,50 @@ class FileImportForm(forms.Form):
 
     file = forms.FileField()
 
+class NestStatusFilter(SimpleListFilter):
+    """Custom filter for selecting multiple nest statuses in the admin panel."""
+    
+    title: str = _("Nest Status")
+    parameter_name: str = "nest_status"
 
+    def lookups(self, request: HttpRequest, model_admin: Any) -> list[Tuple[str, str]]:
+        """
+        Return a list of tuples for the different nest statuses.
+        
+        :param request: The HTTP request object.
+        :param model_admin: The current model admin instance.
+        :return: A list of tuples containing the status values and labels.
+        """
+        return [
+            ("eradicated", "Eradicated"),
+            ("reserved", "Reserved"),
+            ("open", "Open"),
+        ]
+
+    def queryset(self, request: HttpRequest, queryset: QuerySet) -> Optional[QuerySet]:
+        """
+        Filter the queryset based on the selected nest statuses.
+        
+        :param request: The HTTP request object.
+        :param queryset: The current queryset.
+        :return: The filtered queryset based on the selected statuses, or the original queryset if no value is provided.
+        """
+        value = self.value()
+        if not value:
+            return queryset
+        
+        statuses = value.split(',')
+        query = Q()
+
+        if "eradicated" in statuses:
+            query |= Q(eradication_date__isnull=False)
+        if "reserved" in statuses:
+            query |= Q(reserved_datetime__isnull=False)
+        if "open" in statuses:
+            query |= Q(reserved_datetime__isnull=True, eradication_date__isnull=True)
+
+        return queryset.filter(query)
+    
 class ObservationAdminForm(forms.ModelForm):
     """Custom form for the Observation model."""
 
@@ -64,17 +112,20 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         "eradicator_name",
         "reserved_by",
         "modified_by",
+        "public_domain",
+        "reserved_datetime",
     )
     list_filter = (
         "observation_datetime",
         "eradication_date",
         "eradicator_name",
-        "wn_validation_status",
+        NestStatusFilter,
         "nest_height",
         "nest_size",
         "nest_location",
         "nest_type",
         "eradication_result",
+        "public_domain",
         ProvinceFilter,
         MunicipalityExcludeFilter,
         "municipality",
@@ -90,6 +141,54 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
     raw_id_fields = ("municipality", "province")
     actions = ["send_email_to_observers", "mark_as_eradicated", "mark_as_not_visible"]
 
+    readonly_fields = (
+        "wn_notes",
+        "source",
+        "wn_id",
+        "wn_validation_status",
+        "wn_admin_notes",
+        "observer_name",
+        "observer_email",
+        "observer_phone_number",
+        "created_datetime",
+        "created_by",
+        "wn_modified_datetime",
+        "wn_created_datetime",
+        "species",
+        "wn_cluster_id",
+        "modified_by",
+        "modified_datetime",
+        "province",
+        "anb",
+        "municipality",
+    )
+    def get_readonly_fields(self, request: HttpRequest, obj: Optional[Observation] = None) -> list[str]:
+        if obj:  # editing an existing object
+            return list(self.readonly_fields + ("location",))
+        return list(self.readonly_fields)
+
+    def save_model(self, request: HttpRequest, obj: Observation, form: Any, change: bool) -> None:
+        if not change:  # Creating a new object
+            obj.created_by = request.user
+            obj.created_datetime = now()
+
+        obj.modified_by = request.user
+        obj.modified_datetime = now()
+
+        # Auto-edit based on location
+        if obj.location:
+            point = obj.location.transform(4326, clone=True)
+            long, lat = point.x, point.y
+            obj.anb = check_if_point_in_anb_area(long, lat)
+            municipality = get_municipality_from_coordinates(long, lat)
+            obj.municipality = municipality
+            obj.province = municipality.province if municipality else None
+
+        if not obj.source:
+            obj.source = "Waarnemingen.be"
+
+        super().save_model(request, obj, form, change)
+    
     def changelist_view(self, request: HttpRequest, extra_context: Any = None) -> TemplateResponse:
         """
         Override the changelist view to add custom context.

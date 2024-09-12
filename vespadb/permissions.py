@@ -12,14 +12,13 @@ class IsAdminOrSelf(permissions.BasePermission):
 
     def has_object_permission(self, request: Request, view: View, obj: User) -> bool:
         """Write permissions are only allowed to the user themselves or an admin."""
-        return bool(obj == request.user or request.user.is_staff)
+        return bool(obj == request.user or request.user.is_superuser)
 
 
 SYSTEM_USER_OBSERVATION_FIELDS_TO_UPDATE = [
     "location",
     "wn_notes",
     "wn_admin_notes",
-    "species",
     "nest_height",
     "nest_size",
     "nest_location",
@@ -28,7 +27,6 @@ SYSTEM_USER_OBSERVATION_FIELDS_TO_UPDATE = [
     "observer_email",
     "observer_name",
     "observation_datetime",
-    "wn_cluster_id",
     "wn_modified_datetime",
     "wn_validation_status",
     "wn_created_datetime",

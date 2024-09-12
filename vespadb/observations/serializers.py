@@ -2,6 +2,8 @@
 
 import logging
 from typing import TYPE_CHECKING, Any
+from datetime import datetime
+import re 
 
 from django.conf import settings
 from django.contrib.gis.geos import GEOSGeometry, Point
@@ -27,7 +29,6 @@ public_read_fields = [
     "modified_datetime",
     "location",
     "source",
-    "species",
     "nest_height",
     "nest_size",
     "nest_location",
@@ -44,9 +45,14 @@ public_read_fields = [
     "public_domain",
     "municipality_name",
     "visible",
+    "reserved_by",
     "reserved_by_first_name",
     "modified_by_first_name",
     "created_by_first_name",
+    "wn_notes",
+    "eradication_result",
+    "wn_id",
+    "wn_validation_status"
 ]
 
 # Define the fields that authenticated users can read
@@ -57,7 +63,6 @@ user_read_fields = [
     "modified_datetime",
     "location",
     "source",
-    "species",
     "nest_height",
     "nest_size",
     "nest_location",
@@ -101,10 +106,10 @@ conditional_fields = [
 
 # Fields that require special permissions (admins or specific user permissions)
 admin_or_special_permission_fields = [
-    "wn_validation_status",
-    "wn_notes",
+    "wn_admin_notes",
 ]
 
+DATE_REGEX = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 class ObservationSerializer(serializers.ModelSerializer):
     """Serializer for the full details of an Observation model instance."""
@@ -114,6 +119,10 @@ class ObservationSerializer(serializers.ModelSerializer):
     reserved_by_first_name = serializers.SerializerMethodField()
     modified_by_first_name = serializers.SerializerMethodField()
     created_by_first_name = serializers.SerializerMethodField()
+    eradication_date = serializers.DateField(
+        required=False, allow_null=True, format="%Y-%m-%d", input_formats=["%Y-%m-%d"]
+    )
+    
 
     class Meta:
         """Meta class for the ObservationSerializer."""
@@ -134,7 +143,6 @@ class ObservationSerializer(serializers.ModelSerializer):
             "wn_notes": {"help_text": "Notes about the observation."},
             "wn_admin_notes": {"help_text": "Admin notes about the observation."},
             "wn_validation_status": {"help_text": "Validation status of the observation."},
-            "species": {"help_text": "Species of the observed nest."},
             "nest_height": {"help_text": "Height of the nest."},
             "nest_size": {"help_text": "Size of the nest."},
             "nest_location": {"help_text": "Location of the nest."},
@@ -167,7 +175,11 @@ class ObservationSerializer(serializers.ModelSerializer):
                 "help_text": "Date when the nest was eradicated.",
             },
             "eradicator_name": {"help_text": "Name of the person who eradicated the nest."},
-            "eradication_duration": {"help_text": "Duration of the eradication."},
+            "eradication_duration": {
+                "help_text": "Duration of the eradication in minutes",
+                "required": False,
+                "allow_null": True,
+            },
             "eradication_persons": {"help_text": "Number of persons involved in the eradication."},
             "eradication_result": {"help_text": "Result of the eradication."},
             "eradication_product": {"help_text": "Product used for the eradication."},
@@ -180,7 +192,7 @@ class ObservationSerializer(serializers.ModelSerializer):
             "anb": {"help_text": "Flag indicating if the observation is in ANB area."},
             "public_domain": {"help_text": "Flag indicating if the observation is in the public domain."},
         }
-
+        
     def get_municipality_name(self, obj: Observation) -> str | None:
         """Retrieve the name of the municipality associated with the observation, if any."""
         return obj.municipality.name if obj.municipality else None
@@ -221,7 +233,6 @@ class ObservationSerializer(serializers.ModelSerializer):
             instance.save(update_fields=["municipality", "province"])
 
         data: dict[str, Any] = super().to_representation(instance)
-        # Convert datetime fields to CET for outgoing representation
         datetime_fields = [
             "created_datetime",
             "modified_datetime",
@@ -229,33 +240,42 @@ class ObservationSerializer(serializers.ModelSerializer):
             "wn_created_datetime",
             "reserved_datetime",
             "observation_datetime",
-            "eradication_date",
         ]
+        date_fields = ["eradication_date"]
         for field in datetime_fields:
             if data.get(field):
                 data[field] = parse_and_convert_to_cet(data[field]).isoformat()
+        for field in date_fields:
+            if data.get(field):
+                date_str: str = data[field]
+                try:
+                    parsed_date = datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S%z")
+                    data[field] = parsed_date.strftime("%Y-%m-%d")
+                except ValueError:
+                    parsed_date = datetime.strptime(date_str, "%Y-%m-%d")
+                    data[field] = parsed_date.strftime("%Y-%m-%d")
 
         request: Request = self.context.get("request")
         data["municipality_name"] = self.get_municipality_name(instance)
+                
         if request and request.user.is_authenticated:
-            if not request.user.is_staff:
-                # Filter fields for non-staff users based on their permissions
-                user: VespaUser = request.user
-                user_municipality_ids = user.municipalities.values_list("id", flat=True)
-                if (
-                    user.personal_data_access
-                    and instance.municipality
+            user: VespaUser = request.user
+            user_municipality_ids = user.municipalities.values_list("id", flat=True)
+            
+            if not request.user.is_superuser:
+                # Non-admins should not see admin-specific fields
+                admin_fields = set(admin_or_special_permission_fields)
+                for field in admin_fields:
+                    data.pop(field, None)
+                
+                is_inside_user = (
+                    instance.municipality
                     and instance.municipality.id in user_municipality_ids
-                ):
-                    fields_to_include = set(user_read_fields + conditional_fields + admin_or_special_permission_fields)
-                else:
-                    fields_to_include = set(user_read_fields + conditional_fields)
-                # Filter the data to include only the permitted fields
-                filtered_data = {field: data[field] for field in fields_to_include if field in data}
-                return filtered_data
-            # If user is staff, return all fields as is, no need to modify `data`
-            return data
-        # For unauthenticated or public access, restrict to public_read_fields
+                )
+                if not is_inside_user:
+                    # Do not show reserved_by for users outside the municipality and not admins
+                    data.pop("reserved_by", None)
+            return {field: data[field] for field in set(user_read_fields + conditional_fields + admin_or_special_permission_fields) if field in data}
         return {field: data[field] for field in public_read_fields if field in data}
 
     def validate_reserved_by(self, value: VespaUser) -> VespaUser:
@@ -264,17 +284,13 @@ class ObservationSerializer(serializers.ModelSerializer):
             request = self.context.get("request")
 
             # Skip validation for admin users
-            logger.info(f"Request user: {request.user}")
-            logger.info(f"Request user is staff: {request.user.is_staff}")
-            if request and request.user.is_staff:
-                logger.info("return value")
+            if request and request.user.is_superuser:
                 return value
 
             current_reservations_count = Observation.objects.filter(
                 reserved_by=value, eradication_date__isnull=True
             ).count()
             if current_reservations_count >= settings.MAX_RESERVATIONS:
-                logger.error(f"User {value.id} exceeded the reservation limit.")
                 raise ValidationError(
                     f"This user has already reached the maximum number of reservations ({settings.MAX_RESERVATIONS})."
                 )
@@ -284,7 +300,7 @@ class ObservationSerializer(serializers.ModelSerializer):
             if observation_municipality and observation_municipality.id not in user_municipality_ids:
                 raise ValidationError("You do not have permission to reserve nests in this municipality.")
         return value
-
+    
     def update(self, instance: Observation, validated_data: dict[Any, Any]) -> Observation:
         """Update method to handle observation reservations."""
         user = self.context["request"].user
@@ -292,21 +308,51 @@ class ObservationSerializer(serializers.ModelSerializer):
         # Eradication result logic
         eradication_result = validated_data.get("eradication_result")
 
+        # Check if any eradication-related fields are present without eradication_result
+        eradication_related_fields = [
+            "eradication_date",
+            "eradicator_name",
+            "eradication_duration",
+            "eradication_persons",
+            "eradication_method",
+            "eradication_aftercare",
+            "eradication_problems",
+            "eradication_notes",
+        ]
+
+        if any(field in validated_data for field in eradication_related_fields) and eradication_result is None:
+            raise serializers.ValidationError("Eradication result is required when providing eradication-related fields.")
+
+        # Automatically set eradication_date to today if eradication_result is present but eradication_date is not
+        if eradication_result is not None and validated_data.get("eradication_date") is None:
+            validated_data["eradication_date"] = timezone.now().date()
+
+        # Further eradication result logic
         if eradication_result == EradicationResultEnum.SUCCESSFUL:
             validated_data["reserved_datetime"] = None
             validated_data["reserved_by"] = None
-            validated_data["eradication_date"] = timezone.now()
-        elif eradication_result in {
-            EradicationResultEnum.UNSUCCESSFUL,
-            EradicationResultEnum.UNTREATED,
-            EradicationResultEnum.UNKNOWN,
-        }:
-            validated_data["eradication_date"] = None
+            validated_data["eradication_date"] = timezone.now().date()
 
-        if not user.is_staff:
-            # Non-admins cannot update admin_notes and observer_received_email fields
-            validated_data.pop("admin_notes", None)
-            validated_data.pop("observer_received_email", None)
+        if not user.is_superuser:
+            # Non-admins cannot update admin-specific fields, so remove them
+            admin_fields = ["admin_notes", "observer_received_email", "wn_admin_notes"]
+            for field in admin_fields:
+                if field in validated_data:
+                    raise serializers.ValidationError(f"Field(s) {field}' can not be updated by non-admin users.")
+        
+        error_fields = []
+        # Check if 'species' is in validated_data and if it has changed
+        if 'species' in validated_data and validated_data['species'] != instance.species:
+            error_fields.append('species')
+
+        # Check if 'wn_cluster_id' is in validated_data and if it has changed
+        if 'wn_cluster_id' in validated_data and validated_data['wn_cluster_id'] != instance.wn_cluster_id:
+            error_fields.append('wn_cluster_id')
+
+        # If any fields are attempting to be updated, raise a ValidationError
+        if error_fields:
+            error_message = f"Following field(s) cannot be updated by any user: {', '.join(error_fields)}"
+            raise serializers.ValidationError(error_message)
 
         # Conditionally set `reserved_by` and `reserved_datetime` for all users
         if "reserved_by" in validated_data and instance.reserved_by is None:
@@ -314,11 +360,11 @@ class ObservationSerializer(serializers.ModelSerializer):
             instance.reserved_by = user
 
         # Prevent non-admin users from updating observations reserved by others
-        if not user.is_staff and instance.reserved_by and instance.reserved_by != user:
+        if not user.is_superuser and instance.reserved_by and instance.reserved_by != user:
             raise serializers.ValidationError("You cannot edit an observation reserved by another user.")
 
-        # Allow admins to update following fields
-        if user.is_staff:
+        # Allow admins to update the fields they have permission to
+        if user.is_superuser:
             allowed_admin_fields = [
                 "location",
                 "nest_height",
@@ -343,44 +389,18 @@ class ObservationSerializer(serializers.ModelSerializer):
                 "public_domain",
                 "observer_received_email",
             ]
-            for field in set(validated_data) - set(allowed_admin_fields):
-                validated_data.pop(field)
-            instance = super().update(instance, validated_data)
-            return instance
-
-        # For regular users, restrict the set of fields they can update
-        allowed_fields = [
-            "nest_height",
-            "nest_size",
-            "nest_location",
-            "nest_type",
-            "notes",
-            "modified_by",
-            "created_by",
-            "reserved_by",
-            "eradication_date",
-            "eradicator_name",
-            "eradication_result",
-            "eradication_product",
-            "eradication_method",
-            "eradication_problems",
-            "eradication_notes",
-            "eradication_aftercare",
-            "images",
-        ]
-
-        for field in set(validated_data) - set(allowed_fields):
+        for field in set(validated_data) - set(allowed_admin_fields):
             validated_data.pop(field)
-
         instance = super().update(instance, validated_data)
         return instance
 
     def to_internal_value(self, data: dict[str, Any]) -> dict[str, Any]:
-        """Convert the incoming data to a Python native representation."""
+        """
+        Convert the incoming data to a Python native representation.
+        Handles date and datetime fields separately to avoid format errors.
+        """
         logger.info("Raw input data: %s", data)
-        internal_data = super().to_internal_value(data)
-        logger.info("Internal data after conversion: %s", internal_data)
-
+        # List of fields that should be parsed as datetime (with time)
         datetime_fields = [
             "created_datetime",
             "modified_datetime",
@@ -388,28 +408,40 @@ class ObservationSerializer(serializers.ModelSerializer):
             "wn_created_datetime",
             "reserved_datetime",
             "observation_datetime",
-            "eradication_date",
         ]
-        for field in datetime_fields:
+        # List of fields that should be treated as date only (no time)
+        date_fields = ["eradication_date"]
+
+        # Process datetime fields to ensure they are properly converted to UTC
+        for field in datetime_fields + date_fields:
             if data.get(field):
                 if isinstance(data[field], str):
                     try:
-                        internal_data[field] = parse_and_convert_to_utc(data[field])
+                        converted_datetime = parse_and_convert_to_utc(data[field])
+                        if field in date_fields:
+                            converted_date = converted_datetime.date()
+                            data[field] = converted_date
+                        else:
+                            data[field] = converted_datetime
                     except (ValueError, TypeError) as err:
+                        logger.error(f"Invalid datetime format for {field}: {data[field]}")
                         raise serializers.ValidationError({
                             field: [f"Invalid datetime format for {field}."]
                         }).with_traceback(err.__traceback__) from None
                 else:
-                    internal_data[field] = data[field]
+                    data[field] = data[field]  # Already a valid datetime
 
+        # Handle location validation separately (if provided)
         if "location" in data:
-            internal_data["location"] = self.validate_location(data["location"])
-
-        logger.info("Internal data after datetime conversion: %s", internal_data)
+            data["location"] = self.validate_location(data["location"])
+        internal_data = super().to_internal_value(data)
         return dict(internal_data)
 
     def validate_location(self, value: Any) -> Point:
         """Validate the input location data. Handle different formats of location data."""
+        if isinstance(value, Point):
+            return value
+        
         if isinstance(value, str):
             try:
                 return GEOSGeometry(value, srid=4326)

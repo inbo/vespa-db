@@ -2,6 +2,12 @@
   <div class="d-flex flex-column vh-100">
     <NavbarComponent />
     <div class="flex-grow-1 position-relative">
+      <div class="search-bar">
+        <input v-model="searchQuery" @keyup.enter="searchAddress" placeholder="Zoek een adres..." />
+        <button @click="searchAddress">
+          <i class="fas fa-search"></i>
+        </button>
+      </div>
       <button class="btn-filter-toggle" @click="toggleFilterPanel">
         <i class="fas fa-sliders-h"></i> Filters
       </button>
@@ -54,6 +60,7 @@ export default {
   },
   setup() {
     const vespaStore = useVespaStore();
+    const searchQuery = ref('');
     const router = useRouter();
     const selectedObservation = computed(() => vespaStore.selectedObservation);
     const isEditing = computed(() => vespaStore.isEditing);
@@ -66,7 +73,21 @@ export default {
     const isMapLoading = ref(true);
     const filtersUpdated = ref(false);
     const isFetchingGeoJson = ref(false); // Flag to prevent multiple calls
-
+    const searchAddress = async () => {
+      if (searchQuery.value) {
+        try {
+          const result = await vespaStore.searchAddress(searchQuery.value);
+          if (result) {
+            map.value.setView([result.lat, result.lon], 16);
+          } else {
+            // Handle case when address is not found
+            console.log('Adres niet gevonden');
+          }
+        } catch (error) {
+          console.error('Error searching address:', error);
+        }
+      }
+    };
     const formattedError = computed(() => {
       if (!error.value) return null;
       if (error.value.includes("Failed to fetch observation details")) {
@@ -101,6 +122,10 @@ export default {
     const openObservationDetails = async (properties) => {
       try {
         await vespaStore.fetchObservationDetails(properties.id);
+        if (vespaStore.selectedObservation && !vespaStore.selectedObservation.visible) {
+          console.error("Observation is not visible");
+          return;
+        }
         vespaStore.isDetailsPaneOpen = true;
         router.push({ path: `/map/observation/${properties.id}` });
       } catch (error) {
@@ -161,6 +186,11 @@ export default {
     }, 300);
 
     watch(selectedObservation, (newObservation, oldObservation) => {
+      if (newObservation && !newObservation.visible) {
+        vespaStore.isDetailsPaneOpen = false;
+        router.push({ path: '/map' });
+        return;
+      }
       if (newObservation && oldObservation && newObservation.id !== oldObservation.id) {
         const oldMarker = vespaStore.markerClusterGroup.getLayers().find(marker => marker.feature.properties.id === oldObservation.id);
         if (oldMarker) {
@@ -292,7 +322,9 @@ export default {
       formattedError,
       loadingObservations,
       isMapLoading,
-      updateMarkerColor
+      updateMarkerColor,
+      searchQuery,
+      searchAddress,
     };
   },
 };

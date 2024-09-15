@@ -178,6 +178,7 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
         "wn_validation_status": validation_status,
         "wn_cluster_id": cluster_id,
         "images": external_data.get("photos", []),
+        "source": "Waarnemingen.be",
         **mapped_enums,
     }
 
@@ -197,7 +198,7 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
         and any(keyword in external_data["notes"].upper() for keyword in settings.ERADICATION_KEYWORD_LIST)
         and not check_existing_eradication_date(external_data["id"])
     ):
-        mapped_data["eradication_date"] = observation_datetime_utc
+        mapped_data["eradication_date"] = observation_datetime_utc.date()
         mapped_data["eradicator_name"] = "Gemeld als bestreden"
 
     return mapped_data

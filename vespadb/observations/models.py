@@ -48,7 +48,6 @@ class NestTypeEnum(models.TextChoices):
     ACTIVE_PRIMARY_NEST = "actief_primair_nest", _("Actief primair nest")
     ACTIVE_SECONDARY_NEST = "actief_secundair_nest", _("Actief secundair nest")
     INACTIVE_EMPTY_NEST = "inactief_leeg_nest", _("Inactief/leeg nest")
-    POTENTIAL_NEST = "potentieel_nest", _("Potentieel nest")
 
 
 class EradicationResultEnum(models.TextChoices):
@@ -56,7 +55,8 @@ class EradicationResultEnum(models.TextChoices):
 
     SUCCESSFUL = "successful", _("Succesvol behandeld")
     UNSUCCESSFUL = "unsuccessful", _("Niet succesvol behandeld")
-    UNTREATED = "untreated", _("Niet behandeld")
+    UNTREATED = "untreated", _("Niet behandeld want andere soort")
+    UNTREATABLE = "untreatable", _("Onbehandelbaar (bv. te hoog, inactief)")
     UNKNOWN = "unknown", _("Onbekend")
 
 
@@ -126,11 +126,11 @@ class EradicationProductEnum(models.TextChoices):
 
     PERMAS_D = "permas_d", _("Permas-D")
     LIQUID_NITROGEN = "vloeibare_stikstof", _("Vloeibare stikstof")
-    VESPA_FICAM_D = "vespa_ficam_d", _("Vespa Ficam D")
+    FICAM_D = "ficam_d", _("Ficam D")
     TOPSCORE_PAL = "topscore_pal", _("Topscore PAL")
     DIATOMACEOUS_EARTH = "diatomeeenaarde", _("Diatomeeënaarde")
-    ETHER_ACETONE_ETHYL_ACETATE = "ether_aceton_ethyl_acetate", _("Ether/Aceton/Ethyl Acetate")
-    VESPA = "vespa", _("VESPA")
+    ETHER_ACETONE_ETHYL_ACETATE = "ether_aceton_ethyl_acetaat", _("Ether, aceton of ethylacetaat")
+    VESPA = "vespa", _("Vespa")
     OTHER = "andere", _("Andere")
 
 
@@ -232,7 +232,7 @@ class Observation(models.Model):
         help_text="Validation status of the observation",
     )
 
-    species = models.IntegerField(help_text="Species of the observed nest")
+    species = models.IntegerField(help_text="Species of the observed nest", blank=True, null=True)
     nest_height = models.CharField(
         max_length=50, choices=NestHeightEnum.choices, blank=True, null=True, help_text="Height of the nest"
     )
@@ -294,12 +294,12 @@ class Observation(models.Model):
         blank=True, null=True, help_text="Datetime when the observation was reserved"
     )
 
-    eradication_date = models.DateTimeField(blank=True, null=True, help_text="Date when the nest was eradicated")
+    eradication_date = models.DateField(blank=True, null=True, help_text="Date when the nest was eradicated")
     eradicator_name = models.CharField(
         max_length=255, blank=True, null=True, help_text="Name of the person who eradicated the nest"
     )
-    eradication_duration = models.CharField(
-        max_length=50, blank=True, null=True, help_text="Duration of the eradication"
+    eradication_duration = models.IntegerField(
+        blank=True, null=True, help_text="Duration of the eradication in minutes"
     )
     eradication_persons = models.IntegerField(
         blank=True, null=True, help_text="Number of persons involved in the eradication"

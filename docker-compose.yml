@@ -62,7 +62,8 @@ services:
     ports:
       - "5050:80"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
   redis:
     image: "redis:alpine"
@@ -79,8 +80,8 @@ services:
     environment:
       - TZ=UTC
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
 
   celery_beat:
     build:
@@ -92,8 +93,8 @@ services:
     environment:
       - TZ=UTC
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
 
 volumes:
   postgres_data:

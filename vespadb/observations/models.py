@@ -299,9 +299,7 @@ class Observation(models.Model):
         max_length=255, blank=True, null=True, help_text="Name of the person who eradicated the nest"
     )
     eradication_duration = models.IntegerField(
-        blank=True, 
-        null=True, 
-        help_text="Duration of the eradication in minutes"
+        blank=True, null=True, help_text="Duration of the eradication in minutes"
     )
     eradication_persons = models.IntegerField(
         blank=True, null=True, help_text="Number of persons involved in the eradication"

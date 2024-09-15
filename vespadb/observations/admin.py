@@ -3,27 +3,26 @@
 import json
 import logging
 from typing import Any
-from django.contrib.admin import SimpleListFilter
 
-from django.db.models import Q
 from django import forms
 from django.contrib import admin, messages
+from django.contrib.admin import SimpleListFilter
 from django.contrib.gis import admin as gis_admin
 from django.core.mail import send_mail
+from django.db.models import Q
 from django.db.models.query import QuerySet
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.template.response import TemplateResponse
 from django.urls import path
 from django.utils.timezone import now
-from rest_framework.test import APIRequestFactory
 from django.utils.translation import gettext_lazy as _
-from typing import Optional, Tuple
+from rest_framework.test import APIRequestFactory
 
-from vespadb.observations.utils import check_if_point_in_anb_area, get_municipality_from_coordinates
 from vespadb.observations.filters import MunicipalityExcludeFilter, ObserverReceivedEmailFilter, ProvinceFilter
 from vespadb.observations.forms import SendEmailForm
 from vespadb.observations.models import Municipality, Observation, Province
+from vespadb.observations.utils import check_if_point_in_anb_area, get_municipality_from_coordinates
 from vespadb.observations.views import ObservationsViewSet
 
 logger = logging.getLogger(__name__)
@@ -34,16 +33,17 @@ class FileImportForm(forms.Form):
 
     file = forms.FileField()
 
+
 class NestStatusFilter(SimpleListFilter):
     """Custom filter for selecting multiple nest statuses in the admin panel."""
-    
+
     title: str = _("Nest Status")
     parameter_name: str = "nest_status"
 
-    def lookups(self, request: HttpRequest, model_admin: Any) -> list[Tuple[str, str]]:
+    def lookups(self, request: HttpRequest, model_admin: Any) -> list[tuple[str, str]]:
         """
         Return a list of tuples for the different nest statuses.
-        
+
         :param request: The HTTP request object.
         :param model_admin: The current model admin instance.
         :return: A list of tuples containing the status values and labels.
@@ -54,10 +54,10 @@ class NestStatusFilter(SimpleListFilter):
             ("open", "Open"),
         ]
 
-    def queryset(self, request: HttpRequest, queryset: QuerySet) -> Optional[QuerySet]:
+    def queryset(self, request: HttpRequest, queryset: QuerySet) -> QuerySet | None:
         """
         Filter the queryset based on the selected nest statuses.
-        
+
         :param request: The HTTP request object.
         :param queryset: The current queryset.
         :return: The filtered queryset based on the selected statuses, or the original queryset if no value is provided.
@@ -65,8 +65,8 @@ class NestStatusFilter(SimpleListFilter):
         value = self.value()
         if not value:
             return queryset
-        
-        statuses = value.split(',')
+
+        statuses = value.split(",")
         query = Q()
 
         if "eradicated" in statuses:
@@ -77,7 +77,8 @@ class NestStatusFilter(SimpleListFilter):
             query |= Q(reserved_datetime__isnull=True, eradication_date__isnull=True)
 
         return queryset.filter(query)
-    
+
+
 class ObservationAdminForm(forms.ModelForm):
     """Custom form for the Observation model."""
 
@@ -162,12 +163,15 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         "anb",
         "municipality",
     )
-    def get_readonly_fields(self, request: HttpRequest, obj: Optional[Observation] = None) -> list[str]:
+
+    def get_readonly_fields(self, obj: Observation | None = None) -> list[str]:
+        """."""
         if obj:  # editing an existing object
-            return list(self.readonly_fields + ("location",))
+            return [*self.readonly_fields, "location"]
         return list(self.readonly_fields)
 
     def save_model(self, request: HttpRequest, obj: Observation, form: Any, change: bool) -> None:
+        """."""
         if not change:  # Creating a new object
             obj.created_by = request.user
             obj.created_datetime = now()
@@ -188,7 +192,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
             obj.source = "Waarnemingen.be"
 
         super().save_model(request, obj, form, change)
-    
+
     def changelist_view(self, request: HttpRequest, extra_context: Any = None) -> TemplateResponse:
         """
         Override the changelist view to add custom context.

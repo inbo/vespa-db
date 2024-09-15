@@ -5,15 +5,14 @@ import datetime
 import io
 import json
 import logging
-from typing import Any, Optional
-from rest_framework.exceptions import NotFound
-from geopy.location import Location
+from typing import TYPE_CHECKING, Any
 
 from django.contrib.gis.db.models.functions import Transform
 from django.contrib.gis.geos import GEOSGeometry
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files.uploadedfile import InMemoryUploadedFile
+from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import CharField, OuterRef, QuerySet, Subquery, Value
 from django.db.models.functions import Coalesce
@@ -21,12 +20,16 @@ from django.db.utils import IntegrityError
 from django.http import HttpResponse, JsonResponse
 from django.utils.decorators import method_decorator
 from django.utils.timezone import now
+from django.views.decorators.http import require_GET
 from django_filters.rest_framework import DjangoFilterBackend
 from django_ratelimit.decorators import ratelimit
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
+from geopy.exc import GeocoderServiceError, GeocoderTimedOut
+from geopy.geocoders import Nominatim
 from rest_framework import filters, status
 from rest_framework.decorators import action, parser_classes
+from rest_framework.exceptions import NotFound
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny, BasePermission, IsAdminUser, IsAuthenticated
 from rest_framework.request import Request
@@ -34,10 +37,6 @@ from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_gis.filters import DistanceToPointFilter
-from django.core.paginator import Paginator
-from geopy.geocoders import Nominatim
-from django.views.decorators.http import require_GET
-from geopy.exc import GeocoderTimedOut, GeocoderServiceError
 
 from vespadb.observations.cache import invalidate_geojson_cache, invalidate_observation_cache
 from vespadb.observations.filters import ObservationFilter
@@ -48,6 +47,9 @@ from vespadb.observations.serializers import (
     ObservationSerializer,
     ProvinceSerializer,
 )
+
+if TYPE_CHECKING:
+    from geopy.location import Location
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -142,7 +144,9 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             The serializer containing the validated data.
         """
         user = self.request.user
-        if not user.is_superuser and ("admin_notes" in self.request.data or "observer_received_email" in self.request.data):
+        if not user.is_superuser and (
+            "admin_notes" in self.request.data or "observer_received_email" in self.request.data
+        ):
             raise PermissionDenied("You do not have permission to modify admin fields.")
 
         # Ensure user has permission to reserve in the specified municipality
@@ -635,7 +639,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         queryset = self.filter_queryset(self.get_queryset())
         serializer_class = self.get_serializer_class()
         serializer_context = self.get_serializer_context()
-        
+
         paginator = Paginator(queryset, 1000)
         serialized_data = []
         for page_number in paginator.page_range:
@@ -656,6 +660,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             return response
         return Response({"error": "Unsupported format specified."}, status=status.HTTP_400_BAD_REQUEST)
 
+
 @require_GET
 def search_address(request: Request) -> JsonResponse:
     """
@@ -665,45 +670,41 @@ def search_address(request: Request) -> JsonResponse:
     the address to search for. It returns the latitude, longitude, and full
     address of the location if found.
 
-    Parameters:
+    Parameters
     ----------
     request : django.http.HttpRequest
         The HTTP request object containing the 'query' parameter in GET data.
 
-    Returns:
+    Returns
     -------
     django.http.JsonResponse
         A JSON response containing either:
         - On success: latitude, longitude, and full address of the location
         - On failure: an error message with an appropriate HTTP status code
 
-    Raises:
+    Raises
     ------
     No exceptions are raised directly, but various HTTP status codes are returned:
     - 400: If no query is provided
     - 404: If the address is not found
     - 500: For any other exceptions during geocoding
     """
-    query: str = request.GET.get('query', '')
+    query: str = request.GET.get("query", "")
     if not query:
-        return JsonResponse({'error': 'No query provided'}, status=400)
+        return JsonResponse({"error": "No query provided"}, status=400)
 
     geolocator: Nominatim = Nominatim(user_agent="vespa_db")
     try:
-        location: Optional[Location] = geolocator.geocode(query)
+        location: Location | None = geolocator.geocode(query)
         if location:
-            return JsonResponse({
-                'lat': location.latitude,
-                'lon': location.longitude,
-                'address': location.address
-            })
-        else:
-            return JsonResponse({'error': 'Address not found'}, status=404)
+            return JsonResponse({"lat": location.latitude, "lon": location.longitude, "address": location.address})
+        return JsonResponse({"error": "Address not found"}, status=404)
     except (GeocoderTimedOut, GeocoderServiceError) as e:
-        return JsonResponse({'error': f'Geocoding service error: {str(e)}'}, status=503)
-    except Exception as e:
-        return JsonResponse({'error': f'Unexpected error: {str(e)}'}, status=500)
-    
+        return JsonResponse({"error": f"Geocoding service error: {e!s}"}, status=503)
+    except (ValueError, TypeError) as e:
+        return JsonResponse({"error": f"Unexpected error: {e!s}"}, status=500)
+
+
 class MunicipalityViewSet(ReadOnlyModelViewSet):
     """ViewSet for the Municipality model."""
 

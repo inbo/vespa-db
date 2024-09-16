@@ -2,6 +2,12 @@
 
 from django.db import migrations, models
 
+def convert_time_to_string(apps, schema_editor):
+    Observation = apps.get_model('observations', 'Observation')
+    for observation in Observation.objects.all():
+        if observation.eradication_duration:
+            observation.eradication_duration = str(observation.eradication_duration)
+            observation.save()
 
 class Migration(migrations.Migration):
 
@@ -10,6 +16,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RunPython(convert_time_to_string),
         migrations.AlterField(
             model_name='observation',
             name='eradication_duration',

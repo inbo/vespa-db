@@ -307,7 +307,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
                         fail_list.append(observation.id)
                         continue
                     try:
-                        send_mail(subject, message, "vespawatch@inbo.be", [observation.observer_email])
+                        send_mail(subject, message, "noreply@vespawatch.be", [observation.observer_email])
                         logger.info(f"Email sent to {observation.observer_email} for observation {observation.id}")
                         observation.observer_received_email = True
                         observation.save()

@@ -2,12 +2,13 @@
 
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
 from django.contrib.gis.geos import GEOSGeometry, Point
 from django.core.exceptions import ValidationError
+from pytz import timezone
 from rest_framework import serializers
 from rest_framework.request import Request
 
@@ -233,7 +234,7 @@ class ObservationSerializer(serializers.ModelSerializer):
             instance.save(update_fields=["municipality", "province"])
 
         data: dict[str, Any] = super().to_representation(instance)
-        data.pop("wn_admin_notes", None) 
+        data.pop("wn_admin_notes", None)
         datetime_fields = [
             "created_datetime",
             "modified_datetime",
@@ -250,10 +251,10 @@ class ObservationSerializer(serializers.ModelSerializer):
             if data.get(field):
                 date_str: str = data[field]
                 try:
-                    parsed_date = datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S%z").replace(tzinfo=timezone.utc)
+                    parsed_date = datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S%z").replace(tzinfo=UTC)
                     data[field] = parsed_date.strftime("%Y-%m-%d")
                 except ValueError:
-                    parsed_date = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                    parsed_date = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=UTC)
                     data[field] = parsed_date.strftime("%Y-%m-%d")
 
         request: Request = self.context.get("request")
@@ -329,13 +330,13 @@ class ObservationSerializer(serializers.ModelSerializer):
 
         # Automatically set eradication_date to today if eradication_result is present but eradication_date is not
         if eradication_result is not None and validated_data.get("eradication_date") is None:
-            validated_data["eradication_date"] = datetime.now().date()
+            validated_data["eradication_date"] = datetime.now(timezone("EST")).date()
 
         # Further eradication result logic
         if eradication_result == EradicationResultEnum.SUCCESSFUL:
             validated_data["reserved_datetime"] = None
             validated_data["reserved_by"] = None
-            validated_data["eradication_date"] = datetime.now().date()
+            validated_data["eradication_date"] = datetime.now(timezone("EST")).date()
 
         if not user.is_superuser:
             # Non-admins cannot update admin-specific fields, so remove them
@@ -360,7 +361,9 @@ class ObservationSerializer(serializers.ModelSerializer):
 
         # Conditionally set `reserved_by` and `reserved_datetime` for all users
         if "reserved_by" in validated_data and instance.reserved_by is None:
-            validated_data["reserved_datetime"] = datetime.now() if validated_data["reserved_by"] else None
+            validated_data["reserved_datetime"] = (
+                datetime.now(timezone("EST")) if validated_data["reserved_by"] else None
+            )
             instance.reserved_by = user
 
         # Prevent non-admin users from updating observations reserved by others

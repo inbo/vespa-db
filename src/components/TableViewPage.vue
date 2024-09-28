@@ -120,6 +120,7 @@ export default {
         sortBy.value = field;
         sortOrder.value = 'asc';
       }
+
       vespaStore.getObservations(page.value, pageSize.value, sortBy.value, sortOrder.value);
     };
 
@@ -129,6 +130,7 @@ export default {
       } else if (direction === 'prev' && previousPage.value) {
         page.value--;
       }
+
       vespaStore.getObservations(page.value, pageSize.value, sortBy.value, sortOrder.value);
     };
 
@@ -164,6 +166,10 @@ export default {
       const lastAppliedFilters = vespaStore.lastAppliedFilters;
 
       if (currentFilters !== lastAppliedFilters) {
+
+
+
+        //vespaStore.setLastAppliedFilters();
         vespaStore.getObservations(page.value, pageSize.value, sortBy.value, sortOrder.value).then(() => {
           vespaStore.getObservationsGeoJson();
         });
@@ -174,13 +180,20 @@ export default {
       if (!vespaStore.municipalitiesFetched) await vespaStore.fetchMunicipalities();
       if (!vespaStore.provincesFetched) await vespaStore.fetchProvinces();
 
-      if (vespaStore.lastAppliedFilters === null || vespaStore.lastAppliedFilters === 'null') {
-        vespaStore.setLastAppliedFilters();
-      }
+
+      // if (vespaStore.lastAppliedFilters === null || vespaStore.lastAppliedFilters === 'null') {
+      //   console.log("set hier?")
+      //   vespaStore.setLastAppliedFilters();
+      // }
 
       // Avoid calling getObservations if data is already loaded with the same filters
       if (vespaStore.table_observations.length === 0 || JSON.stringify(vespaStore.filters) !== JSON.stringify(vespaStore.lastAppliedFilters)) {
+
+
+
+        //vespaStore.setLastAppliedFilters();
         vespaStore.getObservations(page.value, pageSize.value, sortBy.value, sortOrder.value);
+        vespaStore.getObservationsGeoJson();
       }
     });
 

@@ -113,6 +113,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         "eradicator_name",
         "reserved_by",
         "modified_by",
+        "modified_datetime",
         "public_domain",
         "reserved_datetime",
     )
@@ -132,6 +133,8 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         "municipality",
         "anb",
         "reserved_by",
+        "modified_datetime",
+        "modified_by",
         "created_by",
         "modified_by",
         ObserverReceivedEmailFilter,
@@ -164,7 +167,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         "municipality",
     )
 
-    def get_readonly_fields(self, obj: Observation | None = None) -> list[str]:
+    def get_readonly_fields(self, request: HttpRequest, obj: Observation | None = None) -> list[str]:
         """."""
         if obj:  # editing an existing object
             return [*self.readonly_fields, "location"]

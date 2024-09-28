@@ -176,6 +176,8 @@ export const useVespaStore = defineStore('vespaStore', {
         },
         async applyFilters(filters) {
             this.filters = { ...this.filters, ...filters };
+            // await this.getObservations();
+            // await this.getObservationsGeoJson();
             //await this.getObservations();
         },
         async fetchProvinces() {
@@ -296,11 +298,11 @@ export const useVespaStore = defineStore('vespaStore', {
             }
             if (observation.eradication_date) {
                 observation.eradication_date = this.formatDateWithoutTime(observation.eradication_date);
-                console.log("transformed date:")
-                console.log(observation.eradication_date);
+
+
             }
-            console.log("the observation erad date is");
-            console.log(observation.eradication_date);
+
+
             try {
                 const response = await ApiService.patch(`/observations/${observation.id}/`, observation);
                 if (response.status === 200) {

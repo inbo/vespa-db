@@ -52,6 +52,22 @@
                         data-bs-parent="#sections">
                         <div class="accordion-body">
                             <div class="row mb-2">
+                                <label class="col-4 col-form-label">Resultaat</label>
+                                <div class="col-8">
+                                    <select v-if="selectedObservation.eradication_result !== undefined"
+                                        v-model="editableObservation.eradication_result" class="form-select"
+                                        :class="{ 'is-invalid': eradicationResultError }" :disabled="!canEdit">
+                                        <option :value="null">Geen</option>
+                                        <option v-for="(label, value) in eradicationResultEnum" :key="value"
+                                            :value="value">{{ label
+                                            }}</option>
+                                    </select>
+                                    <div v-if="eradicationResultError" class="invalid-feedback">
+                                        {{ eradicationResultError }}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mb-2">
                                 <label class="col-4 col-form-label">Datum</label>
                                 <div class="col-8">
                                     <input v-if="selectedObservation.eradication_date !== undefined"
@@ -84,22 +100,6 @@
                                         v-model="editableObservation.eradication_persons" type="number"
                                         class="form-control" :readonly="!canEdit" placeholder="bv. 2 (personen)"
                                         :class="{ 'form-control-plaintext': !canEdit }" />
-                                </div>
-                            </div>
-                            <div class="row mb-2">
-                                <label class="col-4 col-form-label">Resultaat</label>
-                                <div class="col-8">
-                                    <select v-if="selectedObservation.eradication_result !== undefined"
-                                        v-model="editableObservation.eradication_result" class="form-select"
-                                        :class="{ 'is-invalid': eradicationResultError }" :disabled="!canEdit">
-                                        <option :value="null">Geen</option>
-                                        <option v-for="(label, value) in eradicationResultEnum" :key="value"
-                                            :value="value">{{ label
-                                            }}</option>
-                                    </select>
-                                    <div v-if="eradicationResultError" class="invalid-feedback">
-                                        {{ eradicationResultError }}
-                                    </div>
                                 </div>
                             </div>
                             <div v-if="isLoggedIn" class="row mb-2">
@@ -141,7 +141,7 @@
                                     </select>
                                 </div>
                             </div>
-                            <div class="row mb-2">
+                            <div v-if="isLoggedIn" class="row mb-2">
                                 <label class="col-4 col-form-label">Problemen</label>
                                 <div class="col-8">
                                     <select v-if="selectedObservation.eradication_problems !== undefined"
@@ -154,7 +154,7 @@
                                     </select>
                                 </div>
                             </div>
-                            <div class="row mb-2">
+                            <div v-if="isLoggedIn" class="row mb-2">
                                 <label class="col-4 col-form-label">Opmerkingen</label>
                                 <div class="col-8">
                                     <textarea v-if="selectedObservation.eradication_notes !== undefined"
@@ -278,14 +278,14 @@
                                         </p>
                                     </div>
                                 </div>
-                                <div class="row mb-2">
+                                <div v-if="isLoggedIn" class="row mb-2">
                                     <label class="col-4 col-form-label">Opmerking validator</label>
                                     <div class="col-8">
                                         <p class="form-control-plaintext">{{ selectedObservation.wn_notes }}</p>
                                     </div>
                                 </div>
                             </div>
-                            <div class="row mb-2">
+                            <div v-if="isLoggedIn" class="row mb-2">
                                 <div class="col-8 offset-4">
                                     <div class="form-check form-switch">
                                         <input v-if="selectedObservation.public_domain !== undefined"
@@ -468,7 +468,8 @@ export default {
         const eradicationResultEnum = {
             "successful": "Succesvol behandeld",
             "unsuccessful": "Niet succesvol behandeld",
-            "untreated": "Niet behandeld",
+            "untreated": "Niet behandeld want andere soort",
+            "untreatable": "Onbehandelbaar (bv. te hoog, inactief)",
             "unknown": "Onbekend"
         };
 

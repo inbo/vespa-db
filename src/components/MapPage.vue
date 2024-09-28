@@ -81,7 +81,7 @@ export default {
             map.value.setView([result.lat, result.lon], 16);
           } else {
             // Handle case when address is not found
-            console.log('Adres niet gevonden');
+
           }
         } catch (error) {
           console.error('Error searching address:', error);
@@ -143,6 +143,7 @@ export default {
 
     const updateMarkers = debounce(async () => {
       if (isFetchingGeoJson.value) return; // Prevent multiple calls
+
       isFetchingGeoJson.value = true;
 
       try {
@@ -182,6 +183,7 @@ export default {
       } finally {
         isFetchingGeoJson.value = false;
         isMapLoading.value = false;
+        vespaStore.getObservations(1, 25).catch(error => console.error('Error fetching observations:', error));
       }
     }, 300);
 
@@ -219,6 +221,7 @@ export default {
       () => vespaStore.filters,
       (newFilters) => {
         filtersUpdated.value = true;
+
         clearAndUpdateMarkers();
       },
       { deep: true }
@@ -236,7 +239,6 @@ export default {
     onMounted(async () => {
       if (!vespaStore.municipalitiesFetched) await vespaStore.fetchMunicipalities();
       if (!vespaStore.provincesFetched) await vespaStore.fetchProvinces();
-
       vespaStore.markerClusterGroup = L.markerClusterGroup({
         spiderfyOnMaxZoom: false,
         showCoverageOnHover: true,
@@ -300,11 +302,12 @@ export default {
       }
 
       vespaStore.map = map.value;
-      if (vespaStore.lastAppliedFilters === null || vespaStore.lastAppliedFilters === 'null') {
-        vespaStore.setLastAppliedFilters();
-      }
+      // if (vespaStore.lastAppliedFilters === null || vespaStore.lastAppliedFilters === 'null') {
+      //   vespaStore.setLastAppliedFilters();
+      // }
       updateMarkers();
-      vespaStore.getObservations(1, 25).catch(error => console.error('Error fetching observations:', error));
+
+
     });
 
     return {

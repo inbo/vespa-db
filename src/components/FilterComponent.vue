@@ -109,6 +109,8 @@ export default {
       const minDateCET = minDate.value ? DateTime.fromJSDate(minDate.value).setZone('Europe/Paris').toFormat('yyyy-MM-dd\'T\'HH:mm:ss') : null;
       const maxDateCET = maxDate.value ? DateTime.fromJSDate(maxDate.value).setZone('Europe/Paris').toFormat('yyyy-MM-dd\'T\'HH:mm:ss') : null;
 
+
+
       vespaStore.applyFilters({
         municipalities: selectedMunicipalities.value.length > 0 ? selectedMunicipalities.value : [],
         provinces: selectedProvinces.value.length > 0 ? selectedProvinces.value : [],
@@ -119,6 +121,7 @@ export default {
         max_observation_date: maxDateCET,
         visible: visibleActief.value
       });
+      
     }, 300);
 
     const toggleMenu1 = () => {
@@ -153,9 +156,30 @@ export default {
 
     watch([selectedMunicipalities, selectedProvinces, selectedNestType, selectedNestStatus, anbAreasActief, selectedObservationStart, selectedObservationEnd, visibleActief], () => {
       emitFilterUpdate();
-    }, { deep: true });
+    }, { deep: true});
+    
+    watch(() => vespaStore.filters, (newFilters, oldFilters) => {
+      const hasChanged = JSON.stringify(newFilters) !== JSON.stringify(oldFilters);
+      
+      if (hasChanged) {
+        selectedMunicipalities.value = newFilters.municipalities || [];
+        selectedProvinces.value = newFilters.provinces || [];
+        anbAreasActief.value = newFilters.anbAreasActief || null;
+        selectedNestType.value = newFilters.nestType || [];
+        selectedNestStatus.value = newFilters.nestStatus || [];
+        minDate.value = newFilters.min_observation_date ? new Date(newFilters.min_observation_date) : null;
+        maxDate.value = newFilters.max_observation_date ? new Date(newFilters.max_observation_date) : null;
+      }
+    }, { immediate: true, deep: true });
 
     onMounted(async () => {
+      selectedMunicipalities.value = vespaStore.filters.municipalities || [];
+      selectedProvinces.value = vespaStore.filters.provinces || [];
+      anbAreasActief.value = vespaStore.filters.anbAreasActief;
+      selectedNestType.value = vespaStore.filters.nestType || [];
+      selectedNestStatus.value = vespaStore.filters.nestStatus || [];
+      minDate.value = vespaStore.filters.min_observation_date ? new Date(vespaStore.filters.min_observation_date) : new Date(new Date().getFullYear(), 3, 1);
+      maxDate.value = vespaStore.filters.max_observation_date ? new Date(vespaStore.filters.max_observation_date) : null;
       if (!vespaStore.municipalitiesFetched) await vespaStore.fetchMunicipalities();
       if (!vespaStore.provincesFetched) await vespaStore.fetchProvinces();
     });

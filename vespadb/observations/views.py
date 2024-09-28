@@ -283,7 +283,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             "results": data,
         })
 
-    @method_decorator(ratelimit(key="ip", rate="15/m", method="GET", block=True))
+    @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
     @swagger_auto_schema(
         operation_description="Retrieve a list of observations. Supports filtering and ordering.",
         responses={200: ObservationSerializer(many=True)},
@@ -339,7 +339,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             )
         },
     )
-    @method_decorator(ratelimit(key="ip", rate="15/m", method="GET", block=True))
+    @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
     @action(detail=False, methods=["get"], url_path="dynamic-geojson")
     def geojson(self, request: Request) -> HttpResponse:
         """Generate GeoJSON data for the observations."""
@@ -420,7 +420,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         ),
         responses={200: "Success", 400: "Bad Request", 415: "Unsupported Media Type"},
     )
-    @method_decorator(ratelimit(key="ip", rate="15/m", method="GET", block=True))
+    @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
     @action(detail=False, methods=["post"], permission_classes=[IsAdminUser])
     @parser_classes([JSONParser, MultiPartParser, FormParser])
     def bulk_import(self, request: Request) -> Response:
@@ -630,7 +630,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             ),
         ],
     )
-    @method_decorator(ratelimit(key="ip", rate="15/m", method="GET", block=True))
+    @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
     @action(detail=False, methods=["get"], permission_classes=[AllowAny])
     def export(self, request: Request) -> Response:
         """Export observations data in the specified format."""
@@ -746,7 +746,7 @@ class MunicipalityViewSet(ReadOnlyModelViewSet):
         cache.set(cache_key, serializer.data, GET_REDIS_CACHE_EXPIRATION)
         return Response(serializer.data)
 
-    @method_decorator(ratelimit(key="ip", rate="15/m", method="GET", block=True))
+    @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
     def list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """Override the list method to add caching."""
         cache_key = "vespadb::municipalities::list"
@@ -772,7 +772,7 @@ class ProvinceViewSet(ReadOnlyModelViewSet):
             return [AllowAny()]
         return [IsAdminUser()]
 
-    @method_decorator(ratelimit(key="ip", rate="15/m", method="GET", block=True))
+    @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
     def list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """Override the list method to add caching."""
         cache_key = "vespadb::provinces::list"

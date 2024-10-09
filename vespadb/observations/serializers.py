@@ -306,6 +306,32 @@ class ObservationSerializer(serializers.ModelSerializer):
         """Update method to handle observation reservations."""
         user = self.context["request"].user
 
+        # Define allowed fields for both admin and non-admin users
+        allowed_admin_fields = [
+            "location",
+            "nest_height",
+            "nest_size",
+            "nest_location",
+            "nest_type",
+            "wn_cluster_id",
+            "admin_notes",
+            "visible",
+            "images",
+            "reserved_by",
+            "eradication_date",
+            "eradicator_name",
+            "eradication_duration",
+            "eradication_persons",
+            "eradication_result",
+            "eradication_product",
+            "eradication_method",
+            "eradication_aftercare",
+            "eradication_problems",
+            "eradication_notes",
+            "public_domain",
+            "observer_received_email",
+        ]
+
         # Eradication result logic
         eradication_result = validated_data.get("eradication_result")
 
@@ -328,72 +354,27 @@ class ObservationSerializer(serializers.ModelSerializer):
 
         # Automatically set eradication_date to today if eradication_result is present but eradication_date is not
         if eradication_result is not None and validated_data.get("eradication_date") is None:
-            validated_data["eradication_date"] = timezone.now().date()
+            validated_data["eradication_date"] = datetime.now(timezone("EST")).date()
 
         # Further eradication result logic
         if eradication_result == EradicationResultEnum.SUCCESSFUL:
             validated_data["reserved_datetime"] = None
             validated_data["reserved_by"] = None
-            validated_data["eradication_date"] = timezone.now().date()
+            validated_data["eradication_date"] = datetime.now(timezone("EST")).date()
 
         if not user.is_superuser:
             # Non-admins cannot update admin-specific fields, so remove them
             admin_fields = ["admin_notes", "observer_received_email", "wn_admin_notes"]
             for field in admin_fields:
                 if field in validated_data:
-                    raise serializers.ValidationError(f"Field(s) {field}' can not be updated by non-admin users.")
+                    raise serializers.ValidationError(f"Field(s) {field}' cannot be updated by non-admin users.")
+            # For non-admin users, restrict the allowed fields further (if necessary)
+            allowed_admin_fields = ["location", "nest_height", "nest_size", "nest_location", "nest_type"]
 
-        error_fields = []
-        # Check if 'species' is in validated_data and if it has changed
-        if "species" in validated_data and validated_data["species"] != instance.species:
-            error_fields.append("species")
-
-        # Check if 'wn_cluster_id' is in validated_data and if it has changed
-        if "wn_cluster_id" in validated_data and validated_data["wn_cluster_id"] != instance.wn_cluster_id:
-            error_fields.append("wn_cluster_id")
-
-        # If any fields are attempting to be updated, raise a ValidationError
-        if error_fields:
-            error_message = f"Following field(s) cannot be updated by any user: {', '.join(error_fields)}"
-            raise serializers.ValidationError(error_message)
-
-        # Conditionally set `reserved_by` and `reserved_datetime` for all users
-        if "reserved_by" in validated_data and instance.reserved_by is None:
-            validated_data["reserved_datetime"] = timezone.now() if validated_data["reserved_by"] else None
-            instance.reserved_by = user
-
-        # Prevent non-admin users from updating observations reserved by others
-        if not user.is_superuser and instance.reserved_by and instance.reserved_by != user:
-            raise serializers.ValidationError("You cannot edit an observation reserved by another user.")
-
-        # Allow admins to update the fields they have permission to
-        if user.is_superuser:
-            allowed_admin_fields = [
-                "location",
-                "nest_height",
-                "nest_size",
-                "nest_location",
-                "nest_type",
-                "wn_cluster_id",
-                "admin_notes",
-                "visible",
-                "images",
-                "reserved_by",
-                "eradication_date",
-                "eradicator_name",
-                "eradication_duration",
-                "eradication_persons",
-                "eradication_result",
-                "eradication_product",
-                "eradication_method",
-                "eradication_aftercare",
-                "eradication_problems",
-                "eradication_notes",
-                "public_domain",
-                "observer_received_email",
-            ]
+        # Remove any fields that are not allowed to be updated
         for field in set(validated_data) - set(allowed_admin_fields):
             validated_data.pop(field)
+
         instance = super().update(instance, validated_data)
         return instance
 

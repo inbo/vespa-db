@@ -307,6 +307,30 @@ class ObservationSerializer(serializers.ModelSerializer):
     def update(self, instance: Observation, validated_data: dict[Any, Any]) -> Observation:  # noqa: C901,PLR0912
         """Update method to handle observation reservations."""
         user = self.context["request"].user
+        allowed_admin_fields = [
+            "location",
+            "nest_height",
+            "nest_size",
+            "nest_location",
+            "nest_type",
+            "wn_cluster_id",
+            "admin_notes",
+            "visible",
+            "images",
+            "reserved_by",
+            "eradication_date",
+            "eradicator_name",
+            "eradication_duration",
+            "eradication_persons",
+            "eradication_result",
+            "eradication_product",
+            "eradication_method",
+            "eradication_aftercare",
+            "eradication_problems",
+            "eradication_notes",
+            "public_domain",
+            "observer_received_email",
+        ]
 
         # Eradication result logic
         eradication_result = validated_data.get("eradication_result")
@@ -370,32 +394,6 @@ class ObservationSerializer(serializers.ModelSerializer):
         if not user.is_superuser and instance.reserved_by and instance.reserved_by != user:
             raise serializers.ValidationError("You cannot edit an observation reserved by another user.")
 
-        # Allow admins to update the fields they have permission to
-        if user.is_superuser:
-            allowed_admin_fields = [
-                "location",
-                "nest_height",
-                "nest_size",
-                "nest_location",
-                "nest_type",
-                "wn_cluster_id",
-                "admin_notes",
-                "visible",
-                "images",
-                "reserved_by",
-                "eradication_date",
-                "eradicator_name",
-                "eradication_duration",
-                "eradication_persons",
-                "eradication_result",
-                "eradication_product",
-                "eradication_method",
-                "eradication_aftercare",
-                "eradication_problems",
-                "eradication_notes",
-                "public_domain",
-                "observer_received_email",
-            ]
         for field in set(validated_data) - set(allowed_admin_fields):
             validated_data.pop(field)
         instance = super().update(instance, validated_data)

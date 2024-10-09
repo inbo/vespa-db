@@ -304,7 +304,7 @@ class ObservationSerializer(serializers.ModelSerializer):
                 raise ValidationError("You do not have permission to reserve nests in this municipality.")
         return value
 
-    def update(self, instance: Observation, validated_data: dict[Any, Any]) -> Observation:  # noqa: C901,PLR0912
+    def update(self, instance: Observation, validated_data: dict[Any, Any]) -> Observation:  # noqa: C901
         """Update method to handle observation reservations."""
         user = self.context["request"].user
         allowed_admin_fields = [

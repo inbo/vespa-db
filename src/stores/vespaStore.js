@@ -297,12 +297,8 @@ export const useVespaStore = defineStore('vespaStore', {
                 observation.observation_datetime = this.formatToISO8601(observation.observation_datetime);
             }
             if (observation.eradication_date) {
-                observation.eradication_date = this.formatDateWithoutTime(observation.eradication_date);
-
-
+                observation.eradication_date = this.formatDateWithEndOfDayTime(observation.eradication_date);
             }
-
-
             try {
                 const response = await ApiService.patch(`/observations/${observation.id}/`, observation);
                 if (response.status === 200) {

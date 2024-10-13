@@ -642,13 +642,37 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
 
         paginator = Paginator(queryset, 1000)
         serialized_data = []
+        errors = []
+
         for page_number in paginator.page_range:
             page = paginator.page(page_number)
-            serializer = serializer_class(page, many=True, context=serializer_context)
-            serialized_data.extend(serializer.data)
+            try:
+                serializer = serializer_class(page, many=True, context=serializer_context)
+                serialized_data.extend(serializer.data)
+            except ValidationError:
+                logger.exception(f"Validation error in page {page_number}, processing individually.")
+                for obj in page.object_list:
+                    serializer = serializer_class(obj, context=serializer_context)
+                    try:
+                        serializer.is_valid(raise_exception=True)
+                        serialized_data.append(serializer.data)
+                    except ValidationError as e:
+                        errors.append({
+                            "id": obj.id,
+                            "error": str(e),
+                            "data": serializer.data,
+                        })
+
+        if errors:
+            logger.error(f"Errors during export: {errors}")
 
         if export_format == "json":
-            return JsonResponse(serialized_data, safe=False, json_dumps_params={"indent": 2})
+            response_data = {
+                "data": serialized_data,
+                "errors": errors,
+            }
+            return JsonResponse(response_data, safe=False, json_dumps_params={"indent": 2})
+
         if export_format == "csv":
             response = HttpResponse(content_type="text/csv")
             response["Content-Disposition"] = f'attachment; filename="observations_export_{user.username}.csv"'

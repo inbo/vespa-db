@@ -532,7 +532,7 @@ export default {
 
         const eradicationStatusText = computed(() => {
             const result = selectedObservation.value?.eradication_result;
-            if (result === 'successful') {
+            if (result && result !== null) {
                 return 'Bestreden';
             } else {
                 return 'Niet bestreden';
@@ -541,7 +541,7 @@ export default {
 
         const eradicationStatusClass = computed(() => {
             const result = selectedObservation.value?.eradication_result;
-            if (result === 'successful') {
+            if (result && result !== null) {
                 return 'bg-success';
             } else {
                 return 'bg-danger';
@@ -643,7 +643,9 @@ export default {
                     'eradication_problems', 'eradication_notes', 'eradication_product'
                 ];
                 const hasEradicationData = eradicationFields.some(field => editableObservation.value[field]);
-
+                if (editableObservation.value.eradication_date) {
+                    editableObservation.value.eradication_date += "T00:00:00";
+                }
                 if (hasEradicationData && !editableObservation.value.eradication_result) {
                     eradicationResultError.value = 'Resultaat is verplicht wanneer andere bestrijdingsgegevens zijn ingevuld.';
                     throw new Error('Validation failed');
@@ -705,6 +707,7 @@ export default {
                 editableObservation.value = { ...newVal };
                 editableObservation.value.observation_datetime = formatToDatetimeLocal(selectedObservation.value.observation_datetime);
                 editableObservation.value.eradication_date = formatToDate(selectedObservation.value.eradication_date);
+                //editableObservation.value.eradication_date = formatToDate(newVal.eradication_date);
             }
         }, { immediate: true });
         watch(selectedObservation, resetEditableObservation, { immediate: true });

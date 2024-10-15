@@ -152,7 +152,6 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         "wn_validation_status",
         "wn_admin_notes",
         "observer_name",
-        "observer_email",
         "observer_phone_number",
         "created_datetime",
         "created_by",

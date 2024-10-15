@@ -16,7 +16,7 @@ from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import CharField, OuterRef, QuerySet, Subquery, Value
 from django.db.models.functions import Coalesce
-from django.db.utils import IntegrityError
+from django.db.utils import IntegrityError, OperationalError
 from django.http import HttpResponse, JsonResponse
 from django.utils.decorators import method_decorator
 from django.utils.timezone import now
@@ -40,7 +40,7 @@ from rest_framework_gis.filters import DistanceToPointFilter
 
 from vespadb.observations.cache import invalidate_geojson_cache, invalidate_observation_cache
 from vespadb.observations.filters import ObservationFilter
-from vespadb.observations.helpers import parse_and_convert_to_utc
+from vespadb.observations.helpers import parse_and_convert_to_utc, retry_with_backoff
 from vespadb.observations.models import Municipality, Observation, Province
 from vespadb.observations.serializers import (
     MunicipalitySerializer,
@@ -633,39 +633,49 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
     @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
     @action(detail=False, methods=["get"], permission_classes=[AllowAny])
     def export(self, request: Request) -> Response:
-        """Export observations data in the specified format."""
+        """Export observations data in the specified format with retry mechanism."""
         user = request.user
         export_format = request.query_params.get("export_format", "json").lower()
         queryset = self.filter_queryset(self.get_queryset())
         serializer_class = self.get_serializer_class()
         serializer_context = self.get_serializer_context()
 
-        paginator = Paginator(queryset, 1000)
+        paginator = Paginator(queryset, 1000)  # Limiting to smaller batches
         serialized_data = []
         errors = []
 
         for page_number in paginator.page_range:
             page = paginator.page(page_number)
             try:
+                # Try serializing the entire page first
                 serializer = serializer_class(page, many=True, context=serializer_context)
                 serialized_data.extend(serializer.data)
             except ValidationError:
                 logger.exception(f"Validation error in page {page_number}, processing individually.")
                 for obj in page.object_list:
-                    serializer = serializer_class(obj, context=serializer_context)
                     try:
-                        serializer.is_valid(raise_exception=True)
-                        serialized_data.append(serializer.data)
+                        # Retry the serialization of each object individually with backoff
+                        serializer_data = retry_with_backoff(
+                            lambda obj=obj: serializer_class(obj, context=serializer_context).data
+                        )
+                        serialized_data.append(serializer_data.data)
                     except ValidationError as e:
                         errors.append({
                             "id": obj.id,
                             "error": str(e),
-                            "data": serializer.data,
+                            "data": serializer_data.data if serializer_data else None,
+                        })
+                    except OperationalError as e:
+                        logger.exception(f"Database error for object {obj.id}: {e}")
+                        errors.append({
+                            "id": obj.id,
+                            "error": "Database connection error",
                         })
 
         if errors:
             logger.error(f"Errors during export: {errors}")
 
+        # Handle the final export based on the requested format
         if export_format == "json":
             response_data = {
                 "data": serialized_data,
@@ -682,6 +692,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 writer.writeheader()
                 writer.writerows(serialized_data)
             return response
+
         return Response({"error": "Unsupported format specified."}, status=status.HTTP_400_BAD_REQUEST)
 
 

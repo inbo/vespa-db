@@ -298,7 +298,7 @@ class Observation(models.Model):
     eradicator_name = models.CharField(
         max_length=255, blank=True, null=True, help_text="Name of the person who eradicated the nest"
     )
-    eradication_duration = models.IntegerField(
+    eradication_duration = models.PositiveIntegerField(
         blank=True, null=True, help_text="Duration of the eradication in minutes"
     )
     eradication_persons = models.IntegerField(

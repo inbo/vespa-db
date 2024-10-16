@@ -230,6 +230,10 @@ class ObservationSerializer(serializers.ModelSerializer):
             instance.save(update_fields=["municipality", "province"])
 
         data: dict[str, Any] = super().to_representation(instance)
+        observation_datetime = data.get('observation_datetime')
+        if isinstance(observation_datetime, datetime.date) and not isinstance(observation_datetime, datetime):
+            data['observation_datetime'] = datetime.combine(observation_datetime, datetime.min.time())
+            
         data.pop("wn_admin_notes", None)
         datetime_fields = [
             "created_datetime",

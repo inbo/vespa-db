@@ -195,7 +195,7 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
         and external_data["notes"]
         and any(keyword in external_data["notes"].upper() for keyword in settings.ERADICATION_KEYWORD_LIST)
     ):
-        mapped_data["eradication_datetime"] = observation_datetime_utc
+        mapped_data["eradication_date"] = observation_datetime_utc
         mapped_data["eradicator_name"] = "Gemeld als bestreden"
 
     return mapped_data

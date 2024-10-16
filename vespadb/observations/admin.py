@@ -44,7 +44,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         "nest_type",
         "nest_height",
         "nest_size",
-        "eradication_datetime",
+        "eradication_date",
         "eradication_result",
         "eradicator_name",
         "reserved_by",
@@ -52,7 +52,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
     )
     list_filter = (
         "observation_datetime",
-        "eradication_datetime",
+        "eradication_date",
         "eradicator_name",
         "wn_validation_status",
         "nest_height",
@@ -219,7 +219,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         -------
         - None
         """
-        count = queryset.update(eradication_datetime=now())
+        count = queryset.update(eradication_date=now())
         self.message_user(request, f"{count} observations marked as eradicated.", messages.SUCCESS)
 
     @admin.action(description="Markeer observatie(s) als niet zichtbaar")

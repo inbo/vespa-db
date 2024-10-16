@@ -42,7 +42,7 @@ def update_reserved_datetime(sender: type[Model], instance: Observation, created
     Update reserved_datetime and handle reservation count on eradication update for an Observation after it has been saved.
 
     This signal sets the reserved_datetime to the current time when a reservation is made, if it was not already set.
-    Also, if eradication_datetime was not previously filled but is updated now, and if reserved_by was set,
+    Also, if eradication_date was not previously filled but is updated now, and if reserved_by was set,
     it decrements the reservation count for the user that reserved the observation.
 
     Parameters
@@ -58,7 +58,7 @@ def update_reserved_datetime(sender: type[Model], instance: Observation, created
 
     if not created:
         old_instance = sender.objects.get(pk=instance.pk)
-        # Check if eradication_datetime was updated and reserved by is set
-        if not old_instance.eradication_datetime and instance.eradication_datetime and instance.reserved_by:
+        # Check if eradication_date was updated and reserved by is set
+        if not old_instance.eradication_date and instance.eradication_date and instance.reserved_by:
             instance.reserved_by.reservation_count = F("reservation_count") - 1
             instance.reserved_by.save(update_fields=["reservation_count"])

@@ -7,6 +7,7 @@ import { defineStore } from 'pinia';
 
 export const useVespaStore = defineStore('vespaStore', {
     state: () => ({
+        loadingAuth: true,
         isLoggedIn: false,
         loading: false,
         error: null,
@@ -170,22 +171,24 @@ export const useVespaStore = defineStore('vespaStore', {
             }
         },
         createCircleMarker(feature, latlng) {
-            let color = "#FF7800"; // Orange default
+            let fillColor = "rgba(var(--bs-dark-rgb))"; // Default for reported
             if (feature.properties.status === "eradicated") {
-                color = "#00FF00"; // Green
+              fillColor = "rgba(var(--bs-success-rgb))"; // Green for eradicated
             } else if (feature.properties.status === "reserved") {
-                color = "#808080"; // Gray
+              fillColor = "rgba(var(--bs-warning-rgb))"; // Yellow for reserved
             }
             let markerOptions = {
-                radius: 10 + (feature.properties.observations_count || 0) * 0.5,
-                fillColor: color,
-                color: "#000",
-                weight: 1,
-                opacity: 1,
-                fillOpacity: 0.8
+              radius: 10 + (feature.properties.observations_count || 0) * 0.5,
+              fillColor: fillColor,
+              color: "#3c3c3c",
+              weight: 1,
+              opacity: 1,
+              fillOpacity: 0.8,
+              className: feature.properties.id === this.selectedObservation?.id ? 'active-marker' : ''
             };
-            return L.circleMarker(latlng, markerOptions).bindPopup(`Observatie ID: ${feature.properties.id}`);
-        },
+            const marker = L.circleMarker(latlng, markerOptions);
+            return marker;
+          },
         async reserveObservation(observation) {
             if (this.user.reservation_count < 50) {
                 const response = await ApiService.patch(`/observations/${observation.id}/`, {
@@ -230,7 +233,7 @@ export const useVespaStore = defineStore('vespaStore', {
         async markObservationAsEradicated(observationId) {
             try {
                 const response = await ApiService.patch(`/observations/${observationId}/`, {
-                    eradication_datetime: new Date().toISOString()
+                    eradication_date: new Date().toISOString()
                 });
                 if (response.status === 200) {
                     this.selectedObservation = response.data;
@@ -247,7 +250,7 @@ export const useVespaStore = defineStore('vespaStore', {
         async markObservationAsNotEradicated(observationId) {
             try {
                 const response = await ApiService.patch(`/observations/${observationId}/`, {
-                    eradication_datetime: null
+                    eradication_date: null
                 });
                 if (response.status === 200) {
                     this.selectedObservation = response.data;
@@ -264,7 +267,6 @@ export const useVespaStore = defineStore('vespaStore', {
             try {
                 const response = await ApiService.get(`/observations/${observationId}`);
                 if (response.status === 200) {
-                    console.log('Fetched Observation Details:', response.data);
                     this.selectedObservation = response.data;
                 } else {
                     throw new Error('Failed to fetch observation details');
@@ -281,7 +283,7 @@ export const useVespaStore = defineStore('vespaStore', {
         },
         async updateObservation(observation) {
             observation.observation_datetime = this.formatToISO8601(observation.observation_datetime);
-            observation.eradication_datetime = this.formatToISO8601(observation.eradication_datetime);
+            observation.eradication_date = this.formatToISO8601(observation.eradication_date);
 
             try {
                 const response = await ApiService.patch(`/observations/${observation.id}/`, observation);
@@ -294,18 +296,6 @@ export const useVespaStore = defineStore('vespaStore', {
             } catch (error) {
                 console.error('Error when updating the observation:', error);
                 return null;
-            }
-        },
-        async fetchMunicipalities() {
-            try {
-                const response = await ApiService.get('/municipalities/');
-                if (response.status === 200) {
-                    this.municipalities = response.data;
-                } else {
-                    console.error('Failed to fetch municipalities: Status Code', response.status);
-                }
-            } catch (error) {
-                console.error('Error fetching municipalities:', error);
             }
         },
         async updateObservation(observation) {
@@ -337,6 +327,18 @@ export const useVespaStore = defineStore('vespaStore', {
                 console.error('Error exporting data:', error);
             }
         },
+        async fetchMunicipalitiesByProvinces(provinceIds) {
+            try {
+                const response = await ApiService.get(`/municipalities/by_provinces/?province_ids=${provinceIds.join(',')}`);
+                if (response.status === 200) {
+                    this.municipalities = response.data;
+                } else {
+                    console.error('Failed to fetch filtered municipalities: Status Code', response.status);
+                }
+            } catch (error) {
+                console.error('Error fetching filtered municipalities:', error);
+            }
+        },
         async login({ username, password }) {
             this.loading = true;
             this.error = null;
@@ -352,7 +354,7 @@ export const useVespaStore = defineStore('vespaStore', {
                     const errorMsg = error.response.data.error;
                     if (Array.isArray(errorMsg)) {
                         this.error = errorMsg.join(', ');
-                    } else if (errorMsg.includes("Invalid username or password")) {
+                    } else if (errorMsg.startsWith("Invalid username or password")) {
                         this.error = "Ongeldige gebruikersnaam of wachtwoord.";
                     } else {
                         this.error = errorMsg;
@@ -365,51 +367,30 @@ export const useVespaStore = defineStore('vespaStore', {
                 this.loading = false;
             }
         },
-        async fetchMunicipalitiesByProvinces(provinceIds) {
+        async authCheck() {
+            this.loadingAuth = true; // Start loading
+            this.loading = true;
             try {
-                const response = await ApiService.get(`/municipalities/by_provinces/?province_ids=${provinceIds.join(',')}`);
-                if (response.status === 200) {
-                    this.municipalities = response.data;
+                const response = await ApiService.get("/auth-check");
+                const data = response.data;
+                if (data.isAuthenticated && data.user) {
+                    this.user = data.user;
+                    this.userMunicipalities = data.user.municipalities;
+                    this.isAdmin = data.user.is_staff;
+                    this.error = "";
+                    this.isLoggedIn = true;
                 } else {
-                    console.error('Failed to fetch filtered municipalities: Status Code', response.status);
+                    this.error = "";
+                    this.isLoggedIn = false;
+                    this.isAdmin = false;
                 }
             } catch (error) {
-                console.error('Error fetching filtered municipalities:', error);
+                this.error = error;
+                this.isLoggedIn = false;
+            } finally {
+                this.loadingAuth = false;
+                this.loading = false;
             }
-        },
-        async authCheck() {
-            this.loading = true;
-            await ApiService
-                .get("/auth-check")
-                .then((response) => {
-                    const data = response.data;
-                    if (data.isAuthenticated && data.user) {
-                        this.user = data.user;
-                        this.userMunicipalities = data.user.municipalities;
-                        this.isAdmin = data.user.is_staff;
-                        console.log('User is admin:', this.isAdmin);
-                        this.error = "";
-                        this.isLoggedIn = true;
-                        this.loading = false;
-
-                        if (!this.authInterval) {
-                            this.authInterval = setInterval(() => {
-                                this.authCheck();
-                            }, 1000 * 60 * 21);
-                        }
-                    } else {
-                        this.error = "";
-                        this.isLoggedIn = false;
-                        this.isAdmin = false;
-                        this.loading = false;
-                        this.authInterval = null;
-                    }
-                })
-                .catch((error) => {
-                    this.error = error;
-                    this.isLoggedIn = false;
-                    this.loading = false;
-                });
         },
         async logout() {
             this.loading = true;

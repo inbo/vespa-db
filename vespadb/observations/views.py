@@ -46,10 +46,11 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 BBOX_LENGTH = 4
-REDIS_CACHE_EXPIRATION = 900  # 15 minutes
+GEOJSON_REDIS_CACHE_EXPIRATION = 900  # 15 minutes
+GET_REDIS_CACHE_EXPIRATION = 86400  # 1 day
 
 
-class ObservationsViewSet(ModelViewSet):
+class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
     """ViewSet for the Observation model."""
 
     queryset = Observation.objects.all()
@@ -138,6 +139,11 @@ class ObservationsViewSet(ModelViewSet):
             raise PermissionDenied("You do not have permission to modify admin fields.")
         serializer.save(modified_by=self.request.user, modified_datetime=now())
 
+    @swagger_auto_schema(
+        operation_description="Partially update an existing observation.",
+        request_body=ObservationSerializer,
+        responses={200: ObservationSerializer},
+    )
     def partial_update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """
         Handle partial updates to an observation, especially for changes to 'reserved_by'.
@@ -162,7 +168,7 @@ class ObservationsViewSet(ModelViewSet):
             "wn_created_datetime",
             "reserved_datetime",
             "observation_datetime",
-            "eradication_datetime",
+            "eradication_date",
         ]
         for field in datetime_fields:
             if field in data:
@@ -196,6 +202,11 @@ class ObservationsViewSet(ModelViewSet):
             created_by=self.request.user, modified_by=self.request.user, created_datetime=now(), modified_datetime=now()
         )
 
+    @swagger_auto_schema(
+        operation_description="Create a new observation.",
+        request_body=ObservationSerializer,
+        responses={201: ObservationSerializer},
+    )
     def create(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """
         Override the create method to determine the municipality for a new Observation instance based on the provided point location.
@@ -209,6 +220,7 @@ class ObservationsViewSet(ModelViewSet):
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
+    @swagger_auto_schema(operation_description="Delete an observation by ID.", responses={204: "No Content"})
     def destroy(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """
         Override the destroy method to update the reservation count when an observation is deleted.
@@ -259,6 +271,10 @@ class ObservationsViewSet(ModelViewSet):
         })
 
     @method_decorator(ratelimit(key="ip", rate="15/m", method="GET", block=True))
+    @swagger_auto_schema(
+        operation_description="Retrieve a list of observations. Supports filtering and ordering.",
+        responses={200: ObservationSerializer(many=True)},
+    )
     def retrieve_list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """
         Handle requests for the list of observations with pagination.
@@ -285,6 +301,31 @@ class ObservationsViewSet(ModelViewSet):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
+    @swagger_auto_schema(
+        operation_description="Retrieve GeoJSON data for observations within a bounding box (bbox).",
+        manual_parameters=[
+            openapi.Parameter(
+                "bbox",
+                openapi.IN_QUERY,
+                description="Bounding box for filtering observations. Format: xmin,ymin,xmax,ymax",
+                type=openapi.TYPE_STRING,
+            )
+        ],
+        responses={
+            200: openapi.Response(
+                "GeoJSON data",
+                openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "type": openapi.Schema(type=openapi.TYPE_STRING),
+                        "features": openapi.Schema(
+                            type=openapi.TYPE_ARRAY, items=openapi.Schema(type=openapi.TYPE_OBJECT)
+                        ),
+                    },
+                ),
+            )
+        },
+    )
     @method_decorator(ratelimit(key="ip", rate="15/m", method="GET", block=True))
     @action(detail=False, methods=["get"], url_path="dynamic-geojson")
     def geojson(self, request: Request) -> HttpResponse:
@@ -332,11 +373,7 @@ class ObservationsViewSet(ModelViewSet):
                     "properties": {
                         "id": obs.id,
                         "status": (
-                            "eradicated"
-                            if obs.eradication_datetime
-                            else "reserved"
-                            if obs.reserved_datetime
-                            else "default"
+                            "eradicated" if obs.eradication_date else "reserved" if obs.reserved_datetime else "default"
                         ),
                     },
                     "geometry": json.loads(obs.point.geojson) if obs.point else None,
@@ -344,7 +381,7 @@ class ObservationsViewSet(ModelViewSet):
                 for obs in queryset
             ]
             geojson_response = {"type": "FeatureCollection", "features": features}
-            cache.set(cache_key, geojson_response, REDIS_CACHE_EXPIRATION)
+            cache.set(cache_key, geojson_response, GEOJSON_REDIS_CACHE_EXPIRATION)
             return JsonResponse(geojson_response)
         except Exception:
             logger.exception("An error occurred while generating GeoJSON data")
@@ -409,6 +446,44 @@ class ObservationsViewSet(ModelViewSet):
         # Save valid observations
         return self.save_observations(processed_data)
 
+    @swagger_auto_schema(operation_description="Retrieve an observation by ID.", responses={200: ObservationSerializer})
+    def retrieve(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        """
+        Retrieve an observation by its ID.
+
+        Parameters
+        ----------
+        - request (Request): The incoming HTTP request.
+        - *args (Any): Additional positional arguments.
+        - **kwargs (Any): Additional keyword arguments.
+
+        Returns
+        -------
+        - Response: A response containing the serialized observation data.
+        """
+        return super().retrieve(request, *args, **kwargs)
+
+    @swagger_auto_schema(
+        operation_description="Update an existing observation.",
+        request_body=ObservationSerializer,
+        responses={200: ObservationSerializer},
+    )
+    def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        """
+        Update an existing observation.
+
+        Parameters
+        ----------
+        - request (Request): The incoming HTTP request containing the observation data.
+        - *args (Any): Additional positional arguments.
+        - **kwargs (Any): Additional keyword arguments.
+
+        Returns
+        -------
+        - Response: A response containing the updated serialized observation data.
+        """
+        return super().update(request, *args, **kwargs)
+
     def parse_csv(self, file: InMemoryUploadedFile) -> list[dict[str, Any]]:
         """Parse a CSV file to a list of dictionaries."""
         file.seek(0)
@@ -423,7 +498,7 @@ class ObservationsViewSet(ModelViewSet):
                     "created_datetime",
                     "modified_datetime",
                     "observation_datetime",
-                    "eradication_datetime",
+                    "eradication_date",
                     "wn_modified_datetime",
                     "wn_created_datetime",
                 ]
@@ -472,7 +547,7 @@ class ObservationsViewSet(ModelViewSet):
             "created_datetime",
             "modified_datetime",
             "observation_datetime",
-            "eradication_datetime",
+            "eradication_date",
             "wn_modified_datetime",
             "wn_created_datetime",
         ]
@@ -571,6 +646,11 @@ class MunicipalityViewSet(ReadOnlyModelViewSet):
     @action(detail=False, methods=["get"])
     def by_provinces(self, request: Request) -> Response:
         """Return municipalities filtered by province IDs."""
+        cache_key = "vespadb::municipalities_by_province::list"
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            return Response(cached_data)
+
         province_ids = request.query_params.get("province_ids")
         if not province_ids:
             return Response({"detail": "province_ids parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
@@ -578,7 +658,20 @@ class MunicipalityViewSet(ReadOnlyModelViewSet):
         province_ids = province_ids.split(",")
         municipalities = Municipality.objects.filter(province_id__in=province_ids).order_by("name")
         serializer = self.get_serializer(municipalities, many=True)
+        cache.set(cache_key, serializer.data, GET_REDIS_CACHE_EXPIRATION)
         return Response(serializer.data)
+
+    @method_decorator(ratelimit(key="ip", rate="15/m", method="GET", block=True))
+    def list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        """Override the list method to add caching."""
+        cache_key = "vespadb::municipalities::list"
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            return Response(cached_data)
+
+        response = super().list(request, *args, **kwargs)
+        cache.set(cache_key, response.data, GET_REDIS_CACHE_EXPIRATION)
+        return response
 
 
 class ProvinceViewSet(ReadOnlyModelViewSet):
@@ -593,3 +686,15 @@ class ProvinceViewSet(ReadOnlyModelViewSet):
         if self.request.method == "GET":
             return [AllowAny()]
         return [IsAdminUser()]
+
+    @method_decorator(ratelimit(key="ip", rate="15/m", method="GET", block=True))
+    def list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        """Override the list method to add caching."""
+        cache_key = "vespadb::provinces::list"
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            return Response(cached_data)
+
+        response = super().list(request, *args, **kwargs)
+        cache.set(cache_key, response.data, GET_REDIS_CACHE_EXPIRATION)
+        return response

@@ -22,8 +22,8 @@ secrets = {
     "DJANGO_SECRET_KEY": os.getenv("SECRET_KEY"),
     "CORS_ALLOWED_ORIGINS": os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000").split(","),
     "CSRF_TRUSTED_ORIGINS": os.getenv("CSRF_TRUSTED_ORIGINS", "http://localhost:3000").split(","),
-    "CSRF_COOKIE_DOMAIN": os.getenv("CSRF_COOKIE_DOMAIN"),
-    "SESSION_COOKIE_DOMAIN": os.getenv("SESSION_COOKIE_DOMAIN"),
+    "CSRF_COOKIE_DOMAIN": os.getenv("CSRF_COOKIE_DOMAIN", ".vespawatch.be"),
+    "SESSION_COOKIE_DOMAIN": os.getenv("SESSION_COOKIE_DOMAIN", ".vespawatch.be"),
     "POSTGRES_DB": os.getenv("POSTGRES_DB"),
     "POSTGRES_USER": os.getenv("POSTGRES_USER"),
     "POSTGRES_PASSWORD": os.getenv("POSTGRES_PASSWORD"),
@@ -69,10 +69,11 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
-    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -121,11 +122,11 @@ CELERY_TIMEZONE = "UTC"
 CELERY_BEAT_SCHEDULE = {
     "fetch_and_update_observations": {
         "task": "vespadb.observations.tasks.observation_sync.fetch_and_update_observations",
-        "schedule": crontab(hour=10, minute=0),  # Runs every day at X AM UTC.
+        "schedule": crontab(hour=4, minute=0),  # Runs every day at X AM UTC.
     },
     "remove_expired_reservations": {
         "task": "vespadb.observations.tasks.reservation_cleanup.free_expired_reservations_and_audit_reservation_count",
-        "schedule": crontab(hour=7, minute=0),  # Runs every day at X AM UTC
+        "schedule": crontab(hour=5, minute=30),  # Runs every day at X AM UTC
     },
 }
 
@@ -260,3 +261,5 @@ SWAGGER_SETTINGS = {
     "JSON_EDITOR": True,
     "REFETCH_SCHEMA_WITH_AUTH": True,
 }
+
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

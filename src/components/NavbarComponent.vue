@@ -1,19 +1,20 @@
 <template>
-  <nav class="navbar navbar-expand-lg navbar-dark bg-success">
+  <nav class="navbar navbar-expand-lg navbar-light bg-light">
     <div class="container-fluid">
-      <a class="navbar-brand" href="/">VespaDB</a>
+      <a class="navbar-brand d-flex align-items-center" href="/">
+        <img class="me-3" src="../assets/logo.png" alt="Vespa-Watch">
+        Vespa-Watch
+      </a>
       <div class="d-flex align-items-center">
         <!-- View Mode Toggle -->
         <div class="btn-group me-2" role="group">
-          <router-link to="/map" class="btn btn-outline-light" active-class="active"
-            aria-current="page">Map</router-link>
-          <router-link to="/table" class="btn btn-outline-light" active-class="active">Tabel</router-link>
+          <router-link to="/map" class="btn btn-outline-dark" active-class="active" aria-current="page">Map</router-link>
+          <router-link to="/table" class="btn btn-outline-dark" active-class="active">Tabel</router-link>
         </div>
 
-        <!-- Export Toggle (Hidden on Small Devices) -->
-        <div class="btn-group me-2 d-none d-lg-inline-flex">
-          <button type="button" class="btn btn-outline-light dropdown-toggle" data-bs-toggle="dropdown"
-            aria-expanded="false">
+        <!-- Export Toggle (Hidden on Medium Devices and below) -->
+        <div class="btn-group me-2 d-md-inline-flex">
+          <button type="button" class="btn btn-outline-dark dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
             Export
           </button>
           <ul class="dropdown-menu">
@@ -23,10 +24,9 @@
         </div>
 
         <!-- User Login/Logout -->
-        <span v-if="isLoggedIn" class="navbar-text">
+        <span v-if="isLoggedIn && !loadingAuth" class="navbar-text">
           <div class="btn-group">
-            <button type="button" class="btn btn-outline-light dropdown-toggle" data-bs-toggle="dropdown"
-              aria-expanded="false">
+            <button type="button" class="btn btn-outline-dark dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
               {{ username }}
             </button>
             <ul class="dropdown-menu dropdown-menu-end">
@@ -35,12 +35,12 @@
             </ul>
           </div>
         </span>
-        <a v-else href="/login" class="btn btn-outline-light ms-2">Inloggen</a>
+        <router-link v-if="!isLoggedIn && !loadingAuth" to="/login" class="btn btn-outline-dark" active-class="active">Inloggen</router-link>
+        <span v-if="loadingAuth" class="navbar-text">Loading...</span> <!-- Placeholder while loading -->
       </div>
     </div>
   </nav>
-  <ModalMessage :title="modalTitle" :message="modalMessage" :isVisible="isModalVisible"
-    @close="isModalVisible = false" />
+  <ModalMessage :title="modalTitle" :message="modalMessage" :isVisible="isModalVisible" @close="isModalVisible = false" />
 </template>
 
 <script>
@@ -58,6 +58,7 @@ export default {
     const router = useRouter();
     const vespaStore = useVespaStore();
     const isLoggedIn = computed(() => vespaStore.isLoggedIn);
+    const loadingAuth = computed(() => vespaStore.loadingAuth);
     const username = computed(() => vespaStore.user.username);
     const fileInput = ref(null);
     const isModalVisible = ref(false);
@@ -93,7 +94,7 @@ export default {
       await vespaStore.exportData(format);
     };
 
-    return { isLoggedIn, username, logout, navigateToChangePassword, exportData, fileInput, isModalVisible, modalTitle, modalMessage };
+    return { isLoggedIn, loadingAuth, username, logout, navigateToChangePassword, exportData, fileInput, isModalVisible, modalTitle, modalMessage };
   },
   mounted() {
     var dropdownElementList = [].slice.call(document.querySelectorAll('.dropdown-toggle'));

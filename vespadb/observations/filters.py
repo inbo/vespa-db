@@ -61,11 +61,11 @@ class ObservationFilter(GeoFilterSet):
             return queryset
         query = Q()
         if "eradicated" in value:
-            query |= Q(eradication_datetime__isnull=False)
+            query |= Q(eradication_date__isnull=False)
         if "reserved" in value:
             query |= Q(reserved_datetime__isnull=False)
         if "open" in value:
-            query |= Q(reserved_datetime__isnull=True, eradication_datetime__isnull=True)
+            query |= Q(reserved_datetime__isnull=True, eradication_date__isnull=True)
 
         return queryset.filter(query)
 

@@ -1,0 +1,622 @@
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile.frontend
+#1 transferring dockerfile: 1.58kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/nginx:alpine
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/node:18
+#3 DONE 0.0s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 222B done
+#4 DONE 0.0s
+
+#5 [builder  1/10] FROM docker.io/library/node:18
+#5 DONE 0.0s
+
+#6 [builder  2/10] WORKDIR /app
+#6 CACHED
+
+#7 [frontend-prod 1/5] FROM docker.io/library/nginx:alpine
+#7 CACHED
+
+#8 [internal] load build context
+#8 transferring context: 29.80MB 0.1s done
+#8 DONE 0.1s
+
+#9 [builder  3/10] COPY package*.json ./
+#9 DONE 0.1s
+
+#10 [builder  4/10] RUN echo "Contents of /app after copying package.json:" && ls -la /app
+#10 0.100 Contents of /app after copying package.json:
+#10 0.102 total 116
+#10 0.102 drwxr-xr-x 1 root root   4096 Jun 23 12:51 .
+#10 0.102 drwxr-xr-x 1 root root   4096 Jun 23 12:51 ..
+#10 0.102 -rw-r--r-- 1 root root 104290 Jun 21 15:05 package-lock.json
+#10 0.102 -rw-r--r-- 1 root root    886 Jun 21 15:05 package.json
+#10 DONE 0.1s
+
+#11 [builder  5/10] RUN npm install --loglevel verbose
+#11 0.280 npm verbose cli /usr/local/bin/node /usr/local/bin/npm
+#11 0.280 npm info using npm@10.7.0
+#11 0.281 npm info using node@v18.20.3
+#11 0.282 npm verbose title npm install
+#11 0.282 npm verbose argv "install" "--loglevel" "verbose"
+#11 0.282 npm verbose logfile logs-max:10 dir:/root/.npm/_logs/2024-06-23T12_51_23_545Z-
+#11 0.283 npm verbose logfile /root/.npm/_logs/2024-06-23T12_51_23_545Z-debug-0.log
+#11 0.558 npm verbose reify failed optional dependency /app/node_modules/fsevents
+#11 0.562 npm verbose reify failed optional dependency /app/node_modules/@rollup/rollup-win32-x64-msvc
+#11 0.562 npm verbose reify failed optional dependency /app/node_modules/@rollup/rollup-win32-ia32-msvc
+#11 0.562 npm verbose reify failed optional dependency /app/node_modules/@rollup/rollup-win32-arm64-msvc
+#11 0.562 npm verbose reify failed optional dependency /app/node_modules/@rollup/rollup-linux-x64-musl
+#11 0.562 npm verbose reify failed optional dependency /app/node_modules/@rollup/rollup-linux-x64-gnu
+#11 0.562 npm verbose reify failed optional dependency /app/node_modules/@rollup/rollup-linux-riscv64-gnu
+#11 0.562 npm verbose reify failed optional dependency /app/node_modules/@rollup/rollup-linux-arm-gnueabihf
+#11 0.562 npm verbose reify failed optional dependency /app/node_modules/@rollup/rollup-darwin-x64
+#11 0.562 npm verbose reify failed optional dependency /app/node_modules/@rollup/rollup-darwin-arm64
+#11 0.563 npm verbose reify failed optional dependency /app/node_modules/@rollup/rollup-android-arm64
+#11 0.563 npm verbose reify failed optional dependency /app/node_modules/@rollup/rollup-android-arm-eabi
+#11 0.564 npm verbose reify failed optional dependency /app/node_modules/@esbuild/win32-x64
+#11 0.564 npm verbose reify failed optional dependency /app/node_modules/@esbuild/win32-ia32
+#11 0.564 npm verbose reify failed optional dependency /app/node_modules/@esbuild/win32-arm64
+#11 0.564 npm verbose reify failed optional dependency /app/node_modules/@esbuild/sunos-x64
+#11 0.564 npm verbose reify failed optional dependency /app/node_modules/@esbuild/openbsd-x64
+#11 0.564 npm verbose reify failed optional dependency /app/node_modules/@esbuild/netbsd-x64
+#11 0.564 npm verbose reify failed optional dependency /app/node_modules/@esbuild/linux-x64
+#11 0.564 npm verbose reify failed optional dependency /app/node_modules/@esbuild/linux-s390x
+#11 0.564 npm verbose reify failed optional dependency /app/node_modules/@esbuild/linux-riscv64
+#11 0.564 npm verbose reify failed optional dependency /app/node_modules/@esbuild/linux-ppc64
+#11 0.564 npm verbose reify failed optional dependency /app/node_modules/@esbuild/linux-mips64el
+#11 0.564 npm verbose reify failed optional dependency /app/node_modules/@esbuild/linux-loong64
+#11 0.564 npm verbose reify failed optional dependency /app/node_modules/@esbuild/linux-ia32
+#11 0.564 npm verbose reify failed optional dependency /app/node_modules/@esbuild/linux-arm
+#11 0.565 npm verbose reify failed optional dependency /app/node_modules/@esbuild/freebsd-x64
+#11 0.565 npm verbose reify failed optional dependency /app/node_modules/@esbuild/freebsd-arm64
+#11 0.565 npm verbose reify failed optional dependency /app/node_modules/@esbuild/darwin-x64
+#11 0.565 npm verbose reify failed optional dependency /app/node_modules/@esbuild/darwin-arm64
+#11 0.565 npm verbose reify failed optional dependency /app/node_modules/@esbuild/android-x64
+#11 0.565 npm verbose reify failed optional dependency /app/node_modules/@esbuild/android-arm64
+#11 0.565 npm verbose reify failed optional dependency /app/node_modules/@esbuild/android-arm
+#11 0.565 npm verbose reify failed optional dependency /app/node_modules/@esbuild/aix-ppc64
+#11 0.780 npm http fetch GET 200 https://registry.npmjs.org/npm 339ms
+#11 0.841 npm http fetch GET 200 https://registry.npmjs.org/yocto-queue/-/yocto-queue-0.1.0.tgz 257ms (cache miss)
+#11 0.841 npm http fetch GET 200 https://registry.npmjs.org/which/-/which-2.0.2.tgz 257ms (cache miss)
+#11 0.843 npm http fetch GET 200 https://registry.npmjs.org/webpack-virtual-modules/-/webpack-virtual-modules-0.6.1.tgz 258ms (cache miss)
+#11 0.843 npm http fetch GET 200 https://registry.npmjs.org/word-wrap/-/word-wrap-1.2.5.tgz 259ms (cache miss)
+#11 0.845 npm http fetch GET 200 https://registry.npmjs.org/vite-plugin-vuetify/-/vite-plugin-vuetify-2.0.3.tgz 259ms (cache miss)
+#11 0.851 npm http fetch GET 200 https://registry.npmjs.org/webpack-sources/-/webpack-sources-3.2.3.tgz 266ms (cache miss)
+#11 0.864 npm http fetch GET 200 https://registry.npmjs.org/xml-name-validator/-/xml-name-validator-4.0.0.tgz 281ms (cache miss)
+#11 0.890 npm http fetch GET 200 https://registry.npmjs.org/type-check/-/type-check-0.4.0.tgz 301ms (cache miss)
+#11 0.923 npm http fetch GET 200 https://registry.npmjs.org/unplugin/-/unplugin-1.10.0.tgz 334ms (cache miss)
+#11 0.925 npm http fetch GET 200 https://registry.npmjs.org/vue-eslint-parser/-/vue-eslint-parser-9.4.3.tgz 338ms (cache miss)
+#11 0.940 npm http fetch POST 200 https://registry.npmjs.org/-/npm/v1/security/advisories/bulk 395ms
+#11 0.951 npm http fetch GET 200 https://registry.npmjs.org/text-table/-/text-table-0.2.0.tgz 361ms (cache miss)
+#11 0.951 npm http fetch GET 200 https://registry.npmjs.org/vuex/-/vuex-4.1.0.tgz 366ms (cache miss)
+#11 0.989 npm http fetch GET 200 https://registry.npmjs.org/supports-color/-/supports-color-7.2.0.tgz 398ms (cache miss)
+#11 0.990 npm http fetch GET 200 https://registry.npmjs.org/supports-preserve-symlinks-flag/-/supports-preserve-symlinks-flag-1.0.0.tgz 401ms (cache miss)
+#11 0.994 npm http fetch GET 200 https://registry.npmjs.org/strip-ansi/-/strip-ansi-6.0.1.tgz 404ms (cache miss)
+#11 1.001 npm http fetch GET 200 https://registry.npmjs.org/upath/-/upath-2.0.1.tgz 414ms (cache miss)
+#11 1.001 npm http fetch GET 200 https://registry.npmjs.org/strip-json-comments/-/strip-json-comments-3.1.1.tgz 410ms (cache miss)
+#11 1.045 npm http fetch GET 200 https://registry.npmjs.org/shebang-command/-/shebang-command-2.0.0.tgz 452ms (cache miss)
+#11 1.046 npm http fetch GET 200 https://registry.npmjs.org/shebang-regex/-/shebang-regex-3.0.0.tgz 454ms (cache miss)
+#11 1.064 npm http fetch GET 200 https://registry.npmjs.org/vue-router/-/vue-router-4.3.0.tgz 478ms (cache miss)
+#11 1.072 npm http fetch GET 200 https://registry.npmjs.org/type-fest/-/type-fest-0.20.2.tgz 480ms (cache miss)
+#11 1.092 npm http fetch GET 200 https://registry.npmjs.org/reusify/-/reusify-1.0.4.tgz 496ms (cache miss)
+#11 1.095 npm http fetch GET 200 https://registry.npmjs.org/run-parallel/-/run-parallel-1.2.0.tgz 500ms (cache miss)
+#11 1.099 npm http fetch GET 200 https://registry.npmjs.org/util-deprecate/-/util-deprecate-1.0.2.tgz 512ms (cache miss)
+#11 1.105 npm http fetch GET 200 https://registry.npmjs.org/vue/-/vue-3.4.21.tgz 519ms (cache miss)
+#11 1.106 npm http fetch GET 200 https://registry.npmjs.org/semver/-/semver-7.6.2.tgz 512ms (cache miss)
+#11 1.106 npm http fetch GET 200 https://registry.npmjs.org/unplugin-vue-components/-/unplugin-vue-components-0.26.0.tgz 518ms (cache miss)
+#11 1.132 npm http fetch GET 200 https://registry.npmjs.org/source-map-js/-/source-map-js-1.2.0.tgz 540ms (cache miss)
+#11 1.137 npm http fetch GET 200 https://registry.npmjs.org/vite/-/vite-5.1.6.tgz 551ms (cache miss)
+#11 1.151 npm http fetch GET 200 https://registry.npmjs.org/readdirp/-/readdirp-3.6.0.tgz 555ms (cache miss)
+#11 1.156 npm http fetch GET 200 https://registry.npmjs.org/queue-microtask/-/queue-microtask-1.2.3.tgz 558ms (cache miss)
+#11 1.161 npm http fetch GET 200 https://registry.npmjs.org/resolve-from/-/resolve-from-4.0.0.tgz 566ms (cache miss)
+#11 1.193 npm http fetch GET 200 https://registry.npmjs.org/punycode/-/punycode-2.3.1.tgz 595ms (cache miss)
+#11 1.201 npm http fetch GET 200 https://registry.npmjs.org/proxy-from-env/-/proxy-from-env-1.1.0.tgz 603ms (cache miss)
+#11 1.228 npm http fetch GET 200 https://registry.npmjs.org/picomatch/-/picomatch-2.3.1.tgz 627ms (cache miss)
+#11 1.230 npm http fetch GET 200 https://registry.npmjs.org/postcss-selector-parser/-/postcss-selector-parser-6.1.0.tgz 632ms (cache miss)
+#11 1.233 npm http fetch GET 200 https://registry.npmjs.org/prelude-ls/-/prelude-ls-1.2.1.tgz 633ms (cache miss)
+#11 1.244 npm http fetch GET 200 https://registry.npmjs.org/picocolors/-/picocolors-1.0.0.tgz 641ms (cache miss)
+#11 1.249 npm http fetch GET 200 https://registry.npmjs.org/path-parse/-/path-parse-1.0.7.tgz 646ms (cache miss)
+#11 1.279 npm http fetch GET 200 https://registry.npmjs.org/path-exists/-/path-exists-4.0.0.tgz 675ms (cache miss)
+#11 1.286 npm http fetch GET 200 https://registry.npmjs.org/postcss/-/postcss-8.4.37.tgz 685ms (cache miss)
+#11 1.288 npm http fetch GET 200 https://registry.npmjs.org/unplugin-fonts/-/unplugin-fonts-1.1.1.tgz 701ms (cache miss)
+#11 1.291 npm http fetch GET 200 https://registry.npmjs.org/parent-module/-/parent-module-1.0.1.tgz 687ms (cache miss)
+#11 1.295 npm http fetch GET 200 https://registry.npmjs.org/p-limit/-/p-limit-3.1.0.tgz 690ms (cache miss)
+#11 1.295 npm http fetch GET 200 https://registry.npmjs.org/pinia/-/pinia-2.1.7.tgz 694ms (cache miss)
+#11 1.311 npm http fetch GET 200 https://registry.npmjs.org/p-locate/-/p-locate-5.0.0.tgz 706ms (cache miss)
+#11 1.314 npm http fetch GET 200 https://registry.npmjs.org/path-key/-/path-key-3.1.1.tgz 711ms (cache miss)
+#11 1.317 npm http fetch GET 200 https://registry.npmjs.org/uri-js/-/uri-js-4.4.1.tgz 729ms (cache miss)
+#11 1.332 npm http fetch GET 200 https://registry.npmjs.org/nth-check/-/nth-check-2.1.1.tgz 726ms (cache miss)
+#11 1.382 npm http fetch GET 200 https://registry.npmjs.org/normalize-path/-/normalize-path-3.0.0.tgz 776ms (cache miss)
+#11 1.397 npm http fetch GET 200 https://registry.npmjs.org/mime-types/-/mime-types-2.1.35.tgz 788ms (cache miss)
+#11 1.443 npm http fetch GET 200 https://registry.npmjs.org/merge2/-/merge2-1.4.1.tgz 833ms (cache miss)
+#11 1.493 npm http fetch GET 200 https://registry.npmjs.org/rollup/-/rollup-4.13.0.tgz 898ms (cache miss)
+#11 1.510 npm http fetch GET 200 https://registry.npmjs.org/resolve/-/resolve-1.22.8.tgz 913ms (cache miss)
+#11 1.559 npm http fetch GET 200 https://registry.npmjs.org/optionator/-/optionator-0.9.4.tgz 953ms (cache miss)
+#11 1.622 npm http fetch GET 200 https://registry.npmjs.org/locate-path/-/locate-path-6.0.0.tgz 1009ms (cache miss)
+#11 1.625 npm http fetch GET 200 https://registry.npmjs.org/ms/-/ms-2.1.2.tgz 1018ms (cache miss)
+#11 1.657 npm http fetch GET 200 https://registry.npmjs.org/minimatch/-/minimatch-9.0.3.tgz 1048ms (cache miss)
+#11 1.659 npm http fetch GET 200 https://registry.npmjs.org/natural-compare/-/natural-compare-1.4.0.tgz 1053ms (cache miss)
+#11 1.661 npm http fetch GET 200 https://registry.npmjs.org/nanoid/-/nanoid-3.3.7.tgz 1053ms (cache miss)
+#11 1.684 npm http fetch GET 200 https://registry.npmjs.org/levn/-/levn-0.4.1.tgz 1069ms (cache miss)
+#11 1.702 npm http fetch GET 200 https://registry.npmjs.org/mime-db/-/mime-db-1.52.0.tgz 1093ms (cache miss)
+#11 1.726 npm http fetch GET 200 https://registry.npmjs.org/local-pkg/-/local-pkg-0.4.3.tgz 1110ms (cache miss)
+#11 1.728 npm http fetch GET 200 https://registry.npmjs.org/json-schema-traverse/-/json-schema-traverse-0.4.1.tgz 1112ms (cache miss)
+#11 1.729 npm http fetch GET 200 https://registry.npmjs.org/sass/-/sass-1.72.0.tgz 1135ms (cache miss)
+#11 1.732 npm http fetch GET 200 https://registry.npmjs.org/micromatch/-/micromatch-4.0.5.tgz 1123ms (cache miss)
+#11 1.745 npm http fetch GET 200 https://registry.npmjs.org/json-buffer/-/json-buffer-3.0.1.tgz 1129ms (cache miss)
+#11 1.784 npm http fetch GET 200 https://registry.npmjs.org/json-stable-stringify-without-jsonify/-/json-stable-stringify-without-jsonify-1.0.1.tgz 1167ms (cache miss)
+#11 1.793 npm http fetch GET 200 https://registry.npmjs.org/isexe/-/isexe-2.0.0.tgz 1174ms (cache miss)
+#11 1.793 npm http fetch GET 200 https://registry.npmjs.org/keyv/-/keyv-4.5.4.tgz 1175ms (cache miss)
+#11 1.794 npm http fetch GET 200 https://registry.npmjs.org/is-path-inside/-/is-path-inside-3.0.3.tgz 1175ms (cache miss)
+#11 1.794 npm http fetch GET 200 https://registry.npmjs.org/is-number/-/is-number-7.0.0.tgz 1176ms (cache miss)
+#11 1.797 npm http fetch GET 200 https://registry.npmjs.org/roboto-fontface/-/roboto-fontface-0.10.0.tgz 1201ms (cache miss)
+#11 1.797 npm http fetch GET 200 https://registry.npmjs.org/magic-string/-/magic-string-0.30.8.tgz 1186ms (cache miss)
+#11 1.820 npm http fetch GET 200 https://registry.npmjs.org/lodash.merge/-/lodash.merge-4.6.2.tgz 1208ms (cache miss)
+#11 1.821 npm http fetch GET 200 https://registry.npmjs.org/is-glob/-/is-glob-4.0.3.tgz 1202ms (cache miss)
+#11 1.825 npm http fetch GET 200 https://registry.npmjs.org/is-core-module/-/is-core-module-2.13.1.tgz 1206ms (cache miss)
+#11 1.826 npm http fetch GET 200 https://registry.npmjs.org/import-fresh/-/import-fresh-3.3.0.tgz 1205ms (cache miss)
+#11 1.827 npm http fetch GET 200 https://registry.npmjs.org/is-extglob/-/is-extglob-2.1.1.tgz 1207ms (cache miss)
+#11 1.828 npm http fetch GET 200 https://registry.npmjs.org/js-yaml/-/js-yaml-4.1.0.tgz 1211ms (cache miss)
+#11 1.829 npm http fetch GET 200 https://registry.npmjs.org/is-binary-path/-/is-binary-path-2.1.0.tgz 1208ms (cache miss)
+#11 1.835 npm http fetch GET 200 https://registry.npmjs.org/imurmurhash/-/imurmurhash-0.1.4.tgz 1215ms (cache miss)
+#11 1.847 npm http fetch GET 200 https://registry.npmjs.org/hasown/-/hasown-2.0.2.tgz 1226ms (cache miss)
+#11 1.848 npm http fetch GET 200 https://registry.npmjs.org/ignore/-/ignore-5.3.1.tgz 1227ms (cache miss)
+#11 1.849 npm http fetch GET 200 https://registry.npmjs.org/has-flag/-/has-flag-4.0.0.tgz 1227ms (cache miss)
+#11 1.857 npm http fetch GET 200 https://registry.npmjs.org/glob-parent/-/glob-parent-5.1.2.tgz 1235ms (cache miss)
+#11 1.875 npm http fetch GET 200 https://registry.npmjs.org/immutable/-/immutable-4.3.5.tgz 1254ms (cache miss)
+#11 1.875 npm http fetch GET 200 https://registry.npmjs.org/form-data/-/form-data-4.0.0.tgz 1253ms (cache miss)
+#11 1.875 npm http fetch GET 200 https://registry.npmjs.org/globals/-/globals-15.4.0.tgz 1254ms (cache miss)
+#11 1.879 npm http fetch GET 200 https://registry.npmjs.org/follow-redirects/-/follow-redirects-1.15.6.tgz 1257ms (cache miss)
+#11 1.886 npm http fetch GET 200 https://registry.npmjs.org/find-up/-/find-up-5.0.0.tgz 1263ms (cache miss)
+#11 1.888 npm http fetch GET 200 https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz 1275ms (cache miss)
+#11 1.888 npm http fetch GET 200 https://registry.npmjs.org/fill-range/-/fill-range-7.0.1.tgz 1265ms (cache miss)
+#11 1.895 npm http fetch GET 200 https://registry.npmjs.org/function-bind/-/function-bind-1.1.2.tgz 1270ms (cache miss)
+#11 1.901 npm http fetch GET 200 https://registry.npmjs.org/flatted/-/flatted-3.3.1.tgz 1278ms (cache miss)
+#11 1.901 npm http fetch GET 200 https://registry.npmjs.org/flat-cache/-/flat-cache-4.0.1.tgz 1277ms (cache miss)
+#11 1.901 npm http fetch GET 200 https://registry.npmjs.org/file-entry-cache/-/file-entry-cache-8.0.0.tgz 1277ms (cache miss)
+#11 1.915 npm http fetch GET 200 https://registry.npmjs.org/fast-json-stable-stringify/-/fast-json-stable-stringify-2.1.0.tgz 1286ms (cache miss)
+#11 1.924 npm http fetch GET 200 https://registry.npmjs.org/fast-levenshtein/-/fast-levenshtein-2.0.6.tgz 1299ms (cache miss)
+#11 1.929 npm http fetch GET 200 https://registry.npmjs.org/fast-glob/-/fast-glob-3.3.2.tgz 1300ms (cache miss)
+#11 1.936 npm http fetch GET 200 https://registry.npmjs.org/estree-walker/-/estree-walker-2.0.2.tgz 1306ms (cache miss)
+#11 1.939 npm http fetch GET 200 https://registry.npmjs.org/fast-deep-equal/-/fast-deep-equal-3.1.3.tgz 1309ms (cache miss)
+#11 1.940 npm http fetch GET 200 https://registry.npmjs.org/fastq/-/fastq-1.17.1.tgz 1310ms (cache miss)
+#11 1.942 npm http fetch GET 200 https://registry.npmjs.org/esutils/-/esutils-2.0.3.tgz 1312ms (cache miss)
+#11 1.945 npm http fetch GET 200 https://registry.npmjs.org/estraverse/-/estraverse-5.3.0.tgz 1315ms (cache miss)
+#11 1.946 npm http fetch GET 200 https://registry.npmjs.org/esrecurse/-/esrecurse-4.3.0.tgz 1315ms (cache miss)
+#11 1.951 npm http fetch GET 200 https://registry.npmjs.org/eslint-visitor-keys/-/eslint-visitor-keys-4.0.0.tgz 1320ms (cache miss)
+#11 1.958 npm http fetch GET 200 https://registry.npmjs.org/espree/-/espree-10.0.1.tgz 1327ms (cache miss)
+#11 1.977 npm http fetch GET 200 https://registry.npmjs.org/escape-string-regexp/-/escape-string-regexp-4.0.0.tgz 1345ms (cache miss)
+#11 2.043 npm http fetch GET 200 https://registry.npmjs.org/debug/-/debug-4.3.4.tgz 1410ms (cache miss)
+#11 2.048 npm http fetch GET 200 https://registry.npmjs.org/deep-is/-/deep-is-0.1.4.tgz 1414ms (cache miss)
+#11 2.050 npm http fetch GET 200 https://registry.npmjs.org/eslint-scope/-/eslint-scope-8.0.1.tgz 1418ms (cache miss)
+#11 2.070 npm http fetch GET 200 https://registry.npmjs.org/esbuild/-/esbuild-0.19.12.tgz 1437ms (cache miss)
+#11 2.087 npm http fetch GET 200 https://registry.npmjs.org/cssesc/-/cssesc-3.0.0.tgz 1453ms (cache miss)
+#11 2.101 npm http fetch GET 200 https://registry.npmjs.org/combined-stream/-/combined-stream-1.0.8.tgz 1467ms (cache miss)
+#11 2.116 npm http fetch GET 200 https://registry.npmjs.org/cross-spawn/-/cross-spawn-7.0.3.tgz 1481ms (cache miss)
+#11 2.118 npm http fetch GET 200 https://registry.npmjs.org/delayed-stream/-/delayed-stream-1.0.0.tgz 1484ms (cache miss)
+#11 2.141 npm http fetch GET 200 https://registry.npmjs.org/eslint-plugin-vue/-/eslint-plugin-vue-9.26.0.tgz 1509ms (cache miss)
+#11 2.144 npm http fetch GET 200 https://registry.npmjs.org/concat-map/-/concat-map-0.0.1.tgz 1508ms (cache miss)
+#11 2.144 npm http fetch GET 200 https://registry.npmjs.org/color-name/-/color-name-1.1.4.tgz 1509ms (cache miss)
+#11 2.163 npm http fetch GET 200 https://registry.npmjs.org/callsites/-/callsites-3.1.0.tgz 1526ms (cache miss)
+#11 2.188 npm http fetch GET 200 https://registry.npmjs.org/chalk/-/chalk-4.1.2.tgz 1553ms (cache miss)
+#11 2.189 npm http fetch GET 200 https://registry.npmjs.org/brace-expansion/-/brace-expansion-2.0.1.tgz 1549ms (cache miss)
+#11 2.229 npm http fetch GET 200 https://registry.npmjs.org/braces/-/braces-3.0.2.tgz 1588ms (cache miss)
+#11 2.238 npm http fetch GET 200 https://registry.npmjs.org/boolbase/-/boolbase-1.0.0.tgz 1596ms (cache miss)
+#11 2.244 npm http fetch GET 200 https://registry.npmjs.org/chokidar/-/chokidar-3.6.0.tgz 1602ms (cache miss)
+#11 2.248 npm http fetch GET 200 https://registry.npmjs.org/binary-extensions/-/binary-extensions-2.3.0.tgz 1606ms (cache miss)
+#11 2.295 npm http fetch GET 200 https://registry.npmjs.org/anymatch/-/anymatch-3.1.3.tgz 1651ms (cache miss)
+#11 2.301 npm http fetch GET 200 https://registry.npmjs.org/asynckit/-/asynckit-0.4.0.tgz 1658ms (cache miss)
+#11 2.329 npm http fetch GET 200 https://registry.npmjs.org/ansi-styles/-/ansi-styles-4.3.0.tgz 1686ms (cache miss)
+#11 2.337 npm http fetch GET 200 https://registry.npmjs.org/ansi-regex/-/ansi-regex-5.0.1.tgz 1692ms (cache miss)
+#11 2.338 npm http fetch GET 200 https://registry.npmjs.org/eslint/-/eslint-9.4.0.tgz 1706ms (cache miss)
+#11 2.345 npm http fetch GET 200 https://registry.npmjs.org/acorn-jsx/-/acorn-jsx-5.3.2.tgz 1700ms (cache miss)
+#11 2.352 npm http fetch GET 200 https://registry.npmjs.org/leaflet/-/leaflet-1.9.4.tgz 1736ms (cache miss)
+#11 2.375 npm http fetch GET 200 https://registry.npmjs.org/esquery/-/esquery-1.5.0.tgz 1745ms (cache miss)
+#11 2.384 npm http fetch GET 200 https://registry.npmjs.org/argparse/-/argparse-2.0.1.tgz 1742ms (cache miss)
+#11 2.388 npm http fetch GET 200 https://registry.npmjs.org/ajv/-/ajv-6.12.6.tgz 1744ms (cache miss)
+#11 2.393 npm http fetch GET 200 https://registry.npmjs.org/color-convert/-/color-convert-2.0.1.tgz 1757ms (cache miss)
+#11 2.395 npm http fetch GET 200 https://registry.npmjs.org/acorn/-/acorn-8.11.3.tgz 1750ms (cache miss)
+#11 2.400 npm http fetch GET 200 https://registry.npmjs.org/luxon/-/luxon-3.4.4.tgz 1788ms (cache miss)
+#11 2.419 npm http fetch GET 200 https://registry.npmjs.org/vuetify/-/vuetify-3.5.9.tgz 1833ms (cache miss)
+#11 2.428 npm http fetch GET 200 https://registry.npmjs.org/entities/-/entities-4.5.0.tgz 1796ms (cache miss)
+#11 2.451 npm http fetch GET 200 https://registry.npmjs.org/@vuetify/loader-shared/-/loader-shared-2.0.3.tgz 1807ms (cache miss)
+#11 2.452 npm http fetch GET 200 https://registry.npmjs.org/@vue/shared/-/shared-3.4.21.tgz 1807ms (cache miss)
+#11 2.470 npm http fetch GET 200 https://registry.npmjs.org/@vue/devtools-api/-/devtools-api-6.6.1.tgz 1822ms (cache miss)
+#11 2.488 npm http fetch GET 200 https://registry.npmjs.org/csstype/-/csstype-3.1.3.tgz 1854ms (cache miss)
+#11 2.528 npm http fetch GET 200 https://registry.npmjs.org/@vue/runtime-core/-/runtime-core-3.4.21.tgz 1882ms (cache miss)
+#11 2.543 npm http fetch GET 200 https://registry.npmjs.org/@vue/compiler-ssr/-/compiler-ssr-3.4.21.tgz 1896ms (cache miss)
+#11 2.544 npm http fetch GET 200 https://registry.npmjs.org/@types/leaflet.markercluster/-/leaflet.markercluster-1.5.4.tgz 1896ms (cache miss)
+#11 2.544 npm http fetch GET 200 https://registry.npmjs.org/balanced-match/-/balanced-match-1.0.2.tgz 1902ms (cache miss)
+#11 2.551 npm http fetch GET 200 https://registry.npmjs.org/to-regex-range/-/to-regex-range-5.0.1.tgz 1962ms (cache miss)
+#11 2.653 npm http fetch GET 200 https://registry.npmjs.org/@types/estree/-/estree-1.0.5.tgz 1993ms (cache miss)
+#11 2.653 npm http fetch GET 200 https://registry.npmjs.org/@vue/server-renderer/-/server-renderer-3.4.21.tgz 2008ms (cache miss)
+#11 2.655 npm http fetch GET 200 https://registry.npmjs.org/@vue/reactivity/-/reactivity-3.4.21.tgz 2008ms (cache miss)
+#11 2.655 npm http fetch GET 200 https://registry.npmjs.org/axios/-/axios-1.6.8.tgz 2009ms (cache miss)
+#11 2.662 npm http fetch GET 200 https://registry.npmjs.org/@vue/compiler-dom/-/compiler-dom-3.4.21.tgz 2013ms (cache miss)
+#11 2.662 npm http fetch GET 200 https://registry.npmjs.org/@vue/compiler-core/-/compiler-core-3.4.21.tgz 2013ms (cache miss)
+#11 2.687 npm http fetch GET 200 https://registry.npmjs.org/@vitejs/plugin-vue/-/plugin-vue-5.0.4.tgz 2037ms (cache miss)
+#11 2.689 npm http fetch GET 200 https://registry.npmjs.org/bootstrap/-/bootstrap-5.3.3.tgz 2047ms (cache miss)
+#11 2.721 npm http fetch GET 200 https://registry.npmjs.org/@nodelib/fs.walk/-/fs.walk-1.2.8.tgz 2059ms (cache miss)
+#11 2.724 npm http fetch GET 200 https://registry.npmjs.org/@nodelib/fs.stat/-/fs.stat-2.0.5.tgz 2061ms (cache miss)
+#11 2.747 npm http fetch GET 200 https://registry.npmjs.org/@nodelib/fs.scandir/-/fs.scandir-2.1.5.tgz 2083ms (cache miss)
+#11 2.776 npm http fetch GET 200 https://registry.npmjs.org/@jridgewell/sourcemap-codec/-/sourcemap-codec-1.4.15.tgz 2113ms (cache miss)
+#11 2.781 npm http fetch GET 200 https://registry.npmjs.org/@humanwhocodes/module-importer/-/module-importer-1.0.1.tgz 2117ms (cache miss)
+#11 2.819 npm http fetch GET 200 https://registry.npmjs.org/@rollup/pluginutils/-/pluginutils-5.1.0.tgz 2157ms (cache miss)
+#11 2.840 npm http fetch GET 200 https://registry.npmjs.org/@eslint/js/-/js-9.4.0.tgz 2174ms (cache miss)
+#11 2.840 npm http fetch GET 200 https://registry.npmjs.org/leaflet.markercluster/-/leaflet.markercluster-1.5.3.tgz 2224ms (cache miss)
+#11 2.840 npm http fetch GET 200 https://registry.npmjs.org/@humanwhocodes/retry/-/retry-0.3.0.tgz 2176ms (cache miss)
+#11 2.863 npm http fetch GET 200 https://registry.npmjs.org/@vue/runtime-dom/-/runtime-dom-3.4.21.tgz 2216ms (cache miss)
+#11 2.863 npm http fetch GET 200 https://registry.npmjs.org/@popperjs/core/-/core-2.11.8.tgz 2201ms (cache miss)
+#11 2.867 npm http fetch GET 200 https://registry.npmjs.org/@eslint/object-schema/-/object-schema-2.1.3.tgz 2203ms (cache miss)
+#11 2.928 npm http fetch GET 200 https://registry.npmjs.org/@eslint-community/regexpp/-/regexpp-4.10.1.tgz 2263ms (cache miss)
+#11 2.928 npm http fetch GET 200 https://registry.npmjs.org/@eslint-community/eslint-utils/-/eslint-utils-4.4.0.tgz 2262ms (cache miss)
+#11 2.940 npm http fetch GET 200 https://registry.npmjs.org/@eslint/config-array/-/config-array-0.15.1.tgz 2274ms (cache miss)
+#11 2.973 npm http fetch GET 200 https://registry.npmjs.org/eslint-visitor-keys/-/eslint-visitor-keys-3.4.3.tgz 2306ms (cache miss)
+#11 2.974 npm http fetch GET 200 https://registry.npmjs.org/espree/-/espree-9.6.1.tgz 2307ms (cache miss)
+#11 3.000 npm http fetch GET 200 https://registry.npmjs.org/eslint-scope/-/eslint-scope-7.2.2.tgz 2333ms (cache miss)
+#11 3.021 npm http fetch GET 200 https://registry.npmjs.org/vue-demi/-/vue-demi-0.14.7.tgz 2353ms (cache miss)
+#11 3.021 npm http fetch GET 200 https://registry.npmjs.org/globals/-/globals-13.24.0.tgz 2353ms (cache miss)
+#11 3.032 npm http fetch GET 200 https://registry.npmjs.org/@vue/compiler-sfc/-/compiler-sfc-3.4.21.tgz 2385ms (cache miss)
+#11 3.042 npm http fetch GET 200 https://registry.npmjs.org/@babel/parser/-/parser-7.24.1.tgz 2376ms (cache miss)
+#11 3.043 npm http fetch GET 200 https://registry.npmjs.org/glob-parent/-/glob-parent-6.0.2.tgz 2374ms (cache miss)
+#11 3.051 npm http fetch GET 200 https://registry.npmjs.org/brace-expansion/-/brace-expansion-1.1.11.tgz 2382ms (cache miss)
+#11 3.055 npm http fetch GET 200 https://registry.npmjs.org/minimatch/-/minimatch-3.1.2.tgz 2382ms (cache miss)
+#11 3.064 npm http fetch GET 200 https://registry.npmjs.org/brace-expansion/-/brace-expansion-1.1.11.tgz 2390ms (cache miss)
+#11 3.073 npm http fetch GET 200 https://registry.npmjs.org/brace-expansion/-/brace-expansion-1.1.11.tgz 2400ms (cache miss)
+#11 3.073 npm http fetch GET 200 https://registry.npmjs.org/minimatch/-/minimatch-3.1.2.tgz 2400ms (cache miss)
+#11 3.087 npm http fetch GET 200 https://registry.npmjs.org/minimatch/-/minimatch-3.1.2.tgz 2413ms (cache miss)
+#11 3.092 npm http fetch GET 200 https://registry.npmjs.org/globals/-/globals-14.0.0.tgz 2417ms (cache miss)
+#11 3.102 npm http fetch GET 200 https://registry.npmjs.org/eslint-visitor-keys/-/eslint-visitor-keys-3.4.3.tgz 2427ms (cache miss)
+#11 3.102 npm http fetch GET 200 https://registry.npmjs.org/@types/geojson/-/geojson-7946.0.14.tgz 2453ms (cache miss)
+#11 3.107 npm http fetch GET 200 https://registry.npmjs.org/@types/bootstrap/-/bootstrap-5.2.10.tgz 2446ms (cache miss)
+#11 3.116 npm http fetch GET 200 https://registry.npmjs.org/@types/leaflet/-/leaflet-1.9.11.tgz 2467ms (cache miss)
+#11 3.118 npm http fetch GET 200 https://registry.npmjs.org/@eslint/eslintrc/-/eslintrc-3.1.0.tgz 2452ms (cache miss)
+#11 3.120 npm http fetch GET 200 https://registry.npmjs.org/braces 2178ms (cache miss)
+#11 3.226 npm http fetch GET 200 https://registry.npmjs.org/vite 2285ms (cache miss)
+#11 3.313 npm http fetch GET 200 https://registry.npmjs.org/micromatch 61ms (cache miss)
+#11 3.373 npm http fetch GET 200 https://registry.npmjs.org/chokidar 121ms (cache miss)
+#11 3.391 npm http fetch GET 200 https://registry.npmjs.org/@rollup/rollup-linux-arm64-musl/-/rollup-linux-arm64-musl-4.13.0.tgz 2731ms (cache miss)
+#11 3.435 npm http fetch GET 200 https://registry.npmjs.org/vite-plugin-vuetify 55ms (cache miss)
+#11 3.474 npm http fetch GET 200 https://registry.npmjs.org/@vitejs%2fplugin-vue 95ms (cache miss)
+#11 3.487 npm http fetch GET 200 https://registry.npmjs.org/@antfu/utils/-/utils-0.7.7.tgz 2821ms (cache miss)
+#11 3.834 npm http fetch GET 200 https://registry.npmjs.org/@rollup/rollup-linux-arm64-gnu/-/rollup-linux-arm64-gnu-4.13.0.tgz 3172ms (cache miss)
+#11 3.920 npm http fetch GET 200 https://registry.npmjs.org/unplugin-fonts 540ms (cache miss)
+#11 3.992 npm http fetch GET 200 https://registry.npmjs.org/@fortawesome/fontawesome-free/-/fontawesome-free-6.5.1.tgz 3327ms (cache miss)
+#11 4.026 npm http fetch GET 200 https://registry.npmjs.org/@mdi/font/-/font-7.0.96.tgz 3362ms (cache miss)
+#11 4.426 npm http fetch GET 200 https://registry.npmjs.org/@esbuild/linux-arm64/-/linux-arm64-0.19.12.tgz 3760ms (cache miss)
+#11 4.447 npm info run @fortawesome/fontawesome-free@6.5.1 postinstall node_modules/@fortawesome/fontawesome-free node attribution.js
+#11 4.454 npm info run esbuild@0.19.12 postinstall node_modules/esbuild node install.js
+#11 4.458 npm info run vue-demi@0.14.7 postinstall node_modules/pinia/node_modules/vue-demi node -e "try{require('./scripts/postinstall.js')}catch(e){}"
+#11 4.483 npm info run @fortawesome/fontawesome-free@6.5.1 postinstall { code: 0, signal: null }
+#11 4.494 npm info run esbuild@0.19.12 postinstall { code: 0, signal: null }
+#11 4.515 npm info run vue-demi@0.14.7 postinstall { code: 0, signal: null }
+#11 4.568 
+#11 4.568 added 200 packages, and audited 201 packages in 4s
+#11 4.568 
+#11 4.568 51 packages are looking for funding
+#11 4.568   run `npm fund` for details
+#11 4.570 
+#11 4.570 2 vulnerabilities (1 moderate, 1 high)
+#11 4.570 
+#11 4.570 To address all issues, run:
+#11 4.570   npm audit fix
+#11 4.570 
+#11 4.570 Run `npm audit` for details.
+#11 4.571 npm notice
+#11 4.571 npm notice New minor version of npm available! 10.7.0 -> 10.8.1
+#11 4.571 npm notice Changelog: https://github.com/npm/cli/releases/tag/v10.8.1
+#11 4.571 npm notice To update run: npm install -g npm@10.8.1
+#11 4.571 npm notice
+#11 4.571 npm verbose exit 0
+#11 4.571 npm info ok
+#11 DONE 4.8s
+
+#12 [builder  6/10] RUN echo "Contents of /app/node_modules after npm install:" && ls -la /app/node_modules
+#12 0.094 Contents of /app/node_modules after npm install:
+#12 0.096 total 776
+#12 0.096 drwxr-xr-x 167 root root  4096 Jun 23 12:51 .
+#12 0.096 drwxr-xr-x   1 root root  4096 Jun 23 12:51 ..
+#12 0.096 drwxr-xr-x   2 root root  4096 Jun 23 12:51 .bin
+#12 0.096 -rw-r--r--   1 root root 88560 Jun 23 12:51 .package-lock.json
+#12 0.096 drwxr-xr-x   3 root root  4096 Jun 23 12:51 @antfu
+#12 0.096 drwxr-xr-x   3 root root  4096 Jun 23 12:51 @babel
+#12 0.096 drwxr-xr-x   3 root root  4096 Jun 23 12:51 @esbuild
+#12 0.096 drwxr-xr-x   6 root root  4096 Jun 23 12:51 @eslint
+#12 0.096 drwxr-xr-x   4 root root  4096 Jun 23 12:51 @eslint-community
+#12 0.096 drwxr-xr-x   3 root root  4096 Jun 23 12:51 @fortawesome
+#12 0.096 drwxr-xr-x   4 root root  4096 Jun 23 12:51 @humanwhocodes
+#12 0.096 drwxr-xr-x   3 root root  4096 Jun 23 12:51 @jridgewell
+#12 0.096 drwxr-xr-x   3 root root  4096 Jun 23 12:51 @mdi
+#12 0.096 drwxr-xr-x   5 root root  4096 Jun 23 12:51 @nodelib
+#12 0.096 drwxr-xr-x   3 root root  4096 Jun 23 12:51 @popperjs
+#12 0.096 drwxr-xr-x   5 root root  4096 Jun 23 12:51 @rollup
+#12 0.096 drwxr-xr-x   7 root root  4096 Jun 23 12:51 @types
+#12 0.096 drwxr-xr-x   3 root root  4096 Jun 23 12:51 @vitejs
+#12 0.096 drwxr-xr-x  12 root root  4096 Jun 23 12:51 @vue
+#12 0.096 drwxr-xr-x   3 root root  4096 Jun 23 12:51 @vuetify
+#12 0.096 drwxr-xr-x   4 root root  4096 Jun 23 12:51 acorn
+#12 0.096 drwxr-xr-x   2 root root  4096 Jun 23 12:51 acorn-jsx
+#12 0.096 drwxr-xr-x   5 root root  4096 Jun 23 12:51 ajv
+#12 0.096 drwxr-xr-x   2 root root  4096 Jun 23 12:51 ansi-regex
+#12 0.096 drwxr-xr-x   2 root root  4096 Jun 23 12:51 ansi-styles
+#12 0.096 drwxr-xr-x   2 root root  4096 Jun 23 12:51 anymatch
+#12 0.096 drwxr-xr-x   3 root root  4096 Jun 23 12:51 argparse
+#12 0.096 drwxr-xr-x   3 root root  4096 Jun 23 12:51 asynckit
+#12 0.096 drwxr-xr-x   4 root root  4096 Jun 23 12:51 axios
+#12 0.096 drwxr-xr-x   3 root root  4096 Jun 23 12:51 balanced-match
+#12 0.096 drwxr-xr-x   2 root root  4096 Jun 23 12:51 binary-extensions
+#12 0.096 drwxr-xr-x   2 root root  4096 Jun 23 12:51 boolbase
+#12 0.096 drwxr-xr-x   5 root root  4096 Jun 23 12:51 bootstrap
+#12 0.096 drwxr-xr-x   3 root root  4096 Jun 23 12:51 brace-expansion
+#12 0.096 drwxr-xr-x   3 root root  4096 Jun 23 12:51 braces
+#12 0.096 drwxr-xr-x   2 root root  4096 Jun 23 12:51 callsites
+#12 0.096 drwxr-xr-x   3 root root  4096 Jun 23 12:51 chalk
+#12 0.096 drwxr-xr-x   4 root root  4096 Jun 23 12:51 chokidar
+#12 0.096 drwxr-xr-x   2 root root  4096 Jun 23 12:51 color-convert
+#12 0.096 drwxr-xr-x   2 root root  4096 Jun 23 12:51 color-name
+#12 0.096 drwxr-xr-x   3 root root  4096 Jun 23 12:51 combined-stream
+#12 0.096 drwxr-xr-x   4 root root  4096 Jun 23 12:51 concat-map
+#12 0.096 drwxr-xr-x   3 root root  4096 Jun 23 12:51 cross-spawn
+#12 0.096 drwxr-xr-x   4 root root  4096 Jun 23 12:51 cssesc
+#12 0.096 drwxr-xr-x   2 root root  4096 Jun 23 12:51 csstype
+#12 0.096 drwxr-xr-x   3 root root  4096 Jun 23 12:51 debug
+#12 0.096 drwxr-xr-x   4 root root  4096 Jun 23 12:51 deep-is
+#12 0.096 drwxr-xr-x   3 root root  4096 Jun 23 12:51 delayed-stream
+#12 0.096 drwxr-xr-x   3 root root  4096 Jun 23 12:51 entities
+#12 0.096 drwxr-xr-x   4 root root  4096 Jun 23 12:51 esbuild
+#12 0.096 drwxr-xr-x   2 root root  4096 Jun 23 12:51 escape-string-regexp
+#12 0.096 drwxr-xr-x   7 root root  4096 Jun 23 12:51 eslint
+#12 0.096 drwxr-xr-x   4 root root  4096 Jun 23 12:51 eslint-plugin-vue
+#12 0.096 drwxr-xr-x   4 root root  4096 Jun 23 12:51 eslint-scope
+#12 0.096 drwxr-xr-x   4 root root  4096 Jun 23 12:51 eslint-visitor-keys
+#12 0.096 drwxr-xr-x   4 root root  4096 Jun 23 12:51 espree
+#12 0.096 drwxr-xr-x   3 root root  4096 Jun 23 12:51 esquery
+#12 0.096 drwxr-xr-x   2 root root  4096 Jun 23 12:51 esrecurse
+#12 0.096 drwxr-xr-x   2 root root  4096 Jun 23 12:51 estraverse
+#12 0.096 drwxr-xr-x   5 root root  4096 Jun 23 12:51 estree-walker
+#12 0.096 drwxr-xr-x   3 root root  4096 Jun 23 12:51 esutils
+#12 0.096 drwxr-xr-x   3 root root  4096 Jun 23 12:51 fast-deep-equal
+#12 0.096 drwxr-xr-x   3 root root  4096 Jun 23 12:51 fast-glob
+#12 0.096 drwxr-xr-x   6 root root  4096 Jun 23 12:51 fast-json-stable-stringify
+#12 0.096 drwxr-xr-x   2 root root  4096 Jun 23 12:51 fast-levenshtein
+#12 0.096 drwxr-xr-x   4 root root  4096 Jun 23 12:51 fastq
+#12 0.096 drwxr-xr-x   2 root root  4096 Jun 23 12:51 file-entry-cache
+#12 0.096 drwxr-xr-x   2 root root  4096 Jun 23 12:51 fill-range
+#12 0.096 drwxr-xr-x   2 root root  4096 Jun 23 12:51 find-up
+#12 0.096 drwxr-xr-x   3 root root  4096 Jun 23 12:51 flat-cache
+#12 0.096 drwxr-xr-x   7 root root  4096 Jun 23 12:51 flatted
+#12 0.096 drwxr-xr-x   2 root root  4096 Jun 23 12:51 follow-redirects
+#12 0.096 drwxr-xr-x   3 root root  4096 Jun 23 12:51 form-data
+#12 0.096 drwxr-xr-x   4 root root  4096 Jun 23 12:51 function-bind
+#12 0.096 drwxr-xr-x   2 root root  4096 Jun 23 12:51 glob-parent
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 globals
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 has-flag
+#12 0.097 drwxr-xr-x   3 root root  4096 Jun 23 12:51 hasown
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 ignore
+#12 0.097 drwxr-xr-x   3 root root  4096 Jun 23 12:51 immutable
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 import-fresh
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 imurmurhash
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 is-binary-path
+#12 0.097 drwxr-xr-x   3 root root  4096 Jun 23 12:51 is-core-module
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 is-extglob
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 is-glob
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 is-number
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 is-path-inside
+#12 0.097 drwxr-xr-x   3 root root  4096 Jun 23 12:51 isexe
+#12 0.097 drwxr-xr-x   5 root root  4096 Jun 23 12:51 js-yaml
+#12 0.097 drwxr-xr-x   3 root root  4096 Jun 23 12:51 json-buffer
+#12 0.097 drwxr-xr-x   3 root root  4096 Jun 23 12:51 json-schema-traverse
+#12 0.097 drwxr-xr-x   4 root root  4096 Jun 23 12:51 json-stable-stringify-without-jsonify
+#12 0.097 drwxr-xr-x   3 root root  4096 Jun 23 12:51 keyv
+#12 0.097 drwxr-xr-x   4 root root  4096 Jun 23 12:51 leaflet
+#12 0.097 drwxr-xr-x   7 root root  4096 Jun 23 12:51 leaflet.markercluster
+#12 0.097 drwxr-xr-x   3 root root  4096 Jun 23 12:51 levn
+#12 0.097 drwxr-xr-x   3 root root  4096 Jun 23 12:51 local-pkg
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 locate-path
+#12 0.097 drwxr-xr-x   3 root root 20480 Jun 23 12:51 lodash
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 lodash.merge
+#12 0.097 drwxr-xr-x   4 root root  4096 Jun 23 12:51 luxon
+#12 0.097 drwxr-xr-x   3 root root  4096 Jun 23 12:51 magic-string
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 merge2
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 micromatch
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 mime-db
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 mime-types
+#12 0.097 drwxr-xr-x   3 root root  4096 Jun 23 12:51 minimatch
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 ms
+#12 0.097 drwxr-xr-x   6 root root  4096 Jun 23 12:51 nanoid
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 natural-compare
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 normalize-path
+#12 0.097 drwxr-xr-x   3 root root  4096 Jun 23 12:51 nth-check
+#12 0.097 drwxr-xr-x   3 root root  4096 Jun 23 12:51 optionator
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 p-limit
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 p-locate
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 parent-module
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 path-exists
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 path-key
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 path-parse
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 picocolors
+#12 0.097 drwxr-xr-x   3 root root  4096 Jun 23 12:51 picomatch
+#12 0.097 drwxr-xr-x   4 root root  4096 Jun 23 12:51 pinia
+#12 0.097 drwxr-xr-x   3 root root  4096 Jun 23 12:51 postcss
+#12 0.097 drwxr-xr-x   3 root root  4096 Jun 23 12:51 postcss-selector-parser
+#12 0.097 drwxr-xr-x   3 root root  4096 Jun 23 12:51 prelude-ls
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 proxy-from-env
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 punycode
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 queue-microtask
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 readdirp
+#12 0.097 drwxr-xr-x   7 root root  4096 Jun 23 12:51 resolve
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 resolve-from
+#12 0.097 drwxr-xr-x   3 root root  4096 Jun 23 12:51 reusify
+#12 0.097 drwxr-xr-x   4 root root  4096 Jun 23 12:51 roboto-fontface
+#12 0.097 drwxr-xr-x   3 root root  4096 Jun 23 12:51 rollup
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 run-parallel
+#12 0.097 drwxr-xr-x   3 root root  4096 Jun 23 12:51 sass
+#12 0.097 drwxr-xr-x   7 root root  4096 Jun 23 12:51 semver
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 shebang-command
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 shebang-regex
+#12 0.097 drwxr-xr-x   3 root root  4096 Jun 23 12:51 source-map-js
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 strip-ansi
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 strip-json-comments
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 supports-color
+#12 0.097 drwxr-xr-x   4 root root  4096 Jun 23 12:51 supports-preserve-symlinks-flag
+#12 0.097 drwxr-xr-x   4 root root  4096 Jun 23 12:51 text-table
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 to-regex-range
+#12 0.097 drwxr-xr-x   3 root root  4096 Jun 23 12:51 type-check
+#12 0.097 drwxr-xr-x   4 root root  4096 Jun 23 12:51 type-fest
+#12 0.097 drwxr-xr-x   3 root root  4096 Jun 23 12:51 unplugin
+#12 0.097 drwxr-xr-x   3 root root  4096 Jun 23 12:51 unplugin-fonts
+#12 0.097 drwxr-xr-x   3 root root  4096 Jun 23 12:51 unplugin-vue-components
+#12 0.097 drwxr-xr-x   3 root root  4096 Jun 23 12:51 upath
+#12 0.097 drwxr-xr-x   3 root root  4096 Jun 23 12:51 uri-js
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 util-deprecate
+#12 0.097 drwxr-xr-x   5 root root  4096 Jun 23 12:51 vite
+#12 0.097 drwxr-xr-x   3 root root  4096 Jun 23 12:51 vite-plugin-vuetify
+#12 0.097 drwxr-xr-x   6 root root  4096 Jun 23 12:51 vue
+#12 0.097 drwxr-xr-x   3 root root  4096 Jun 23 12:51 vue-eslint-parser
+#12 0.097 drwxr-xr-x   4 root root  4096 Jun 23 12:51 vue-router
+#12 0.097 drwxr-xr-x   4 root root  4096 Jun 23 12:51 vuetify
+#12 0.097 drwxr-xr-x   4 root root  4096 Jun 23 12:51 vuex
+#12 0.097 drwxr-xr-x   3 root root  4096 Jun 23 12:51 webpack-sources
+#12 0.097 drwxr-xr-x   4 root root  4096 Jun 23 12:51 webpack-virtual-modules
+#12 0.097 drwxr-xr-x   3 root root  4096 Jun 23 12:51 which
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 word-wrap
+#12 0.097 drwxr-xr-x   3 root root  4096 Jun 23 12:51 xml-name-validator
+#12 0.097 drwxr-xr-x   2 root root  4096 Jun 23 12:51 yocto-queue
+#12 DONE 0.1s
+
+#13 [builder  7/10] COPY . ./
+#13 DONE 0.1s
+
+#14 [builder  8/10] RUN echo "Contents of /app after copying frontend files:" && ls -la /app
+#14 0.149 Contents of /app after copying frontend files:
+#14 0.150 total 444
+#14 0.150 drwxr-xr-x   1 root root   4096 Jun 23 12:51 .
+#14 0.150 drwxr-xr-x   1 root root   4096 Jun 23 12:51 ..
+#14 0.150 -rw-r--r--   1 root root   8196 Jun 23 12:43 .DS_Store
+#14 0.150 drwxr-xr-x   2 root root   4096 Mar 20 11:43 .devcontainer
+#14 0.150 -rw-r--r--   1 root root    180 May 15 20:23 .dockerignore
+#14 0.150 -rw-r--r--   1 root root    121 Jun 21 15:05 .editorconfig
+#14 0.150 -rw-r--r--   1 root root     36 Jun 21 15:18 .env
+#14 0.150 drwxr-xr-x   3 root root   4096 Feb 22 15:31 .github
+#14 0.150 -rw-r--r--   1 root root    534 Jun 23 12:45 .gitignore
+#14 0.150 -rw-r--r--   1 root root   2522 Feb 27 19:59 .pre-commit-config.yaml
+#14 0.150 -rw-r--r--   1 root root      6 Feb 22 15:31 .python-version
+#14 0.150 drwxr-xr-x   2 root root   4096 Feb 27 22:43 .vscode
+#14 0.150 -rw-r--r--   1 root root    339 Jun 21 15:05 404.html
+#14 0.150 -rw-r--r--   1 root root   3222 Jun 21 15:05 Dockerfile.backend
+#14 0.150 -rw-r--r--   1 root root   1531 Jun 23 12:49 Dockerfile.frontend
+#14 0.150 -rw-r--r--   1 root root   1104 Feb 22 13:48 LICENSE
+#14 0.150 -rw-r--r--   1 root root    857 Feb 22 15:31 Makefile
+#14 0.150 -rw-r--r--   1 root root   2523 Jun 21 15:05 README.md
+#14 0.150 -rw-r--r--   1 root root      8 Feb 27 14:23 __init__.py
+#14 0.150 drwxr-xr-x   2 root root   4096 Jun 21 15:05 __pycache__
+#14 0.150 drwxr-xr-x   6 root root   4096 May 22 10:13 collected_static
+#14 0.150 -rw-r--r--   1 root root   1133 Jun 21 14:57 default.conf
+#14 0.150 -rw-r--r--   1 root root   1937 Jun 23 12:42 docker-compose.yml
+#14 0.150 -rwxr-xr-x   1 root root   1456 Jun 17 13:40 entrypoint.sh
+#14 0.150 -rw-r--r--   1 root root    255 Jun 21 15:05 eslint.config.mjs
+#14 0.150 -rw-r--r--   1 root root    318 Jun 21 15:05 index.html
+#14 0.150 -rw-r--r--   1 root root    300 Jun 21 15:05 jsconfig.json
+#14 0.150 -rwxr-xr-x   1 root root    689 Jun 21 08:13 manage.py
+#14 0.150 -rw-r--r--   1 root root    482 Jun 23 12:50 nginx-frontend.conf
+#14 0.150 -rw-r--r--   1 root root   1313 Jun 21 15:05 nginx.conf
+#14 0.150 drwxr-xr-x 167 root root   4096 Jun 23 12:51 node_modules
+#14 0.150 -rw-r--r--   1 root root      0 Jun 23 12:51 output.log
+#14 0.150 -rw-r--r--   1 root root 104290 Jun 21 15:05 package-lock.json
+#14 0.150 -rw-r--r--   1 root root    886 Jun 21 15:05 package.json
+#14 0.150 -rw-r--r--   1 root root 176624 Jun  6 07:53 poetry.lock
+#14 0.150 drwxr-xr-x   2 root root   4096 Jun 21 15:05 public
+#14 0.150 -rw-r--r--   1 root root   6917 May 30 16:20 pyproject.toml
+#14 0.150 drwxr-xr-x   8 root root   4096 Jun 21 15:05 src
+#14 0.150 drwxr-xr-x   2 root root   4096 May 27 06:10 static
+#14 0.150 drwxr-xr-x   8 root root   4096 Jun 21 08:23 vespadb
+#14 0.150 -rw-r--r--   1 root root   1605 Jun 23 12:42 vite.config.js
+#14 DONE 0.2s
+
+#15 [builder  9/10] RUN npx vite build
+#15 0.516 [33mThe CJS build of Vite's Node API is deprecated. See https://vitejs.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+#15 0.571 vite_env { VITE_APP_API_URL: 'http://rootenv:8000' }
+#15 0.584 vite v5.1.6 building for production...
+#15 0.624 transforming...
+#15 2.396 ✓ 388 modules transformed.
+#15 2.848 rendering chunks...
+#15 2.861 computing gzip size...
+#15 2.882 dist/index.html                                             2.13 kB │ gzip:   0.64 kB
+#15 2.882 dist/assets/fa-v4compatibility-aR9vOKaP.woff2               4.79 kB
+#15 2.882 dist/assets/fa-v4compatibility-F0dlVTLQ.ttf                10.83 kB
+#15 2.882 dist/assets/fa-regular-400-OOsPf1xj.woff2                  25.45 kB
+#15 2.882 dist/assets/fa-regular-400-BMFokQJ2.ttf                    68.00 kB
+#15 2.882 dist/assets/fa-brands-400-C99Yv4gD.woff2                  117.37 kB
+#15 2.882 dist/assets/fa-solid-900-DAI24fNt.woff2                   156.50 kB
+#15 2.883 dist/assets/fa-brands-400-DtZKBM2a.ttf                    207.97 kB
+#15 2.883 dist/assets/materialdesignicons-webfont-CYDMK1kx.woff2    385.36 kB
+#15 2.883 dist/assets/fa-solid-900-DM0teJdg.ttf                     419.72 kB
+#15 2.883 dist/assets/materialdesignicons-webfont-CgCzGbLl.woff     561.78 kB
+#15 2.883 dist/assets/materialdesignicons-webfont-D3kAzl71.ttf    1,243.50 kB
+#15 2.883 dist/assets/materialdesignicons-webfont-DttUABo4.eot    1,243.72 kB
+#15 2.883 dist/assets/index-C4bgCmMb.css                            975.86 kB │ gzip: 151.98 kB
+#15 2.883 dist/assets/index-B5dJxugR.js                             740.80 kB │ gzip: 231.73 kB
+#15 2.883 
+#15 2.883 (!) Some chunks are larger than 500 kB after minification. Consider:
+#15 2.883 - Using dynamic import() to code-split the application
+#15 2.883 - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+#15 2.883 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+#15 2.883 ✓ built in 2.29s
+#15 DONE 2.9s
+
+#16 [builder 10/10] RUN echo "Contents of /app/dist after vite build:" && ls -la /app/dist
+#16 0.272 Contents of /app/dist after vite build:
+#16 0.273 total 28
+#16 0.273 drwxr-xr-x 3 root root  4096 Jun 23 12:51 .
+#16 0.273 drwxr-xr-x 1 root root  4096 Jun 23 12:51 ..
+#16 0.273 drwxr-xr-x 2 root root  4096 Jun 23 12:51 assets
+#16 0.273 -rw-r--r-- 1 root root 12235 Jun 23 12:51 favicon.ico
+#16 0.273 -rw-r--r-- 1 root root  2130 Jun 23 12:51 index.html
+#16 DONE 0.3s
+
+#17 [frontend-prod 2/5] COPY --from=builder /app/dist /usr/share/nginx/html
+#17 DONE 0.0s
+
+#18 [frontend-prod 3/5] RUN echo "Contents of /usr/share/nginx/html after copying built files:" && ls -la /usr/share/nginx/html
+#18 0.079 Contents of /usr/share/nginx/html after copying built files:
+#18 0.079 total 36
+#18 0.079 drwxr-xr-x    1 root     root          4096 Jun 23 12:51 .
+#18 0.079 drwxr-xr-x    1 root     root          4096 May 30 18:51 ..
+#18 0.079 -rw-r--r--    1 root     root           497 May 29 17:56 50x.html
+#18 0.079 drwxr-xr-x    2 root     root          4096 Jun 23 12:51 assets
+#18 0.079 -rw-r--r--    1 root     root         12235 Jun 23 12:51 favicon.ico
+#18 0.079 -rw-r--r--    1 root     root          2130 Jun 23 12:51 index.html
+#18 DONE 0.1s
+
+#19 [frontend-prod 4/5] COPY nginx-frontend.conf /etc/nginx/nginx.conf
+#19 DONE 0.0s
+
+#20 [frontend-prod 5/5] RUN echo "Contents of /etc/nginx after copying nginx.conf:" && ls -la /etc/nginx
+#20 0.071 Contents of /etc/nginx after copying nginx.conf:
+#20 0.071 total 40
+#20 0.071 drwxr-xr-x    1 root     root          4096 Jun 23 12:51 .
+#20 0.071 drwxr-xr-x    1 root     root          4096 Jun 23 12:51 ..
+#20 0.071 drwxr-xr-x    2 root     root          4096 May 30 18:51 conf.d
+#20 0.071 -rw-r--r--    1 root     root          1077 May 29 17:56 fastcgi.conf
+#20 0.071 -rw-r--r--    1 root     root          1007 May 29 17:56 fastcgi_params
+#20 0.071 -rw-r--r--    1 root     root          5349 May 29 17:56 mime.types
+#20 0.071 lrwxrwxrwx    1 root     root            22 May 30 18:51 modules -> /usr/lib/nginx/modules
+#20 0.071 -rw-r--r--    1 root     root           482 Jun 23 12:50 nginx.conf
+#20 0.071 -rw-r--r--    1 root     root           636 May 29 17:56 scgi_params
+#20 0.071 -rw-r--r--    1 root     root           664 May 29 17:56 uwsgi_params
+#20 DONE 0.1s
+
+#21 exporting to image
+#21 exporting layers 0.0s done
+#21 writing image sha256:5b9d4e84de47f716d0aca7cadcddf443171abeb536fbaa559ccf80816c7b3db3 done
+#21 naming to docker.io/library/vespadb-frontend done
+#21 DONE 0.0s
+
+What's Next?
+  View a summary of image vulnerabilities and recommendations → docker scout quickview

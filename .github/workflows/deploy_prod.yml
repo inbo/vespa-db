@@ -1,14 +1,14 @@
-name: Deploy UAT
+name: Deploy PROD
 
 on:
   push:
     branches:
-      - uat
+      - master
 
 jobs:
   deploy:
     runs-on: self-hosted
-    environment: UAT
+    environment: PROD
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -36,7 +36,7 @@ jobs:
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           REPOSITORY: ${{ secrets.AWS_ECR_REPO_FRONTEND }}
-          IMAGE_TAG: uat
+          IMAGE_TAG: latest
         run: |
           docker build --build-arg ${{ secrets.FRONTEND_DOCKER_BUILD_ARGS }} -t $REGISTRY/$REPOSITORY:$IMAGE_TAG -f Dockerfile.frontend .
           docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG

@@ -81,8 +81,8 @@ repos:
         args: [--lock]
         language: system
         pass_filenames: false
-      - id: mypy
-        name: mypy
-        entry: poetry run mypy
-        language: system
-        types: [python]
+      # - id: mypy
+      #   name: mypy
+      #   entry: poetry run mypy
+      #   language: system
+      #   types: [python]

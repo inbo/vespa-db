@@ -317,9 +317,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
                         observation.save()
                         success_list.append(observation.id)
                     except Exception as e:
-                        logger.exception(
-                            f"Failed to send email to {observation.observer_email} for observation {observation.id}: {e}"
-                        )
+                        logger.exception(f"Failed to send email to {observation.observer_email} for observation {observation.id}: {e}")
                         fail_list.append(observation.id)
 
                 if success_list:

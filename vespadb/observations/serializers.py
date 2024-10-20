@@ -215,12 +215,7 @@ class ObservationSerializer(serializers.ModelSerializer):
         return obj.created_by.first_name if obj.created_by else None
 
     def to_representation(self, instance: Observation) -> dict[str, Any]:  # noqa: C901
-        """
-        Dynamically filter fields based on user authentication status.
-
-        :param instance: Observation instance.
-        :return: A dictionary representation of the observation instance with filtered fields.
-        """
+        """Dynamically filter fields based on user authentication status."""
         if not instance.municipality and instance.location:
             long = instance.location.x
             lat = instance.location.y

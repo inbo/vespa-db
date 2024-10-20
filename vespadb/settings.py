@@ -263,3 +263,7 @@ SWAGGER_SETTINGS = {
 }
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+EMAIL_BACKEND = "django_ses.SESBackend"
+AWS_SES_REGION_NAME = "eu-west-1"
+AWS_SES_REGION_ENDPOINT = "email.eu-west-1.amazonaws.com"
+DEFAULT_FROM_EMAIL = "noreply@vespawatch.be"

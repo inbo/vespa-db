@@ -303,9 +303,11 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
 
                 for observation in queryset:
                     if not observation.observer_email:
+                        logger.warning(f"Observation {observation.id} has no observer email.")
                         fail_list.append(observation.id)
                         continue
                     if observation.observer_received_email and not resend:
+                        logger.warning(f"Observation {observation.id} already received an email.")
                         fail_list.append(observation.id)
                         continue
                     try:
@@ -319,6 +321,11 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
                             f"Failed to send email to {observation.observer_email} for observation {observation.id}: {e}"
                         )
                         fail_list.append(observation.id)
+
+                if success_list:
+                    messages.success(request, f"Emails successfully sent to {len(success_list)} observers.")
+                if fail_list:
+                    messages.warning(request, f"Failed to send emails for {len(fail_list)} observations.")
 
                 return TemplateResponse(
                     request,

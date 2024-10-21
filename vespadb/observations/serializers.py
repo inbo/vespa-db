@@ -2,7 +2,7 @@
 
 import logging
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, date
 from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
@@ -226,9 +226,9 @@ class ObservationSerializer(serializers.ModelSerializer):
 
         data: dict[str, Any] = super().to_representation(instance)
         observation_datetime = data.get('observation_datetime')
-        if isinstance(observation_datetime, datetime.date) and not isinstance(observation_datetime, datetime):
+        if isinstance(observation_datetime, date) and not isinstance(observation_datetime, datetime):
             data['observation_datetime'] = datetime.combine(observation_datetime, datetime.min.time())
-            
+        
         data.pop("wn_admin_notes", None)
         datetime_fields = [
             "created_datetime",

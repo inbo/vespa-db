@@ -1,5 +1,4 @@
 """Fetch and update observations from waarnemingen API."""
-
 import logging
 import os
 from datetime import UTC, datetime, timedelta
@@ -87,21 +86,26 @@ def create_observations(observations_to_create: list[Observation]) -> None:
         return
 
     try:
-        Observation.objects.bulk_create(observations_to_create, batch_size=BATCH_SIZE, ignore_conflicts=True)
-        logger.info("Successfully created %s new observations", len(observations_to_create))
+        with transaction.atomic():  # Bulk operations in a separate atomic block
+            Observation.objects.bulk_create(observations_to_create, batch_size=BATCH_SIZE, ignore_conflicts=True)
+            logger.info("Successfully created %s new observations", len(observations_to_create))
     except Exception as bulk_error:
         logger.exception("Bulk creation failed: %s", bulk_error)
+
         successful_creations = 0
+        # Handle individual saves OUTSIDE of any transaction block
         for observation in observations_to_create:
             try:
-                observation.save()
+                observation.save()  # Save each observation individually
                 successful_creations += 1
-            except DatabaseError as e:
-                logger.exception("Failed to create observation with wn_id %s individually: %s", observation.wn_id, e)
+            except Exception as e:
+                # Log error and the input data without stopping the sync
+                logger.error(f"Failed to create observation with wn_id {observation.wn_id}: {e}")
+                logger.error(f"Input data for failed observation: {observation.__dict__}")
+
         logger.info("Individually created %s observations after bulk failure", successful_creations)
-
-
-def update_observations(observations_to_update: list[Observation], wn_ids_to_update: list[str]) -> None:  # noqa: C901
+        
+def update_observations(observations_to_update: list[Observation], wn_ids_to_update: list[str]) -> None:
     """Update existing observations with bulk update, and fallback to individual updates on failure."""
     observations_update_dict = {obs.wn_id: obs for obs in observations_to_update}
     existing_observations_to_update = Observation.objects.filter(wn_id__in=wn_ids_to_update)
@@ -138,20 +142,20 @@ def update_observations(observations_to_update: list[Observation], wn_ids_to_upd
             logger.info("Attempting to bulk update %s observations", len(observations_to_bulk_update))
             Observation.objects.bulk_update(observations_to_bulk_update, FIELDS_TO_UPDATE, batch_size=BATCH_SIZE)
             logger.info("Successfully bulk updated %s observations", len(observations_to_bulk_update))
-        except (DatabaseError, ValueError) as bulk_error:
+        except Exception as bulk_error:
             logger.exception("Bulk update failed: %s", bulk_error)
             logger.info("Falling back to individual updates")
-            successful_updates = 0
 
+            successful_updates = 0
             # Fall back to individual updates in case of failure
             for observation in observations_to_bulk_update:
                 try:
                     observation.save(update_fields=FIELDS_TO_UPDATE)
                     successful_updates += 1
-                except DatabaseError as e:
-                    logger.exception(
-                        "Failed to update observation with wn_id %s individually: %s", observation.wn_id, e
-                    )
+                except Exception as e:
+                    # Log error and the input data without stopping the sync
+                    logger.error(f"Failed to update observation with wn_id {observation.wn_id}: {e}")
+                    logger.error(f"Input data for failed observation: {observation.__dict__}")
 
             logger.info("Individually updated %s observations after bulk failure", successful_updates)
     else:

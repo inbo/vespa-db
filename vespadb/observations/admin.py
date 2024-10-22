@@ -217,7 +217,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         custom_urls = [
             path("import-file/", self.admin_site.admin_view(self.import_file), name="import_file"),
             path("bulk-import/", self.admin_site.admin_view(self.bulk_import_view), name="bulk_import"),
-            path("send-email/", self.admin_site.admin_view(self.send_email_to_observers), name="send-email"),
+            path("send-email/", self.admin_site.admin_view(self.send_email_view), name="send-email"),  # Correcte URL naam
         ]
         return custom_urls + urls
 
@@ -279,24 +279,18 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         else:
             self.message_user(request, f"Failed to import observations: {response.data}", level="error")
         return redirect("admin:observations_observation_changelist")
-
-    @admin.action(description="Verzend emails naar observatoren")
-    def send_email_to_observers(
-        self, request: HttpRequest, queryset: QuerySet[Observation]
-    ) -> TemplateResponse | HttpResponse:
-        """
-        Send emails to the observers of the selected observations.
-
-        :param request: HttpRequest object
-        :param queryset: QuerySet of selected observations
-        :return: TemplateResponse or HttpResponse object
-        """
-        if "apply" in request.POST:
+    
+    def send_email_view(self, request: HttpRequest) -> HttpResponse:
+        """View to display the form and send emails."""
+        if request.method == 'POST':
             form = SendEmailForm(request.POST)
             if form.is_valid():
                 subject = form.cleaned_data["subject"]
                 message = form.cleaned_data["message"]
                 resend = form.cleaned_data["resend"]
+
+                selected_observations = request.session.get('selected_observations', [])
+                queryset = Observation.objects.filter(pk__in=selected_observations)
 
                 success_list = []
                 fail_list = []
@@ -312,7 +306,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
                         continue
                     try:
                         send_mail(subject, message, "noreply@vespawatch.be", [observation.observer_email])
-                        logger.info(f"Email sent to {observation.observer_email} for observation {observation.id}")
+                        logger.debug(f"Email sent to {observation.observer_email} for observation {observation.id}")
                         observation.observer_received_email = True
                         observation.save()
                         success_list.append(observation.id)
@@ -325,19 +319,22 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
                 if fail_list:
                     messages.warning(request, f"Failed to send emails for {len(fail_list)} observations.")
 
-                return TemplateResponse(
-                    request,
-                    "admin/send_email_result.html",
-                    {
-                        "success_list": success_list,
-                        "fail_list": fail_list,
-                    },
-                )
-
+                return redirect('admin:observations_observation_changelist')
         else:
             form = SendEmailForm()
 
-        return render(request, "admin/send_email.html", {"observations": queryset, "form": form})
+        return render(request, 'admin/send_email.html', {'form': form})
+
+    @admin.action(description="Verzend emails naar observatoren")
+    def send_email_to_observers(self, request: HttpRequest, queryset: QuerySet[Observation]) -> HttpResponse:
+        """
+        Action to prepare sending emails.
+        """
+        # Sla de geselecteerde observaties op in de sessie
+        request.session['selected_observations'] = list(queryset.values_list('pk', flat=True))
+        
+        # Redirect naar de juiste naam van de custom URL
+        return redirect('admin:send-email')
 
     @admin.action(description="Markeer observatie(s) als bestreden")
     def mark_as_eradicated(self, request: HttpRequest, queryset: Any) -> None:

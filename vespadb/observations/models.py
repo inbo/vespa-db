@@ -247,7 +247,7 @@ class Observation(models.Model):
     )
 
     observer_phone_number = models.CharField(
-        max_length=20, blank=True, null=True, help_text="Phone number of the observer"
+        max_length=200, blank=True, null=True, help_text="Phone number of the observer"
     )
     observer_email = models.EmailField(blank=True, null=True, help_text="Email of the observer")
     observer_received_email = models.BooleanField(default=False, help_text="Flag indicating if observer received email")

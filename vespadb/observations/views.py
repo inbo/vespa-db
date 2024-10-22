@@ -650,7 +650,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 # Try serializing the entire page first
                 serializer = serializer_class(page, many=True, context=serializer_context)
                 serialized_data.extend(serializer.data)
-            except ValidationError:
+            except Exception as e:
                 logger.exception(f"Validation error in page {page_number}, processing individually.")
                 for obj in page.object_list:
                     try:
@@ -670,6 +670,11 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                         errors.append({
                             "id": obj.id,
                             "error": "Database connection error",
+                        })
+                    except Exception as e:
+                        errors.append({
+                            "id": obj.id,
+                            "error": e,
                         })
 
         if errors:

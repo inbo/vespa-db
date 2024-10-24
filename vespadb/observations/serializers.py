@@ -213,7 +213,7 @@ class ObservationSerializer(serializers.ModelSerializer):
     def get_created_by_first_name(self, obj: Observation) -> str | None:
         """Retrieve the first name of the user who created the observation."""
         return obj.created_by.first_name if obj.created_by else None
-
+        
     def to_representation(self, instance: Observation) -> dict[str, Any]:  # noqa: C901
         """Dynamically filter fields based on user authentication status."""
         if not instance.municipality and instance.location:
@@ -226,6 +226,9 @@ class ObservationSerializer(serializers.ModelSerializer):
 
         data: dict[str, Any] = super().to_representation(instance)
         observation_datetime = data.get('observation_datetime')
+        if 'created_by' not in data or data['created_by'] is None:
+            data['created_by_first_name'] = None
+        
         if isinstance(observation_datetime, date) and not isinstance(observation_datetime, datetime):
             data['observation_datetime'] = datetime.combine(observation_datetime, datetime.min.time())
         

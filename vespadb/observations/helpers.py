@@ -62,16 +62,14 @@ def parse_and_convert_to_cet(datetime_str: str) -> datetime:
     return parser.parse(datetime_str).astimezone(cet_tz)
 
 
-def retry_with_backoff(func: Callable[..., T], *args: Any, max_retries: int = 3, backoff_in_seconds: int = 2) -> Any:
+def retry_with_backoff(func: Callable[..., T], retries: int=3, backoff_in_seconds: int=2) -> Any:
     """Retry mechanism for retrying a function with a backoff strategy."""
-    attempt = 0
-    while attempt < max_retries:
+    for attempt in range(retries):
         try:
-            return func(*args)  # Call the function with the provided arguments
-        except OperationalError:
-            attempt += 1
-            if attempt < max_retries:
-                time.sleep(backoff_in_seconds)  # Wait before retrying
+            return func()
+        except Exception as e:
+            if attempt < retries - 1:
+                wait_time = backoff_in_seconds * (2 ** attempt)
+                time.sleep(wait_time)
             else:
                 raise
-    return None

@@ -633,74 +633,46 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
     @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
     @action(detail=False, methods=["get"], permission_classes=[AllowAny])
     def export(self, request: Request) -> Response:
-        """Export observations data in the specified format with retry mechanism."""
-        user = request.user
-        export_format = request.query_params.get("export_format", "json").lower()
+        export_format = request.query_params.get("export_format", "csv").lower()
         queryset = self.filter_queryset(self.get_queryset())
-        serializer_class = self.get_serializer_class()
-        serializer_context = self.get_serializer_context()
+        paginator = Paginator(queryset, 1000)  # Process in batches of 1000 items
 
-        paginator = Paginator(queryset, 1000)  # Limiting to smaller batches
         serialized_data = []
         errors = []
 
+        # Loop through each page in the paginator
         for page_number in paginator.page_range:
             page = paginator.page(page_number)
+
             try:
-                # Try serializing the entire page first
-                serializer = serializer_class(page, many=True, context=serializer_context)
+                # Try serializing the page
+                serializer = self.get_serializer(page, many=True)
                 serialized_data.extend(serializer.data)
             except Exception as e:
-                logger.exception(f"Validation error in page {page_number}, processing individually.")
+                # Retry with backoff for individual objects on failure
                 for obj in page.object_list:
                     try:
-                        # Retry the serialization of each object individually with backoff
-                        serializer_data = retry_with_backoff(
-                            lambda obj=obj: serializer_class(obj, context=serializer_context).data
-                        )
-                        serialized_data.append(serializer_data.data)
-                    except ValidationError as e:
+                        serialized_obj = retry_with_backoff(lambda: self.get_serializer(obj).data)
+                        serialized_data.append(serialized_obj)
+                    except Exception as inner_error:
                         errors.append({
                             "id": obj.id,
-                            "error": str(e),
-                            "data": serializer_data.data if serializer_data else None,
+                            "error": str(inner_error)
                         })
-                    except OperationalError as e:
-                        logger.exception(f"Database error for object {obj.id}: {e}")
-                        errors.append({
-                            "id": obj.id,
-                            "error": "Database connection error",
-                        })
-                    except Exception as e:
-                        errors.append({
-                            "id": obj.id,
-                            "error": e,
-                        })
-
-        if errors:
-            logger.error(f"Errors during export: {errors}")
-
-        # Handle the final export based on the requested format
-        if export_format == "json":
-            response_data = {
-                "data": serialized_data,
-                "errors": errors,
-            }
-            return JsonResponse(response_data, safe=False, json_dumps_params={"indent": 2})
-
+        
         if export_format == "csv":
-            response = HttpResponse(content_type="text/csv")
-            response["Content-Disposition"] = f'attachment; filename="observations_export_{user.username}.csv"'
-            if serialized_data:
-                headers = serialized_data[0].keys()
-                writer = csv.DictWriter(response, fieldnames=headers)
-                writer.writeheader()
-                writer.writerows(serialized_data)
-            return response
+            return self.export_as_csv(serialized_data)
+        
+        return JsonResponse({"data": serialized_data, "errors": errors}, safe=False)
 
-        return Response({"error": "Unsupported format specified."}, status=status.HTTP_400_BAD_REQUEST)
-
-
+    def export_as_csv(self, data: list[dict[str, Any]]) -> HttpResponse:
+        """Export the data as a CSV file."""
+        response = HttpResponse(content_type="text/csv")
+        writer = csv.DictWriter(response, fieldnames=data[0].keys())
+        writer.writeheader()
+        writer.writerows(data)
+        return response
+    
 @require_GET
 def search_address(request: Request) -> JsonResponse:
     """

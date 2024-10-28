@@ -6,19 +6,24 @@ from typing import Any
 
 from django import forms
 from django.contrib import admin, messages
+from django.contrib.admin import SimpleListFilter
 from django.contrib.gis import admin as gis_admin
 from django.core.mail import send_mail
+from django.db.models import Q
 from django.db.models.query import QuerySet
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.template.response import TemplateResponse
 from django.urls import path
 from django.utils.timezone import now
+from django.utils.translation import gettext_lazy as _
 from rest_framework.test import APIRequestFactory
+from django.conf import settings
 
-from vespadb.observations.filters import MunicipalityExcludeFilter, ProvinceFilter
+from vespadb.observations.filters import MunicipalityExcludeFilter, ObserverReceivedEmailFilter, ProvinceFilter
 from vespadb.observations.forms import SendEmailForm
 from vespadb.observations.models import Municipality, Observation, Province
+from vespadb.observations.utils import check_if_point_in_anb_area, get_municipality_from_coordinates
 from vespadb.observations.views import ObservationsViewSet
 
 logger = logging.getLogger(__name__)
@@ -30,8 +35,68 @@ class FileImportForm(forms.Form):
     file = forms.FileField()
 
 
+class NestStatusFilter(SimpleListFilter):
+    """Custom filter for selecting multiple nest statuses in the admin panel."""
+
+    title: str = _("Nest Status")
+    parameter_name: str = "nest_status"
+
+    def lookups(self, request: HttpRequest, model_admin: Any) -> list[tuple[str, str]]:
+        """
+        Return a list of tuples for the different nest statuses.
+
+        :param request: The HTTP request object.
+        :param model_admin: The current model admin instance.
+        :return: A list of tuples containing the status values and labels.
+        """
+        return [
+            ("eradicated", "Eradicated"),
+            ("reserved", "Reserved"),
+            ("open", "Open"),
+        ]
+
+    def queryset(self, request: HttpRequest, queryset: QuerySet) -> QuerySet | None:
+        """
+        Filter the queryset based on the selected nest statuses.
+
+        :param request: The HTTP request object.
+        :param queryset: The current queryset.
+        :return: The filtered queryset based on the selected statuses, or the original queryset if no value is provided.
+        """
+        value = self.value()
+        if not value:
+            return queryset
+
+        statuses = value.split(",")
+        query = Q()
+
+        if "eradicated" in statuses:
+            query |= Q(eradication_date__isnull=False)
+        if "reserved" in statuses:
+            query |= Q(reserved_datetime__isnull=False)
+        if "open" in statuses:
+            query |= Q(reserved_datetime__isnull=True, eradication_date__isnull=True)
+
+        return queryset.filter(query)
+
+
+class ObservationAdminForm(forms.ModelForm):
+    """Custom form for the Observation model."""
+
+    class Meta:
+        """Meta class for the ObservationAdminForm."""
+
+        model = Observation
+        fields = "__all__"
+        widgets = {
+            "eradication_date": forms.DateInput(attrs={"type": "date"}),
+        }
+
+
 class ObservationAdmin(gis_admin.GISModelAdmin):
     """Admin class for Observation model."""
+
+    form = ObservationAdminForm
 
     list_display = (
         "id",
@@ -49,30 +114,87 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         "eradicator_name",
         "reserved_by",
         "modified_by",
+        "modified_datetime",
+        "public_domain",
+        "reserved_datetime",
     )
     list_filter = (
         "observation_datetime",
         "eradication_date",
         "eradicator_name",
-        "wn_validation_status",
+        NestStatusFilter,
         "nest_height",
         "nest_size",
         "nest_location",
         "nest_type",
         "eradication_result",
+        "public_domain",
         ProvinceFilter,
         MunicipalityExcludeFilter,
         "municipality",
         "anb",
         "reserved_by",
+        "modified_datetime",
+        "modified_by",
         "created_by",
         "modified_by",
+        ObserverReceivedEmailFilter,
     )
     search_fields = ("id", "eradicator_name", "observer_name")
     filter_horizontal = ()
     ordering = ("-observation_datetime",)
     raw_id_fields = ("municipality", "province")
     actions = ["send_email_to_observers", "mark_as_eradicated", "mark_as_not_visible"]
+
+    readonly_fields = (
+        "wn_notes",
+        "source",
+        "wn_id",
+        "wn_validation_status",
+        "wn_admin_notes",
+        "observer_name",
+        "observer_phone_number",
+        "created_datetime",
+        "created_by",
+        "wn_modified_datetime",
+        "wn_created_datetime",
+        "species",
+        "wn_cluster_id",
+        "modified_by",
+        "modified_datetime",
+        "province",
+        "anb",
+        "municipality",
+    )
+
+    def get_readonly_fields(self, request: HttpRequest, obj: Observation | None = None) -> list[str]:
+        """."""
+        if obj:  # editing an existing object
+            return [*self.readonly_fields, "location"]
+        return list(self.readonly_fields)
+
+    def save_model(self, request: HttpRequest, obj: Observation, form: Any, change: bool) -> None:
+        """."""
+        if not change:  # Creating a new object
+            obj.created_by = request.user
+            obj.created_datetime = now()
+
+        obj.modified_by = request.user
+        obj.modified_datetime = now()
+
+        # Auto-edit based on location
+        if obj.location:
+            point = obj.location.transform(4326, clone=True)
+            long, lat = point.x, point.y
+            obj.anb = check_if_point_in_anb_area(long, lat)
+            municipality = get_municipality_from_coordinates(long, lat)
+            obj.municipality = municipality
+            obj.province = municipality.province if municipality else None
+
+        if not obj.source:
+            obj.source = "Waarnemingen.be"
+
+        super().save_model(request, obj, form, change)
 
     def changelist_view(self, request: HttpRequest, extra_context: Any = None) -> TemplateResponse:
         """
@@ -96,7 +218,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         custom_urls = [
             path("import-file/", self.admin_site.admin_view(self.import_file), name="import_file"),
             path("bulk-import/", self.admin_site.admin_view(self.bulk_import_view), name="bulk_import"),
-            path("send-email/", self.admin_site.admin_view(self.send_email_to_observers), name="send-email"),
+            path("send-email/", self.admin_site.admin_view(self.send_email_view), name="send-email"),  # Correcte URL naam
         ]
         return custom_urls + urls
 
@@ -114,9 +236,18 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
                 file_name = file.name
 
                 if file_name.endswith(".json"):
-                    data = json.load(file)
-                    request.data = {"data": data}
-                    request.content_type = "application/json"
+                    try:
+                        data = json.load(file)
+                        if not isinstance(data, list):
+                            raise TypeError("Invalid JSON format. Expected a list of objects.")
+                        request.data = {"data": data}
+                        request.content_type = "application/json"
+                    except json.JSONDecodeError as e:
+                        self.message_user(request, f"JSON decode error: {e}", level="error")
+                        return redirect("admin:observations_observation_changelist")
+                    except ValueError as e:
+                        self.message_user(request, str(e), level="error")
+                        return redirect("admin:observations_observation_changelist")
                 elif file_name.endswith(".csv"):
                     request.data = {"file": file}
                     request.content_type = "multipart/form-data"
@@ -149,60 +280,62 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         else:
             self.message_user(request, f"Failed to import observations: {response.data}", level="error")
         return redirect("admin:observations_observation_changelist")
-
-    @admin.action(description="Verzend emails naar observatoren")
-    def send_email_to_observers(
-        self, request: HttpRequest, queryset: QuerySet[Observation]
-    ) -> TemplateResponse | HttpResponse:
-        """
-        Send emails to the observers of the selected observations.
-
-        :param request: HttpRequest object
-        :param queryset: QuerySet of selected observations
-        :return: TemplateResponse or HttpResponse object
-        """
-        if "apply" in request.POST:
+    
+    def send_email_view(self, request: HttpRequest) -> HttpResponse:
+        """View to display the form and send emails."""
+        if request.method == 'POST':
             form = SendEmailForm(request.POST)
             if form.is_valid():
                 subject = form.cleaned_data["subject"]
                 message = form.cleaned_data["message"]
                 resend = form.cleaned_data["resend"]
 
+                selected_observations = request.session.get('selected_observations', [])
+                queryset = Observation.objects.filter(pk__in=selected_observations)
+
                 success_list = []
                 fail_list = []
 
                 for observation in queryset:
                     if not observation.observer_email:
+                        logger.warning(f"Observation {observation.id} has no observer email.")
                         fail_list.append(observation.id)
                         continue
                     if observation.observer_received_email and not resend:
+                        logger.warning(f"Observation {observation.id} already received an email.")
                         fail_list.append(observation.id)
                         continue
                     try:
-                        send_mail(subject, message, "vespawatch@inbo.be", [observation.observer_email])
-                        logger.info(f"Email sent to {observation.observer_email} for observation {observation.id}")
+                        send_mail(subject, message, from_email=settings.DEFAULT_FROM_EMAIL,recipient_list=[observation.observer_email])
+                        logger.debug(f"Email sent to {observation.observer_email} for observation {observation.id}")
                         observation.observer_received_email = True
                         observation.save()
                         success_list.append(observation.id)
                     except Exception as e:
-                        logger.exception(
-                            f"Failed to send email to {observation.observer_email} for observation {observation.id}: {e}"
-                        )
+                        logger.exception(f"Failed to send email to {observation.observer_email} for observation {observation.id}: {e}")
                         fail_list.append(observation.id)
 
-                return TemplateResponse(
-                    request,
-                    "admin/send_email_result.html",
-                    {
-                        "success_list": success_list,
-                        "fail_list": fail_list,
-                    },
-                )
+                if success_list:
+                    messages.success(request, f"Emails successfully sent to {len(success_list)} observers.")
+                if fail_list:
+                    messages.warning(request, f"Failed to send emails for {len(fail_list)} observations.")
 
+                return redirect('admin:observations_observation_changelist')
         else:
             form = SendEmailForm()
 
-        return render(request, "admin/send_email.html", {"observations": queryset, "form": form})
+        return render(request, 'admin/send_email.html', {'form': form})
+
+    @admin.action(description="Verzend emails naar observatoren")
+    def send_email_to_observers(self, request: HttpRequest, queryset: QuerySet[Observation]) -> HttpResponse:
+        """
+        Action to prepare sending emails.
+        """
+        # Sla de geselecteerde observaties op in de sessie
+        request.session['selected_observations'] = list(queryset.values_list('pk', flat=True))
+        
+        # Redirect naar de juiste naam van de custom URL
+        return redirect('admin:send-email')
 
     @admin.action(description="Markeer observatie(s) als bestreden")
     def mark_as_eradicated(self, request: HttpRequest, queryset: Any) -> None:

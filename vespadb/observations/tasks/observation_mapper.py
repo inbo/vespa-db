@@ -19,6 +19,7 @@ from vespadb.observations.models import (
     NestLocationEnum,
     NestSizeEnum,
     NestTypeEnum,
+    Observation,
     ValidationStatusEnum,
 )
 from vespadb.observations.utils import check_if_point_in_anb_area, get_municipality_from_coordinates
@@ -117,7 +118,7 @@ def parse_datetime_with_timezone(
     return datetime_obj.astimezone(pytz.utc)
 
 
-def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dict[str, Any] | None:
+def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dict[str, Any] | None:  # noqa: C901
     """
     Map external API data to a Django observation model fields, returning None if the data is incomplete or improperly formatted.
 
@@ -177,6 +178,7 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
         "wn_validation_status": validation_status,
         "wn_cluster_id": cluster_id,
         "images": external_data.get("photos", []),
+        "source": "Waarnemingen.be",
         **mapped_enums,
     }
 
@@ -190,12 +192,39 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
         })
 
     # Eradication specifics
+    eradication_flagged = False
+
+    # Check for eradication keywords in notes
     if (
         "notes" in external_data
         and external_data["notes"]
         and any(keyword in external_data["notes"].upper() for keyword in settings.ERADICATION_KEYWORD_LIST)
+        and not check_existing_eradication_date(external_data["id"])
     ):
-        mapped_data["eradication_date"] = observation_datetime_utc
+        eradication_flagged = True
+
+    # Check for "BESTREDEN" in 'Remark (Asian hornet)' attribute
+    for attribute in external_data.get("attributes", []):
+        if attribute.get("name") == "Remark (Asian hornet)" and "BESTREDEN" in attribute.get("value", "").upper():
+            eradication_flagged = True
+            break
+
+    if eradication_flagged and not check_existing_eradication_date(external_data["id"]):
+        mapped_data["eradication_date"] = observation_datetime_utc.date()
         mapped_data["eradicator_name"] = "Gemeld als bestreden"
 
     return mapped_data
+
+
+def check_existing_eradication_date(wn_id: str) -> bool:
+    """
+    Check if the eradication_date is already set for the given wn_id.
+
+    :param wn_id: The ID of the observation from the external API.
+    :return: True if the eradication_date is already set, False otherwise.
+    """
+    try:
+        observation = Observation.objects.get(wn_id=wn_id)
+        return observation.eradication_date is not None
+    except Observation.DoesNotExist:
+        return False

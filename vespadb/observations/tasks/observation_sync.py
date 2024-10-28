@@ -1,5 +1,4 @@
 """Fetch and update observations from waarnemingen API."""
-
 import logging
 import os
 from datetime import UTC, datetime, timedelta
@@ -7,7 +6,7 @@ from typing import Any
 
 import requests
 from celery import Task, shared_task
-from django.db import models, transaction
+from django.db import DatabaseError, models, transaction
 from django.utils.timezone import now
 from dotenv import load_dotenv
 
@@ -22,6 +21,7 @@ load_dotenv()
 logger = logging.getLogger("vespadb.observations.tasks")
 
 BATCH_SIZE = 500
+NEST_ACTIVITY_IDS = ["3240", "3036", "3241"]
 
 
 def get_oauth_token() -> str | None:
@@ -57,6 +57,7 @@ def fetch_observations_page(token: str, modified_since: str, offset: int = 0) ->
             "limit": 100,
             "offset": offset,
             "validation_status": ["P", "J"],
+            "activity": NEST_ACTIVITY_IDS,
         }
         response = requests.get(
             "https://waarnemingen.be/api/v1/inbo/vespa-watch/observations/",
@@ -80,22 +81,39 @@ def cache_wn_ids() -> set[str]:
 
 
 def create_observations(observations_to_create: list[Observation]) -> None:
-    """Bulk create observations."""
-    if observations_to_create:
-        Observation.objects.bulk_create(observations_to_create, batch_size=BATCH_SIZE, ignore_conflicts=True)
-        logger.info("Created %s new observations", len(observations_to_create))
+    """Attempt to bulk create observations, and fall back to individual creation on failure."""
+    if not observations_to_create:
+        return
 
+    try:
+        with transaction.atomic():  # Bulk operations in a separate atomic block
+            Observation.objects.bulk_create(observations_to_create, batch_size=BATCH_SIZE, ignore_conflicts=True)
+            logger.info("Successfully created %s new observations", len(observations_to_create))
+    except Exception as bulk_error:
+        logger.exception("Bulk creation failed: %s", bulk_error)
 
+        successful_creations = 0
+        # Handle individual saves OUTSIDE of any transaction block
+        for observation in observations_to_create:
+            try:
+                observation.save()  # Save each observation individually
+                successful_creations += 1
+            except Exception as e:
+                # Log error and the input data without stopping the sync
+                logger.error(f"Failed to create observation with wn_id {observation.wn_id}: {e}")
+                logger.error(f"Input data for failed observation: {observation.__dict__}")
+
+        logger.info("Individually created %s observations after bulk failure", successful_creations)
+        
 def update_observations(observations_to_update: list[Observation], wn_ids_to_update: list[str]) -> None:
-    """Update existing observations."""
+    """Update existing observations with bulk update, and fallback to individual updates on failure."""
     observations_update_dict = {obs.wn_id: obs for obs in observations_to_update}
     existing_observations_to_update = Observation.objects.filter(wn_id__in=wn_ids_to_update)
     observations_to_bulk_update = []
 
-    for observation in existing_observations_to_update:
-        updated_observation = observations_update_dict[observation.wn_id]
+    def needs_update(observation: Observation, updated_observation: Observation) -> bool:
+        """Check if an observation needs to be updated."""
         update_needed = False
-
         for field in FIELDS_TO_UPDATE:
             if hasattr(observation, field):
                 new_value = getattr(updated_observation, field)
@@ -111,13 +129,35 @@ def update_observations(observations_to_update: list[Observation], wn_ids_to_upd
                 if current_value != new_value:
                     setattr(observation, field, new_value)
                     update_needed = True
+        return update_needed
 
-        if update_needed:
+    for observation in existing_observations_to_update:
+        updated_observation = observations_update_dict[observation.wn_id]
+        if needs_update(observation, updated_observation):
             observations_to_bulk_update.append(observation)
 
+    # Attempt to perform a bulk update
     if observations_to_bulk_update:
-        logger.info("Updating %s observations", len(observations_to_bulk_update))
-        Observation.objects.bulk_update(observations_to_bulk_update, FIELDS_TO_UPDATE, batch_size=BATCH_SIZE)
+        try:
+            logger.info("Attempting to bulk update %s observations", len(observations_to_bulk_update))
+            Observation.objects.bulk_update(observations_to_bulk_update, FIELDS_TO_UPDATE, batch_size=BATCH_SIZE)
+            logger.info("Successfully bulk updated %s observations", len(observations_to_bulk_update))
+        except Exception as bulk_error:
+            logger.exception("Bulk update failed: %s", bulk_error)
+            logger.info("Falling back to individual updates")
+
+            successful_updates = 0
+            # Fall back to individual updates in case of failure
+            for observation in observations_to_bulk_update:
+                try:
+                    observation.save(update_fields=FIELDS_TO_UPDATE)
+                    successful_updates += 1
+                except Exception as e:
+                    # Log error and the input data without stopping the sync
+                    logger.error(f"Failed to update observation with wn_id {observation.wn_id}: {e}")
+                    logger.error(f"Input data for failed observation: {observation.__dict__}")
+
+            logger.info("Individually updated %s observations after bulk failure", successful_updates)
     else:
         logger.info("No updates required for the observations.")
 
@@ -267,9 +307,14 @@ def fetch_and_update_observations(self: Task, since_week: int | None = None, dat
                         )
                     )
 
-            with transaction.atomic():  # Ensure that all operations are atomic
-                create_observations(observations_to_create)
-                update_observations(observations_to_update, wn_ids_to_update)
+            # Ensure that the following operations are atomic
+            try:
+                with transaction.atomic():
+                    create_observations(observations_to_create)
+                    update_observations(observations_to_update, wn_ids_to_update)
+            except Exception as e:
+                logger.exception("Transaction failed, rolling back: %s", e)
+                # Transaction will be automatically rolled back
 
             if not data.get("next"):
                 break

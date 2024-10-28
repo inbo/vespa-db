@@ -4,27 +4,34 @@ import csv
 import datetime
 import io
 import json
+import time
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from django.contrib.gis.db.models.functions import Transform
 from django.contrib.gis.geos import GEOSGeometry
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files.uploadedfile import InMemoryUploadedFile
+from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import CharField, OuterRef, QuerySet, Subquery, Value
 from django.db.models.functions import Coalesce
-from django.db.utils import IntegrityError
+from django.db.utils import IntegrityError, OperationalError
 from django.http import HttpResponse, JsonResponse
+from django.db import connection
 from django.utils.decorators import method_decorator
 from django.utils.timezone import now
+from django.views.decorators.http import require_GET
 from django_filters.rest_framework import DjangoFilterBackend
 from django_ratelimit.decorators import ratelimit
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
+from geopy.exc import GeocoderServiceError, GeocoderTimedOut
+from geopy.geocoders import Nominatim
 from rest_framework import filters, status
 from rest_framework.decorators import action, parser_classes
+from rest_framework.exceptions import NotFound
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny, BasePermission, IsAdminUser, IsAuthenticated
 from rest_framework.request import Request
@@ -33,14 +40,19 @@ from rest_framework.serializers import BaseSerializer
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_gis.filters import DistanceToPointFilter
 
+from vespadb.observations.cache import invalidate_geojson_cache, invalidate_observation_cache
 from vespadb.observations.filters import ObservationFilter
 from vespadb.observations.helpers import parse_and_convert_to_utc
+from vespadb.observations.utils import db_retry
 from vespadb.observations.models import Municipality, Observation, Province
 from vespadb.observations.serializers import (
     MunicipalitySerializer,
     ObservationSerializer,
     ProvinceSerializer,
 )
+
+if TYPE_CHECKING:
+    from geopy.location import Location
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -135,9 +147,22 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             The serializer containing the validated data.
         """
         user = self.request.user
-        if not user.is_staff and ("admin_notes" in self.request.data or "observer_received_email" in self.request.data):
+        if not user.is_superuser and (
+            "admin_notes" in self.request.data or "observer_received_email" in self.request.data
+        ):
             raise PermissionDenied("You do not have permission to modify admin fields.")
-        serializer.save(modified_by=self.request.user, modified_datetime=now())
+
+        # Ensure user has permission to reserve in the specified municipality
+        if "reserved_by" in self.request.data:
+            observation = self.get_object()
+            if not user.is_superuser:
+                user_municipality_ids = user.municipalities.values_list("id", flat=True)
+                if observation.municipality and observation.municipality.id not in user_municipality_ids:
+                    raise PermissionDenied("You do not have permission to reserve nests in this municipality.")
+
+        instance = serializer.save(modified_by=user, modified_datetime=now())
+        invalidate_observation_cache(instance.id)
+        invalidate_geojson_cache()
 
     @swagger_auto_schema(
         operation_description="Partially update an existing observation.",
@@ -145,19 +170,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         responses={200: ObservationSerializer},
     )
     def partial_update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
-        """
-        Handle partial updates to an observation, especially for changes to 'reserved_by'.
-
-        Parameters
-        ----------
-            request (Request): The incoming HTTP request.
-            *args (Any): Additional positional arguments.
-            **kwargs (Any): Additional keyword arguments.
-
-        Returns
-        -------
-            Response: The HTTP response with the partial update result.
-        """
+        """Handle partial updates to an observation, especially for changes to 'reserved_by'."""
         data = request.data.copy()
 
         # Convert datetime fields to UTC if present
@@ -243,6 +256,9 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             if reserved_by:
                 reserved_by.reservation_count -= 1
                 reserved_by.save(update_fields=["reservation_count"])
+            # Invalidate the caches
+            invalidate_observation_cache(observation.id)
+            invalidate_geojson_cache()
             return response
         except Exception as e:
             logger.exception("Error during delete operation")
@@ -270,7 +286,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             "results": data,
         })
 
-    @method_decorator(ratelimit(key="ip", rate="15/m", method="GET", block=True))
+    @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
     @swagger_auto_schema(
         operation_description="Retrieve a list of observations. Supports filtering and ordering.",
         responses={200: ObservationSerializer(many=True)},
@@ -326,7 +342,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             )
         },
     )
-    @method_decorator(ratelimit(key="ip", rate="15/m", method="GET", block=True))
+    @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
     @action(detail=False, methods=["get"], url_path="dynamic-geojson")
     def geojson(self, request: Request) -> HttpResponse:
         """Generate GeoJSON data for the observations."""
@@ -372,11 +388,13 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                     "type": "Feature",
                     "properties": {
                         "id": obs.id,
-                        "status": (
-                            "eradicated" if obs.eradication_date else "reserved" if obs.reserved_datetime else "default"
-                        ),
+                        "status": "eradicated"
+                        if obs.eradication_result == "successful"
+                        else "reserved"
+                        if obs.reserved_by
+                        else "default",
                     },
-                    "geometry": json.loads(obs.point.geojson) if obs.point else None,
+                    "geometry": json.loads(obs.location.geojson) if obs.location else None,
                 }
                 for obs in queryset
             ]
@@ -405,7 +423,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         ),
         responses={200: "Success", 400: "Bad Request", 415: "Unsupported Media Type"},
     )
-    @method_decorator(ratelimit(key="ip", rate="15/m", method="GET", block=True))
+    @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
     @action(detail=False, methods=["post"], permission_classes=[IsAdminUser])
     @parser_classes([JSONParser, MultiPartParser, FormParser])
     def bulk_import(self, request: Request) -> Response:
@@ -461,7 +479,11 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         -------
         - Response: A response containing the serialized observation data.
         """
-        return super().retrieve(request, *args, **kwargs)
+        instance = self.get_object()
+        if not instance.visible:
+            raise NotFound("This observation is not visible.")
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
 
     @swagger_auto_schema(
         operation_description="Update an existing observation.",
@@ -518,7 +540,12 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         """Validate and convert location data."""
         try:
             if isinstance(location, str):
-                geom = GEOSGeometry(location, srid=4326)
+                if location.startswith("SRID"):
+                    # Extract the actual point from the SRID string
+                    point_str = location.split(";")[1].strip()
+                    geom = GEOSGeometry(point_str, srid=4326)
+                else:
+                    geom = GEOSGeometry(location, srid=4326)
                 logger.info(f"Validated GEOSGeometry: {geom}")
                 return geom.wkt
             raise ValidationError("Invalid location data type")
@@ -531,18 +558,23 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         valid_observations = []
         errors = []
         for data_item in data:
-            cleaned_item = self.clean_data(data_item)
-            serializer = ObservationSerializer(data=cleaned_item)
-            if serializer.is_valid():
-                valid_observations.append(serializer.validated_data)
-            else:
-                errors.append(serializer.errors)
+            try:
+                cleaned_item = self.clean_data(data_item)
+                serializer = ObservationSerializer(data=cleaned_item)
+                if serializer.is_valid():
+                    valid_observations.append(serializer.validated_data)
+                else:
+                    errors.append(serializer.errors)
+            except Exception as e:
+                logger.exception(f"Error processing data item: {data_item} - {e}")
+                errors.append({"error": str(e)})
         return valid_observations, errors
 
     def clean_data(self, data_dict: dict[str, Any]) -> dict[str, Any]:
         """Clean the incoming data and remove empty or None values."""
         logger.info("Original data item: %s", data_dict)
         data_dict.pop("id", None)
+
         datetime_fields = [
             "created_datetime",
             "modified_datetime",
@@ -564,6 +596,12 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 else:
                     data_dict.pop(field, None)
 
+        # Convert empty strings to None for nullable fields
+        nullable_fields = ["reserved_by", "eradication_result", "nest_size", "eradicator_name"]
+        for field in nullable_fields:
+            if not data_dict.get(field):
+                data_dict[field] = None
+
         cleaned_data = {k: v for k, v in data_dict.items() if v not in [None, ""]}  # noqa: PLR6201
         logger.info("Cleaned data item: %s", cleaned_data)
         return cleaned_data
@@ -581,7 +619,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             return Response(
                 {"error": f"An error occurred during bulk import: {e!s}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
+            
     @swagger_auto_schema(
         method="get",
         manual_parameters=[
@@ -595,29 +633,93 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             ),
         ],
     )
-    @method_decorator(ratelimit(key="ip", rate="15/m", method="GET", block=True))
+    @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
     @action(detail=False, methods=["get"], permission_classes=[AllowAny])
     def export(self, request: Request) -> Response:
-        """Export observations data in the specified format."""
-        user = request.user
-        export_format = request.query_params.get("export_format", "json").lower()
-        queryset = self.filter_queryset(self.get_queryset())
-        serializer_class = self.get_serializer_class()
-        serializer_context = self.get_serializer_context()
-        serializer = serializer_class(queryset, many=True, context=serializer_context)
-        serialized_data = serializer.data
-        if export_format == "json":
-            return JsonResponse(serialized_data, safe=False, json_dumps_params={"indent": 2})
-        if export_format == "csv":
-            response = HttpResponse(content_type="text/csv")
-            response["Content-Disposition"] = f'attachment; filename="observations_export_{user.username}.csv"'
-            if serialized_data:
-                headers = serialized_data[0].keys()
-                writer = csv.DictWriter(response, fieldnames=headers)
-                writer.writeheader()
-                writer.writerows(serialized_data)
-            return response
-        return Response({"error": "Unsupported format specified."}, status=status.HTTP_400_BAD_REQUEST)
+        retries = 3
+        delay = 5
+
+        for attempt in range(retries):
+            try:
+                export_format = request.query_params.get("export_format", "csv").lower()
+                queryset = self.filter_queryset(self.get_queryset())
+
+                serialized_data = []
+                errors = []
+
+                for obj in queryset.iterator(chunk_size=100):
+                    try:
+                        serialized_obj = self.get_serializer(obj).data
+                        serialized_data.append(serialized_obj)
+                    except Exception as inner_error:
+                        errors.append({
+                            "id": obj.id,
+                            "error": str(inner_error)
+                        })
+
+                if export_format == "csv":
+                    return self.export_as_csv(serialized_data)
+                return JsonResponse({"data": serialized_data, "errors": errors}, safe=False)
+
+            except OperationalError:
+                if attempt < retries - 1:
+                    time.sleep(delay)
+                    connection.close()
+                else:
+                    return JsonResponse({"error": "Database connection failed after retries"}, safe=False)
+            except Exception as e:
+                return JsonResponse({"errors": str(e)}, safe=False)
+                
+    def export_as_csv(self, data: list[dict[str, Any]]) -> HttpResponse:
+        """Export the data as a CSV file."""
+        response = HttpResponse(content_type="text/csv")
+        writer = csv.DictWriter(response, fieldnames=data[0].keys())
+        writer.writeheader()
+        writer.writerows(data)
+        return response
+    
+@require_GET
+def search_address(request: Request) -> JsonResponse:
+    """
+    Search for an address using the Nominatim geocoding service.
+
+    This view function takes a GET request with a 'query' parameter containing
+    the address to search for. It returns the latitude, longitude, and full
+    address of the location if found.
+
+    Parameters
+    ----------
+    request : django.http.HttpRequest
+        The HTTP request object containing the 'query' parameter in GET data.
+
+    Returns
+    -------
+    django.http.JsonResponse
+        A JSON response containing either:
+        - On success: latitude, longitude, and full address of the location
+        - On failure: an error message with an appropriate HTTP status code
+
+    Raises
+    ------
+    No exceptions are raised directly, but various HTTP status codes are returned:
+    - 400: If no query is provided
+    - 404: If the address is not found
+    - 500: For any other exceptions during geocoding
+    """
+    query: str = request.GET.get("query", "")
+    if not query:
+        return JsonResponse({"error": "No query provided"}, status=400)
+
+    geolocator: Nominatim = Nominatim(user_agent="vespa_db")
+    try:
+        location: Location | None = geolocator.geocode(query)
+        if location:
+            return JsonResponse({"lat": location.latitude, "lon": location.longitude, "address": location.address})
+        return JsonResponse({"error": "Address not found"}, status=404)
+    except (GeocoderTimedOut, GeocoderServiceError) as e:
+        return JsonResponse({"error": f"Geocoding service error: {e!s}"}, status=503)
+    except (ValueError, TypeError) as e:
+        return JsonResponse({"error": f"Unexpected error: {e!s}"}, status=500)
 
 
 class MunicipalityViewSet(ReadOnlyModelViewSet):
@@ -661,7 +763,7 @@ class MunicipalityViewSet(ReadOnlyModelViewSet):
         cache.set(cache_key, serializer.data, GET_REDIS_CACHE_EXPIRATION)
         return Response(serializer.data)
 
-    @method_decorator(ratelimit(key="ip", rate="15/m", method="GET", block=True))
+    @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
     def list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """Override the list method to add caching."""
         cache_key = "vespadb::municipalities::list"
@@ -687,7 +789,7 @@ class ProvinceViewSet(ReadOnlyModelViewSet):
             return [AllowAny()]
         return [IsAdminUser()]
 
-    @method_decorator(ratelimit(key="ip", rate="15/m", method="GET", block=True))
+    @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
     def list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """Override the list method to add caching."""
         cache_key = "vespadb::provinces::list"

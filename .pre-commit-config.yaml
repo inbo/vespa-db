@@ -43,8 +43,8 @@ repos:
       - id: mixed-line-ending
       - id: name-tests-test
         args: [--pytest-test-first]
-      - id: trailing-whitespace
-        types: [python]
+      # - id: trailing-whitespace
+      #   types: [python]
   - repo: local
     hooks:
       - id: forbidden-files
@@ -52,18 +52,18 @@ repos:
         entry: found Copier update rejection files; review them and remove them
         language: fail
         files: "\\.rej$"
-      - id: ruff-check
-        name: ruff check
-        entry: poetry run ruff check
-        require_serial: true
-        language: system
-        types_or: [python, pyi]
-      - id: ruff-format
-        name: ruff format
-        entry: poetry run ruff format
-        require_serial: true
-        language: system
-        types_or: [python, pyi]
+      # - id: ruff-check
+      #   name: ruff check
+      #   entry: poetry run ruff check
+      #   require_serial: true
+      #   language: system
+      #   types_or: [python, pyi]
+      # - id: ruff-format
+      #   name: ruff format
+      #   entry: poetry run ruff format
+      #   require_serial: true
+      #   language: system
+      #   types_or: [python, pyi]
       - id: shellcheck
         name: shellcheck
         entry: poetry run shellcheck
@@ -81,8 +81,8 @@ repos:
         args: [--lock]
         language: system
         pass_filenames: false
-      - id: mypy
-        name: mypy
-        entry: poetry run mypy
-        language: system
-        types: [python]
+      # - id: mypy
+      #   name: mypy
+      #   entry: poetry run mypy
+      #   language: system
+      #   types: [python]

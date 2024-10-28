@@ -42,15 +42,17 @@ export default {
         const vespaStore = useVespaStore();
         const username = ref('');
         const password = ref('');
-        const error = computed(() => {
-            return Array.isArray(vespaStore.error) ? vespaStore.error.join(', ') : vespaStore.error;
+
+        const loginError = computed(() => {
+            return Array.isArray(vespaStore.loginError) ? vespaStore.loginError.join(', ') : vespaStore.loginError;
         });
 
         const formattedError = computed(() => {
-            if (!error.value) return null;
+            if (!loginError.value) return null;
             // Additional checks can be added here for other known errors
-            return error.value;
+            return loginError.value;
         });
+
 
         const login = async () => {
             await vespaStore.login({ username: username.value, password: password.value });
@@ -68,3 +70,9 @@ export default {
     }
 };
 </script>
+<style scoped>
+.error-container {
+    max-width: 100%;
+    word-wrap: break-word;
+}
+</style>

@@ -187,3 +187,37 @@ class MunicipalityExcludeFilter(SimpleListFilter):
         if self.value():
             return queryset.exclude(municipality_id=self.value())
         return queryset
+
+
+class ObserverReceivedEmailFilter(SimpleListFilter):
+    """Filter observations by whether the observer received an email."""
+
+    title = "Observer Received Email"
+    parameter_name = "observer_received_email"
+
+    def lookups(self, request: Any, model_admin: Any) -> list[tuple[str, str]]:
+        """
+        Return a list of tuples for the filter options.
+
+        :param request: The current request object
+        :param model_admin: The current model admin instance
+        :return: A list of tuples with filter options
+        """
+        return [
+            ("yes", "Yes"),
+            ("no", "No"),
+        ]
+
+    def queryset(self, request: Any, queryset: QuerySet) -> QuerySet | None:
+        """
+        Filter the queryset based on the selected filter option.
+
+        :param request: The current request object
+        :param queryset: The current queryset
+        :return: The filtered queryset
+        """
+        if self.value() == "yes":
+            return queryset.filter(observer_received_email=True)
+        if self.value() == "no":
+            return queryset.filter(observer_received_email=False)
+        return queryset

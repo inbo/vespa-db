@@ -1,9 +1,13 @@
 """Observation helpers."""
 
+import time
+from collections.abc import Callable
 from datetime import datetime
+from typing import Any, TypeVar
 
 import pytz
 from dateutil import parser
+from django.db.utils import OperationalError
 
 # List of accepted datetime formats
 DATETIME_FORMATS = [
@@ -16,6 +20,8 @@ DATETIME_FORMATS = [
     "%Y-%m-%d %H:%M",
     "%Y-%m-%d",
 ]
+
+T = TypeVar("T")
 
 
 def parse_and_convert_to_utc(datetime_str: str) -> datetime:
@@ -54,3 +60,16 @@ def parse_and_convert_to_cet(datetime_str: str) -> datetime:
     """
     cet_tz = pytz.timezone("Europe/Brussels")
     return parser.parse(datetime_str).astimezone(cet_tz)
+
+
+def retry_with_backoff(func: Callable[..., T], retries: int=3, backoff_in_seconds: int=2) -> Any:
+    """Retry mechanism for retrying a function with a backoff strategy."""
+    for attempt in range(retries):
+        try:
+            return func()
+        except Exception as e:
+            if attempt < retries - 1:
+                wait_time = backoff_in_seconds * (2 ** attempt)
+                time.sleep(wait_time)
+            else:
+                raise

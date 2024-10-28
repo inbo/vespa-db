@@ -4,6 +4,7 @@ import csv
 import datetime
 import io
 import json
+import time
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -18,6 +19,7 @@ from django.db.models import CharField, OuterRef, QuerySet, Subquery, Value
 from django.db.models.functions import Coalesce
 from django.db.utils import IntegrityError, OperationalError
 from django.http import HttpResponse, JsonResponse
+from django.db import connection
 from django.utils.decorators import method_decorator
 from django.utils.timezone import now
 from django.views.decorators.http import require_GET
@@ -40,7 +42,8 @@ from rest_framework_gis.filters import DistanceToPointFilter
 
 from vespadb.observations.cache import invalidate_geojson_cache, invalidate_observation_cache
 from vespadb.observations.filters import ObservationFilter
-from vespadb.observations.helpers import parse_and_convert_to_utc, retry_with_backoff
+from vespadb.observations.helpers import parse_and_convert_to_utc
+from vespadb.observations.utils import db_retry
 from vespadb.observations.models import Municipality, Observation, Province
 from vespadb.observations.serializers import (
     MunicipalitySerializer,
@@ -616,7 +619,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             return Response(
                 {"error": f"An error occurred during bulk import: {e!s}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
+            
     @swagger_auto_schema(
         method="get",
         manual_parameters=[
@@ -633,41 +636,40 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
     @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
     @action(detail=False, methods=["get"], permission_classes=[AllowAny])
     def export(self, request: Request) -> Response:
-        try:
-            export_format = request.query_params.get("export_format", "csv").lower()
-            queryset = self.filter_queryset(self.get_queryset())
-            paginator = Paginator(queryset, 1000)  # Process in batches of 1000 items
+        retries = 3
+        delay = 5
 
-            serialized_data = []
-            errors = []
+        for attempt in range(retries):
+            try:
+                export_format = request.query_params.get("export_format", "csv").lower()
+                queryset = self.filter_queryset(self.get_queryset())
 
-            # Loop through each page in the paginator
-            for page_number in paginator.page_range:
-                page = paginator.page(page_number)
+                serialized_data = []
+                errors = []
 
-                try:
-                    # Try serializing the page
-                    serializer = self.get_serializer(page, many=True)
-                    serialized_data.extend(serializer.data)
-                except Exception as e:
-                    # Retry with backoff for individual objects on failure
-                    for obj in page.object_list:
-                        try:
-                            serialized_obj = retry_with_backoff(lambda: self.get_serializer(obj).data)
-                            serialized_data.append(serialized_obj)
-                        except Exception as inner_error:
-                            errors.append({
-                                "id": obj.id,
-                                "error": str(inner_error)
-                            })
-            
-            if export_format == "csv":
-                return self.export_as_csv(serialized_data)
-            
-            return JsonResponse({"data": serialized_data, "errors": errors}, safe=False)
-        except Exception as e:
-            return JsonResponse({"errors": errors}, safe=False)
-        
+                for obj in queryset.iterator(chunk_size=1000):
+                    try:
+                        serialized_obj = self.get_serializer(obj).data
+                        serialized_data.append(serialized_obj)
+                    except Exception as inner_error:
+                        errors.append({
+                            "id": obj.id,
+                            "error": str(inner_error)
+                        })
+
+                if export_format == "csv":
+                    return self.export_as_csv(serialized_data)
+                return JsonResponse({"data": serialized_data, "errors": errors}, safe=False)
+
+            except OperationalError:
+                if attempt < retries - 1:
+                    time.sleep(delay)
+                    connection.close()
+                else:
+                    return JsonResponse({"error": "Database connection failed after retries"}, safe=False)
+            except Exception as e:
+                return JsonResponse({"errors": str(e)}, safe=False)
+                
     def export_as_csv(self, data: list[dict[str, Any]]) -> HttpResponse:
         """Export the data as a CSV file."""
         response = HttpResponse(content_type="text/csv")

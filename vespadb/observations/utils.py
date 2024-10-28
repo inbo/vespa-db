@@ -4,7 +4,7 @@ from django.contrib.gis.geos import Point
 import time
 from functools import wraps
 from django.db import connection, OperationalError
-from typing import Callable, TypeVar, Any, cast
+from typing import Callable, TypeVar, Any, cast, Generator, List
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -55,3 +55,19 @@ def db_retry(retries: int = 3, delay: int = 5) -> Callable[[F], F]:
                         raise
         return cast(F, wrapper)
     return decorator
+
+def retry_query(queryset: Generator[Any, None, None], retries: int = 3, delay: int = 5) -> List[Any]:
+    """Execute a query with retries to handle intermittent database connection errors."""
+    for attempt in range(retries):
+        try:
+            return list(queryset)
+        except OperationalError:
+            if attempt < retries - 1:
+                time.sleep(delay)
+                connection.close()
+            else:
+                # Raise a more informative error if retries are exhausted
+                raise OperationalError(f"Database connection failed after {retries} attempts")
+    
+    # This return is added to satisfy type checkers, though it should never reach here.
+    return []

@@ -49,6 +49,7 @@ public_read_fields = [
     "eradication_result",
     "wn_id",
     "wn_validation_status",
+    "visible",
 ]
 
 # Define the fields that authenticated users can read
@@ -92,6 +93,7 @@ user_read_fields = [
     "reserved_by_first_name",
     "modified_by_first_name",
     "created_by_first_name",
+    "visible",
 ]
 
 # Define the conditional fields for authenticated users with specific permissions

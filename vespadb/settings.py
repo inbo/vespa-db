@@ -268,3 +268,4 @@ EMAIL_BACKEND = "django_ses.SESBackend"
 AWS_SES_REGION_NAME = "eu-west-1"
 AWS_SES_REGION_ENDPOINT = "email.eu-west-1.amazonaws.com"
 DEFAULT_FROM_EMAIL = secrets["DEFAULT_FROM_EMAIL"]
+SERVER_EMAIL = secrets["DEFAULT_FROM_EMAIL"]

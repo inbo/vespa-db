@@ -647,7 +647,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 serialized_data = []
                 errors = []
 
-                for obj in queryset.iterator(chunk_size=1000):
+                for obj in queryset.iterator(chunk_size=100):
                     try:
                         serialized_obj = self.get_serializer(obj).data
                         serialized_data.append(serialized_obj)

@@ -33,6 +33,7 @@ secrets = {
     "CELERY_BROKER_URL": os.getenv("CELERY_BROKER_URL"),
     "REDIS_REFRESH_RATE_MIN": os.getenv("REDIS_REFRESH_RATE_MIN", "15"),
     "DJANGO_DEBUG": os.getenv("DJANGO_DEBUG", "False"),
+    "DEFAULT_FROM_EMAIL": os.getenv("DEFAULT_FROM_EMAIL", "noreply@uat.vespawatch.be")
 }
 
 # Core settings
@@ -266,4 +267,4 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 EMAIL_BACKEND = "django_ses.SESBackend"
 AWS_SES_REGION_NAME = "eu-west-1"
 AWS_SES_REGION_ENDPOINT = "email.eu-west-1.amazonaws.com"
-DEFAULT_FROM_EMAIL = "noreply@vespawatch.be"
+DEFAULT_FROM_EMAIL = secrets["DEFAULT_FROM_EMAIL"]

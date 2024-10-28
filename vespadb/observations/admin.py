@@ -18,6 +18,7 @@ from django.urls import path
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from rest_framework.test import APIRequestFactory
+from django.conf import settings
 
 from vespadb.observations.filters import MunicipalityExcludeFilter, ObserverReceivedEmailFilter, ProvinceFilter
 from vespadb.observations.forms import SendEmailForm
@@ -305,7 +306,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
                         fail_list.append(observation.id)
                         continue
                     try:
-                        send_mail(subject, message, "noreply@vespawatch.be", [observation.observer_email])
+                        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [observation.observer_email])
                         logger.debug(f"Email sent to {observation.observer_email} for observation {observation.id}")
                         observation.observer_received_email = True
                         observation.save()

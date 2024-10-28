@@ -1,7 +1,12 @@
 """Utility functions for the observations app."""
 
 from django.contrib.gis.geos import Point
+import time
+from functools import wraps
+from django.db import connection, OperationalError
+from typing import Callable, TypeVar, Any, cast
 
+F = TypeVar("F", bound=Callable[..., Any])
 
 def get_municipality_from_coordinates(longitude: float, latitude: float):  # type: ignore[no-untyped-def]
     """Get the municipality for a given long and lat."""
@@ -24,3 +29,29 @@ def check_if_point_in_anb_area(longitude: float, latitude: float) -> bool:
 
     anb_areas_containing_point = ANB.objects.filter(polygon__contains=point_to_check)
     return bool(anb_areas_containing_point)
+
+def db_retry(retries: int = 3, delay: int = 5) -> Callable[[F], F]:
+    """
+    Decorator to retry a database operation in case of an OperationalError.
+
+    Args:
+        retries (int): Number of retry attempts. Defaults to 3.
+        delay (int): Delay between retries in seconds. Defaults to 5.
+
+    Returns:
+        Callable: The wrapped function with retry logic.
+    """
+    def decorator(func: F) -> F:
+        @wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            for attempt in range(retries):
+                try:
+                    return func(*args, **kwargs)
+                except OperationalError:
+                    if attempt < retries - 1:
+                        time.sleep(delay)
+                        connection.close()
+                    else:
+                        raise
+        return cast(F, wrapper)
+    return decorator

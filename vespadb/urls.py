@@ -1,4 +1,4 @@
-"""Vespadb urls."""
+"""Vespa-DB urls."""
 
 from django.conf import settings
 from django.conf.urls.static import static
@@ -12,9 +12,9 @@ from vespadb.healthcheck import HealthCheckView
 
 schema_view = get_schema_view(
     openapi.Info(
-        title="VespaDB API Documentation",
+        title="Vespa-DB API Documentation",
         default_version="v1",
-        description="API documentation for VespaDB. This API allows users to manage observations of Vespa velutina nests.",
+        description="API documentation for Vespa-DB. This API allows users to manage observations of Vespa velutina nests.",
         contact=openapi.Contact(email="vespawatch@inbo.be"),
     ),
     public=True,

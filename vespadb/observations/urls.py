@@ -1,4 +1,4 @@
-"""vespadb Observations URL Configuration."""
+"""Vespa-DB Observations URL Configuration."""
 
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter

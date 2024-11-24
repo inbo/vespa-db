@@ -36,7 +36,6 @@ public_read_fields = [
     "observation_datetime",
     "modified_by",
     "created_by",
-    "province",
     "eradication_date",
     "municipality",
     "province",
@@ -45,7 +44,7 @@ public_read_fields = [
     "municipality_name",
     "modified_by_first_name",
     "created_by_first_name",
-    "wn_notes",
+    "notes",
     "eradication_result",
     "wn_id",
     "wn_validation_status",
@@ -139,7 +138,7 @@ class ObservationSerializer(serializers.ModelSerializer):
             "modified_datetime": {"help_text": "Datetime when the observation was last modified."},
             "location": {"help_text": "Geographical location of the observation as a point."},
             "source": {"help_text": "Source of the observation."},
-            "wn_notes": {"help_text": "Notes about the observation."},
+            "notes": {"help_text": "Notes about the observation."},
             "wn_admin_notes": {"write_only": True},
             "wn_validation_status": {"help_text": "Validation status of the observation."},
             "nest_height": {"help_text": "Height of the nest."},
@@ -262,23 +261,24 @@ class ObservationSerializer(serializers.ModelSerializer):
 
         if request and request.user.is_authenticated:
             user: VespaUser = request.user
+            permission_level = user.get_permission_level()
             user_municipality_ids = user.municipalities.values_list("id", flat=True)
+            is_inside_user_municipality = (
+                instance.municipality and instance.municipality.id in user_municipality_ids
+            )
 
-            if not request.user.is_superuser:
-                # Non-admins should not see admin-specific fields
-                admin_fields = set(admin_or_special_permission_fields)
-                for field in admin_fields:
-                    data.pop(field, None)
+            # Voor gebruikers zonder toegang tot specifieke gemeenten
+            if permission_level == "logged_in_without_municipality":
+                return {field: data[field] for field in public_read_fields if field in data}
 
-                is_inside_user = instance.municipality and instance.municipality.id in user_municipality_ids
-                if not is_inside_user:
-                    # Do not show reserved_by for users outside the municipality and not admins
-                    data.pop("reserved_by", None)
-            return {
-                field: data[field]
-                for field in set(user_read_fields + conditional_fields + admin_or_special_permission_fields)
-                if field in data
-            }
+            # Voor gebruikers met toegang tot specifieke gemeenten, extra gegevens tonen indien binnen hun gemeenten
+            if is_inside_user_municipality or request.user.is_superuser:
+                return {field: data[field] for field in user_read_fields if field in data}
+
+            # Voor observaties buiten de gemeenten van de gebruiker, beperk tot publieke velden
+            return {field: data[field] for field in public_read_fields if field in data}
+
+        # Voor niet-ingelogde gebruikers, retourneer enkel de publieke velden
         return {field: data[field] for field in public_read_fields if field in data}
 
     def validate_reserved_by(self, value: VespaUser) -> VespaUser:
@@ -360,7 +360,7 @@ class ObservationSerializer(serializers.ModelSerializer):
         if eradication_result == EradicationResultEnum.SUCCESSFUL:
             validated_data["reserved_datetime"] = None
             validated_data["reserved_by"] = None
-            validated_data["eradication_date"] = datetime.now(timezone("EST")).date()
+            #validated_data["eradication_date"] = datetime.now(timezone("EST")).date()
 
         if not user.is_superuser:
             # Non-admins cannot update admin-specific fields, so remove them

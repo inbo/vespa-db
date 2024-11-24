@@ -27,7 +27,6 @@ class VespaUserAdmin(UserAdmin):
             {
                 "fields": (
                     "user_type",
-                    "personal_data_access",
                     "municipalities",
                 )
             },
@@ -42,7 +41,6 @@ class VespaUserAdmin(UserAdmin):
         "first_name",
         "last_name",
         "user_type",
-        "personal_data_access",
         "reservation_count",
     )
     search_fields = ("username", "email", "first_name", "last_name")

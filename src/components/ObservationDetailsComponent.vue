@@ -29,7 +29,7 @@
                     class="btn btn-sm btn-outline-danger" @click="cancelReservation">Reservatie annuleren</button>
             </div>
 
-            <div v-if="isLoggedIn && canEdit" class="mb-3" id="edit">
+            <div v-if="canViewRestrictedFields && canEdit" class="mb-3" id="edit">
                 <button class="btn btn-sm btn-outline-success" @click="confirmUpdate">Wijzigingen opslaan</button>
             </div>
             <div v-if="successMessage" class="alert alert-success alert-dismissible fade show" role="alert">
@@ -75,7 +75,7 @@
                                         :readonly="!canEdit" :class="{ 'form-control-plaintext': !canEdit }" />
                                 </div>
                             </div>
-                            <div v-if="isLoggedIn" class="row mb-2">
+                            <div v-if="canViewRestrictedFields" class="row mb-2">
                                 <label class="col-4 col-form-label">Uitvoerder</label>
                                 <div class="col-8">
                                     <input v-if="selectedObservation.eradicator_name !== undefined"
@@ -84,7 +84,7 @@
                                         :class="{ 'form-control-plaintext': !canEdit }" />
                                 </div>
                             </div>
-                            <div v-if="isLoggedIn" class="row mb-2">
+                            <div v-if="canViewRestrictedFields" class="row mb-2">
                                 <label class="col-4 col-form-label">Duur</label>
                                 <div class="col-8">
                                     <input v-if="selectedObservation.eradication_duration !== undefined"
@@ -93,7 +93,7 @@
                                         :class="{ 'form-control-plaintext': !canEdit }" />
                                 </div>
                             </div>
-                            <div v-if="isLoggedIn" class="row mb-2">
+                            <div v-if="canViewRestrictedFields" class="row mb-2">
                                 <label class="col-4 col-form-label">Personeel</label>
                                 <div class="col-8">
                                     <input v-if="selectedObservation.eradication_persons !== undefined"
@@ -102,7 +102,7 @@
                                         :class="{ 'form-control-plaintext': !canEdit }" />
                                 </div>
                             </div>
-                            <div v-if="isLoggedIn" class="row mb-2">
+                            <div v-if="canViewRestrictedFields" class="row mb-2">
                                 <label class="col-4 col-form-label">Methode</label>
                                 <div class="col-8">
                                     <select v-if="selectedObservation.eradication_method !== undefined"
@@ -115,7 +115,7 @@
                                     </select>
                                 </div>
                             </div>
-                            <div v-if="isLoggedIn" class="row mb-2">
+                            <div v-if="canViewRestrictedFields" class="row mb-2">
                                 <label class="col-4 col-form-label">Product</label>
                                 <div class="col-8">
                                     <select v-if="selectedObservation.eradication_product !== undefined"
@@ -128,7 +128,7 @@
                                     </select>
                                 </div>
                             </div>
-                            <div v-if="isLoggedIn" class="row mb-2">
+                            <div v-if="canViewRestrictedFields" class="row mb-2">
                                 <label class="col-4 col-form-label">Nazorg</label>
                                 <div class="col-8">
                                     <select v-if="selectedObservation.eradication_aftercare !== undefined"
@@ -141,7 +141,7 @@
                                     </select>
                                 </div>
                             </div>
-                            <div v-if="isLoggedIn" class="row mb-2">
+                            <div v-if="canViewRestrictedFields" class="row mb-2">
                                 <label class="col-4 col-form-label">Problemen</label>
                                 <div class="col-8">
                                     <select v-if="selectedObservation.eradication_problems !== undefined"
@@ -154,7 +154,7 @@
                                     </select>
                                 </div>
                             </div>
-                            <div v-if="isLoggedIn" class="row mb-2">
+                            <div v-if="canViewRestrictedFields" class="row mb-2">
                                 <label class="col-4 col-form-label">Opmerkingen</label>
                                 <div class="col-8">
                                     <textarea v-if="selectedObservation.eradication_notes !== undefined"
@@ -254,12 +254,6 @@
                                 </div>
                             </div>
                             <div class="row mb-2">
-                                <label class="col-4 col-form-label">Opmerking</label>
-                                <div class="col-8">
-                                    <p class="form-control-plaintext">{{ selectedObservation.wn_admin_notes }}</p>
-                                </div>
-                            </div>
-                            <div class="row mb-2">
                                 <label class="col-4 col-form-label">Bron</label>
                                 <div class="col-8">
                                     <p class="form-control-plaintext">
@@ -273,24 +267,25 @@
                             <div>
                                 <div class="row mb-2">
                                     <label class="col-4 col-form-label">Validatiestatus</label>
-                                    <div class="col-8">
-                                        <p class="form-control-plaintext">{{ selectedObservation.wn_validation_status }}
-                                        </p>
+                                    <div class="col-8" v-if="selectedObservation.wn_validation_status !== undefined">
+                                        <p :value="null">Geen</p>
+                                        <p v-for="(label, value) in validationStatusEnum" :key="value" :value="value">{{
+                                            label }}</p>
                                     </div>
                                 </div>
-                                <div v-if="isLoggedIn" class="row mb-2">
+                                <div v-if="canViewRestrictedFields" class="row mb-2">
                                     <label class="col-4 col-form-label">Opmerking validator</label>
                                     <div class="col-8">
-                                        <p class="form-control-plaintext">{{ selectedObservation.wn_notes }}</p>
+                                        <p class="form-control-plaintext">{{ selectedObservation.notes }}</p>
                                     </div>
                                 </div>
                             </div>
-                            <div v-if="isLoggedIn" class="row mb-2">
+                            <div v-if="canViewRestrictedFields" class="row mb-2">
                                 <div class="col-8 offset-4">
                                     <div class="form-check form-switch">
                                         <input v-if="selectedObservation.public_domain !== undefined"
                                             v-model="editableObservation.public_domain" class="form-check-input"
-                                            type="checkbox" id="public-domain" :disabled="!isLoggedIn" />
+                                            type="checkbox" id="public-domain" :disabled="!canViewRestrictedFields" />
                                         <label class="form-check-label" for="public-domain">Nest op publiek
                                             terrein</label>
                                     </div>
@@ -300,7 +295,7 @@
                     </div>
                 </section>
 
-                <section class="accordion-item" v-if="canViewContactInfo">
+                <section class="accordion-item" v-if="canViewRestrictedFields">
                     <h4 class="accordion-header" id="contact-header">
                         <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
                             data-bs-target="#contact" aria-expanded="false" aria-controls="contact">
@@ -325,14 +320,12 @@
                             <div class="row mb-2">
                                 <label class="col-4 col-form-label">Telefoon</label>
                                 <div class="col-8">
-                                    <p class="form-control-plaintext">{{ selectedObservation.observer_phone_number }}
-                                    </p>
+                                    <p class="form-control-plaintext">{{ selectedObservation.observer_phone_number }}</p>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </section>
-
                 <section class="accordion-item" v-if="canEditAdminFields">
                     <h4 class="accordion-header" id="admin-header">
                         <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
@@ -385,7 +378,7 @@
                 </section>
             </div>
 
-            <p class="mb-3 text-muted small" id="metadata">
+            <p v-if="canViewRestrictedFields" class="mb-3 text-muted small" id="metadata">
                 Aangemaakt op <span class="created-datetime">{{ selectedObservation.created_datetime ?
                     formatDate(selectedObservation.created_datetime) : '' }}</span> door <span class="created-by">{{
                         selectedObservation.created_by_first_name || '' }}</span>, gewijzigd op <span
@@ -431,10 +424,6 @@ export default {
                 (!selectedObservation.value?.reserved_by || selectedObservation.value.reserved_by === vespaStore.user.username) &&
                 !isObservationSuccessful.value;
         });
-
-        const resetEditableObservation = () => {
-            editableObservation.value = JSON.parse(JSON.stringify(selectedObservation.value || {}));
-        };
 
         const isUserReserver = computed(() => {
             return selectedObservation.value?.reserved_by === vespaStore.user.id;
@@ -538,6 +527,10 @@ export default {
                 return 'Niet bestreden';
             }
         });
+        const canViewRestrictedFields = computed(() => {
+            return vespaStore.isAdmin || 
+                (isLoggedIn.value && vespaStore.userMunicipalities.includes(selectedObservation.value?.municipality_name));
+        });
 
         const eradicationStatusClass = computed(() => {
             const result = selectedObservation.value?.eradication_result;
@@ -547,7 +540,10 @@ export default {
                 return 'bg-danger';
             }
         });
-
+        const validationStatusEnum = {
+            "goedgekeurd_met_bewijs": "Goedgekeurd met bewijs",
+            "goedgekeurd_door_admin": "Goedgekeurd door admin"
+        };
         const formatDate = (isoString, defaultValue = "") => {
             if (!isoString) {
                 return defaultValue;
@@ -620,7 +616,6 @@ export default {
         const closeDetails = () => {
             emit('closeDetails');
             vespaStore.isDetailsPaneOpen = false;
-            resetEditableObservation();
             errorMessage.value = '';
             eradicationResultError.value = '';
         };
@@ -634,8 +629,12 @@ export default {
             }
         };
 
+        const isUpdating = ref(false);
         const confirmUpdate = async () => {
+            if (isUpdating.value) return;
+
             try {
+                isUpdating.value = true;
                 // Check if any eradication fields are filled
                 const eradicationFields = [
                     'eradication_date', 'eradicator_name', 'eradication_duration',
@@ -643,23 +642,45 @@ export default {
                     'eradication_problems', 'eradication_notes', 'eradication_product'
                 ];
                 const hasEradicationData = eradicationFields.some(field => editableObservation.value[field]);
-                if (editableObservation.value.eradication_date) {
-                    editableObservation.value.eradication_date += "T00:00:00";
+
+                if (
+                    editableObservation.value.eradication_result &&
+                    !editableObservation.value.eradication_date
+                ) {
+                    const today = new Date();
+                    editableObservation.value.eradication_date = today.toISOString().split('T')[0];
                 }
+                
+                // Format eradication_date if provided, and check for valid eradication result
+                if (editableObservation.value.eradication_date) {
+                    const date = new Date(editableObservation.value.eradication_date);
+                    if (!isNaN(date.getTime())) {
+                        editableObservation.value.eradication_date = date.toISOString().split('T')[0];
+                    } else {
+                        throw new Error("Invalid eradication date format");
+                    }
+                }
+
                 if (hasEradicationData && !editableObservation.value.eradication_result) {
                     eradicationResultError.value = 'Resultaat is verplicht wanneer andere bestrijdingsgegevens zijn ingevuld.';
                     throw new Error('Validation failed');
                 }
+
+                // Reset error messages
                 errorMessage.value = '';
                 eradicationResultError.value = '';
 
+                // Send updated observation to the store
                 await vespaStore.updateObservation(editableObservation.value);
-                resetEditableObservation();
             } catch (error) {
-                if (error.message !== 'Validation failed') {
+                if (error.message === "Invalid eradication date format") {
+                    errorMessage.value = 'De ingevoerde datum is ongeldig.';
+                } else if (error.message !== 'Validation failed') {
                     errorMessage.value = 'Er is een fout opgetreden bij het opslaan van de wijzigingen.';
                 }
                 console.error('Error updating observation:', error);
+            }finally {
+                isUpdating.value = false;
             }
         };
         const cancelEdit = () => {
@@ -672,13 +693,8 @@ export default {
         };
 
         const canViewContactInfo = computed(() => {
-            if (vespaStore.isAdmin) {
-                return true;
-            }
-            if (!vespaStore.user.personal_data_access) {
-                return false;
-            }
-            const userMunicipalities = vespaStore.user.municipalities;
+            if (vespaStore.isAdmin) return true;
+            const userMunicipalities = vespaStore.userMunicipalities;
             const observationMunicipality = selectedObservation.value?.municipality_name;
             return userMunicipalities.includes(observationMunicipality);
         });
@@ -702,15 +718,18 @@ export default {
             successMessage.value = '';
         };
 
-        watch(() => vespaStore.selectedObservation, (newVal) => {
-            if (newVal) {
-                editableObservation.value = { ...newVal };
-                editableObservation.value.observation_datetime = formatToDatetimeLocal(selectedObservation.value.observation_datetime);
-                editableObservation.value.eradication_date = formatToDate(selectedObservation.value.eradication_date);
-                //editableObservation.value.eradication_date = formatToDate(newVal.eradication_date);
+        watch(() => vespaStore.selectedObservation, (newVal, oldVal) => {
+            if (!newVal || newVal.id === oldVal?.id) {
+                return;
             }
+            editableObservation.value = { ...newVal };
+            editableObservation.value.observation_datetime = formatToDatetimeLocal(newVal.observation_datetime);
+            editableObservation.value.eradication_date = newVal.eradication_date
+                ? formatToDate(newVal.eradication_date)
+                : null;
         }, { immediate: true });
-        watch(selectedObservation, resetEditableObservation, { immediate: true });
+
+        watch(selectedObservation, { immediate: true });
 
         return {
             selectedObservation,
@@ -750,6 +769,7 @@ export default {
             editableObservation,
             errorMessage,
             eradicationResultError,
+            canViewRestrictedFields
         };
     }
 };

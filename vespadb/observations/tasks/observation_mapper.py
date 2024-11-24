@@ -26,42 +26,75 @@ from vespadb.observations.utils import check_if_point_in_anb_area, get_municipal
 
 logger = logging.getLogger("vespadb.observations.tasks")
 
+mapping_dict: dict[int, dict[str, str]] = {
+    329: {
+        "Hoger dan 4 meter": "hoger_dan_4_meter",
+        "Higher than 4 meters": "hoger_dan_4_meter",
+        "Lager dan 4 meter": "lager_dan_4_meter",
+        "Lower than 4 meters": "lager_dan_4_meter",
+    },
+    330: {
+        "Groter dan 25 cm": "groter_dan_25_cm",
+        "Kleiner dan 25 cm": "kleiner_dan_25_cm",
+        "Larger than 25cm": "groter_dan_25_cm",
+        "Smaller than 25cm": "kleiner_dan_25_cm",
+    },
+    331 : {
+        "Binnen, in gebouw of constructie": "binnen_in_gebouw_of_constructie",
+        "Buiten, maar overdekt door constructie": "buiten_maar_overdekt_door_constructie",
+        "Buiten, natuurlijk overdekt": "buiten_natuurlijk_overdekt",
+        "Buiten, onbedekt in boom of struik": "buiten_onbedekt_in_boom_of_struik",
+        "Buiten, onbedekt op gebouw": "buiten_onbedekt_op_gebouw",
+        "Inside, in a building or construction": "binnen_in_gebouw_of_constructie",
+        "Outside, but covered by construction": "buiten_maar_overdekt_door_constructie",
+        "Outside, natural cover": "buiten_natuurlijk_overdekt",
+        "Outside, uncovered in a tree or bush": "buiten_onbedekt_in_boom_of_struik",
+        "Outside, uncovered on building": "buiten_onbedekt_op_gebouw",
+    }
+}
+
 ENUMS_MAPPING: dict[str, type[TextChoices]] = {
-    "Nesthoogte": NestHeightEnum,
-    "Nestgrootte": NestSizeEnum,
-    "Nestplaats": NestLocationEnum,
-    "Nesttype": NestTypeEnum,
-    "Resultaat": EradicationResultEnum,
-    "Problemen": EradicationProblemsEnum,
-    "Methode": EradicationMethodEnum,
+    "Nest height": NestHeightEnum,
+    "Nest size": NestSizeEnum,
+    "Nest location": NestLocationEnum,
+    "Nest type": NestTypeEnum,
+    "Result": EradicationResultEnum,
+    "Problems": EradicationProblemsEnum,
+    "Method": EradicationMethodEnum,
     "Product": EradicationProductEnum,
 }
-ENUM_FIELD_MAPPING: dict[str, str] = {
-    "Nesthoogte": "nest_height",
-    "Nestgrootte": "nest_size",
-    "Nestplaats": "nest_location",
-    "Nesttype": "nest_type",
-    "Resultaat": "eradication_result",
-    "Problemen": "eradication_problems",
-    "Methode": "eradication_method",
-    "Product": "eradication_product",
+ENUM_FIELD_MAPPING: dict[int, str] = {
+    329: "nest_height",
+    330: "nest_size",
+    331: "nest_location",
 }
+# Literal mapping functions
+def map_nest_height_attribute_to_enum(value: str) -> Any | None:
+    """Maps Nest height values to enums based on literal mapping."""
+    return mapping_dict[329].get(value.strip())
 
+def map_nest_size_attribute_to_enum(value: str) -> Any | None:
+    """Maps Nest size values to enums based on literal mapping."""
+    return mapping_dict[330].get(value.strip())
 
-def map_attribute_to_enum(value: str, enum: type[TextChoices]) -> TextChoices | None:
+def map_nest_location_attribute_to_enum(value: str) -> str | None:
+    """Maps Nest location values to enums based on literal mapping."""
+    return mapping_dict[331].get(value.strip())
+
+def map_attribute_to_enum(attribute_id: int, value: str) -> str | None:
     """
-    Map a single attribute value to an enum using close match.
-
-    :param value: The value from the API that needs to be mapped to an enum.
-    :param enum: The enum type that the value is expected to map to.
-    :return: The corresponding enum value if a match is found, otherwise None.
+    Maps a single attribute value to an enum using literal mapping functions.
     """
-    enum_dict = {e.value: e for e in enum}
-    closest_match = get_close_matches(value, enum_dict.keys(), n=1, cutoff=0.6)
-    return enum_dict.get(closest_match[0]) if closest_match else None
+    if attribute_id == 329:
+        return map_nest_height_attribute_to_enum(value)
+    elif attribute_id == 330:
+        return map_nest_size_attribute_to_enum(value)
+    elif attribute_id == 331:
+        return map_nest_location_attribute_to_enum(value)
+    else:
+        return None
 
-
-def map_attributes_to_enums(api_attributes: list[dict[str, str]]) -> dict[str, TextChoices]:
+def map_attributes_to_enums(api_attributes: list[dict[str, Any]]) -> dict[str, str]:
     """
     Map API attributes to model enums based on configured mappings.
 
@@ -70,16 +103,16 @@ def map_attributes_to_enums(api_attributes: list[dict[str, str]]) -> dict[str, T
     """
     mapped_values = {}
     for attribute in api_attributes:
+        attribute_id = int(attribute.get("attribute", 0))
         attr_name = attribute.get("name")
         value = str(attribute.get("value"))
-        if attr_name in ENUMS_MAPPING:
-            mapped_enum = map_attribute_to_enum(value, ENUMS_MAPPING[attr_name])
+        if attribute_id in mapping_dict:
+            mapped_enum = map_attribute_to_enum(attribute_id, value)
             if mapped_enum:
-                mapped_values[ENUM_FIELD_MAPPING[attr_name]] = mapped_enum
+                mapped_values[ENUM_FIELD_MAPPING[attribute_id]] = mapped_enum
             else:
-                logger.warning(f"No enum match found for {attr_name}: {value}")
+                logger.debug(f"No enum match found for {attr_name}: {value}")
     return mapped_values
-
 
 def map_validation_status_to_enum(validation_status: str) -> ValidationStatusEnum | None:
     """
@@ -165,6 +198,7 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
     cluster_id = None
     if nest:
         cluster_id = nest.get("id")
+
     mapped_data = {
         "wn_id": external_data["id"],
         "location": location,
@@ -182,7 +216,6 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
         **mapped_enums,
     }
 
-    # Additional user data
     user_data = external_data.get("user", {})
     if user_data:
         mapped_data.update({
@@ -191,10 +224,8 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
             "observer_name": user_data.get("name"),
         })
 
-    # Eradication specifics
     eradication_flagged = False
 
-    # Check for eradication keywords in notes
     if (
         "notes" in external_data
         and external_data["notes"]
@@ -203,9 +234,8 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
     ):
         eradication_flagged = True
 
-    # Check for "BESTREDEN" in 'Remark (Asian hornet)' attribute
     for attribute in external_data.get("attributes", []):
-        if attribute.get("name") == "Remark (Asian hornet)" and "BESTREDEN" in attribute.get("value", "").upper():
+        if attribute.get("attribute") == 369 and "BESTREDEN" in attribute.get("value", "").upper():
             eradication_flagged = True
             break
 
@@ -214,7 +244,6 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
         mapped_data["eradicator_name"] = "Gemeld als bestreden"
 
     return mapped_data
-
 
 def check_existing_eradication_date(wn_id: str) -> bool:
     """

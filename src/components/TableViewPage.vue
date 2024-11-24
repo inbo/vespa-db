@@ -182,14 +182,11 @@ export default {
 
 
       // if (vespaStore.lastAppliedFilters === null || vespaStore.lastAppliedFilters === 'null') {
-      //   console.log("set hier?")
       //   vespaStore.setLastAppliedFilters();
       // }
 
       // Avoid calling getObservations if data is already loaded with the same filters
       if (vespaStore.table_observations.length === 0 || JSON.stringify(vespaStore.filters) !== JSON.stringify(vespaStore.lastAppliedFilters)) {
-
-
 
         //vespaStore.setLastAppliedFilters();
         vespaStore.getObservations(page.value, pageSize.value, sortBy.value, sortOrder.value);

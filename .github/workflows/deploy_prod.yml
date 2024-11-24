@@ -3,7 +3,7 @@ name: Deploy PROD
 on:
   push:
     branches:
-      - master
+      - main
 
 jobs:
   deploy:
@@ -27,7 +27,7 @@ jobs:
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           REPOSITORY: ${{ secrets.AWS_ECR_REPO_BACKEND }}
-          IMAGE_TAG: uat
+          IMAGE_TAG: latest
         run: |
           docker build -t $REGISTRY/$REPOSITORY:$IMAGE_TAG -f Dockerfile.backend .
           docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG

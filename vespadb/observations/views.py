@@ -4,6 +4,7 @@ import csv
 import datetime
 import io
 import json
+import time
 import logging
 import csv
 import json
@@ -45,7 +46,7 @@ from vespadb.observations.serializers import user_read_fields, public_read_field
 from vespadb.observations.cache import invalidate_geojson_cache, invalidate_observation_cache
 from vespadb.observations.filters import ObservationFilter
 from vespadb.observations.helpers import parse_and_convert_to_utc
-from vespadb.observations.models import Municipality, Observation, Province, EradicationResultEnum
+from vespadb.observations.models import Municipality, Observation, Province
 from vespadb.observations.serializers import (
     MunicipalitySerializer,
     ObservationSerializer,

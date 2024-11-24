@@ -1,4 +1,4 @@
-"""VespaDB Observations admin module."""
+"""Vespa-DB Observations admin module."""
 
 import json
 import logging

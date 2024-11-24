@@ -147,7 +147,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
     actions = ["send_email_to_observers", "mark_as_eradicated", "mark_as_not_visible"]
 
     readonly_fields = (
-        "wn_notes",
+        "notes",
         "source",
         "wn_id",
         "wn_validation_status",

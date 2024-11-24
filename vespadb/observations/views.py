@@ -41,6 +41,7 @@ from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_gis.filters import DistanceToPointFilter
+from vespadb.observations.serializers import user_read_fields, public_read_fields
 
 from vespadb.observations.cache import invalidate_geojson_cache, invalidate_observation_cache
 from vespadb.observations.filters import ObservationFilter
@@ -63,12 +64,10 @@ GEOJSON_REDIS_CACHE_EXPIRATION = 900  # 15 minutes
 GET_REDIS_CACHE_EXPIRATION = 86400  # 1 day
 BATCH_SIZE = 150
 CSV_HEADERS = [
-    "id", "created_datetime", "modified_datetime", "location", "source",
-    "nest_height", "nest_size", "nest_location", "nest_type",
-    "observation_datetime", "modified_by", "created_by", "province",
-    "eradication_date", "municipality", "images", "public_domain",
-    "municipality_name", "modified_by_first_name", "created_by_first_name",
-    "wn_notes", "eradication_result", "wn_id", "wn_validation_status"
+    "id", "created_datetime", "modified_datetime", "latitude", "longitude", "source", "source_id",
+    "nest_height", "nest_size", "nest_location", "nest_type", "observation_datetime",
+    "province", "eradication_date", "municipality", "images", "anb_domain",
+    "notes", "eradication_result", "wn_id", "wn_validation_status", "nest_status"
 ]
 class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
     """ViewSet for the Observation model."""
@@ -118,7 +117,10 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             List[BasePermission]: A list of permission instances that should be applied to the action.
         """
         if self.action in {"create", "update", "partial_update"}:
-            permission_classes = [IsAuthenticated()]
+            if  self.request.user.is_superuser:
+                permission_classes = [IsAdminUser()]
+            elif self.request.user.is_authenticated and self.request.user.get_permission_level() == "logged_in_with_municipality":
+                permission_classes = [IsAuthenticated()]
         elif self.action == "destroy":
             permission_classes = [IsAdminUser()]
         else:
@@ -144,7 +146,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 )
             )
         return base_queryset
-
+    
     def perform_update(self, serializer: BaseSerializer) -> None:
         """
         Set modified_by to the current user and modified_datetime to the current UTC time upon updating an observation.
@@ -155,18 +157,12 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             The serializer containing the validated data.
         """
         user = self.request.user
-        if not user.is_superuser and (
-            "admin_notes" in self.request.data or "observer_received_email" in self.request.data
-        ):
-            raise PermissionDenied("You do not have permission to modify admin fields.")
+        observation = self.get_object()
 
-        # Ensure user has permission to reserve in the specified municipality
-        if "reserved_by" in self.request.data:
-            observation = self.get_object()
-            if not user.is_superuser:
-                user_municipality_ids = user.municipalities.values_list("id", flat=True)
-                if observation.municipality and observation.municipality.id not in user_municipality_ids:
-                    raise PermissionDenied("You do not have permission to reserve nests in this municipality.")
+        if not user.is_superuser and "reserved_by" in self.request.data:
+            user_municipality_ids = user.municipalities.values_list("id", flat=True)
+            if observation.municipality and observation.municipality.id not in user_municipality_ids:
+                raise PermissionDenied("You do not have permission to reserve nests in this municipality.")
 
         instance = serializer.save(modified_by=user, modified_datetime=now())
         invalidate_observation_cache(instance.id)
@@ -521,6 +517,9 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         data = []
         for row in reader:
             try:
+                if "source_id" in row:
+                    row["source_id"] = int(row["source_id"]) if row["source_id"].isdigit() else None
+                    
                 logger.info(f"Original location data: {row['location']}")
                 row["location"] = self.validate_location(row["location"])
                 logger.info(f"Parsed location: {row['location']}")
@@ -627,7 +626,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             return Response(
                 {"error": f"An error occurred during bulk import: {e!s}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-            
+    
     @swagger_auto_schema(
         method="get",
         manual_parameters=[
@@ -636,7 +635,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 in_=openapi.IN_QUERY,
                 description="Format of the exported data",
                 type=openapi.TYPE_STRING,
-                enum=["csv", "json"],
+                enum=["csv"],
                 default="csv",
             ),
         ],
@@ -645,74 +644,134 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
     @action(detail=False, methods=["get"], permission_classes=[AllowAny])
     def export(self, request: HttpRequest) -> Union[StreamingHttpResponse, JsonResponse]:
         """
-        Export observations data as CSV in a memory-efficient, streamable format.
-        
-        Handles large datasets by streaming data in chunks to avoid memory overload.
-        Only supports CSV export; JSON format is no longer available.
+        Export observations as CSV with dynamically controlled fields based on user permissions.
+
+        Observations from municipalities the user has access to will display full details;
+        others will show limited fields as per public access.
         """
         if request.query_params.get("export_format", "csv").lower() != "csv":
             return JsonResponse({"error": "Only CSV export is supported"}, status=400)
 
-        # Filter queryset
-        queryset = self.filter_queryset(self.get_queryset())
+        # Determine user permissions
+        if request.user.is_authenticated:
+            user_municipality_ids = set(request.user.municipalities.values_list("id", flat=True))
+            is_admin = request.user.is_superuser
+        else:
+            user_municipality_ids = set()
+            is_admin = False
 
-        # Define response with streaming CSV data
+        # Set CSV headers directly from CSV_HEADERS as a base
+        dynamic_csv_headers = CSV_HEADERS
+
+        # Prepare response
+        queryset = self.filter_queryset(self.get_queryset())
         response = StreamingHttpResponse(
-            self.generate_csv_rows(queryset), content_type="text/csv"
+            self.generate_csv_rows(queryset, dynamic_csv_headers, user_municipality_ids, is_admin),
+            content_type="text/csv"
         )
         response["Content-Disposition"] = 'attachment; filename="observations_export.csv"'
         return response
-    
-    def generate_csv_rows(self, queryset: QuerySet) -> Generator[bytes, None, None]:
-        """
-        Generator that yields rows of CSV data, handling large datasets efficiently.
-        
-        Converts each observation to a dictionary row, handling missing or misconfigured
-        data gracefully, and writes to CSV format on-the-fly to avoid memory overuse.
-        """
-        # Yield CSV header row
-        yield self._csv_line(CSV_HEADERS)
 
-        # Iterate over queryset in chunks to avoid high memory usage
-        for obj in queryset.iterator(chunk_size=500):
-            row = self.serialize_observation(obj)
+    def generate_csv_rows(
+        self, queryset: QuerySet, headers: list[str], user_municipality_ids: set, is_admin: bool
+    ) -> Generator[bytes, None, None]:
+        """Generate CSV rows with headers and filtered data according to user permissions."""
+        # Yield headers
+        yield self._csv_line(headers)
+
+        for observation in queryset.iterator(chunk_size=500):
+            # Determine fields to include based on user permissions for each observation
+            if is_admin or (observation.municipality_id in user_municipality_ids):
+                # Full access for admins and assigned municipalities
+                allowed_fields = user_read_fields
+            else:
+                # Restricted access for other municipalities
+                allowed_fields = public_read_fields
+
+            # Add essential fields for export
+            allowed_fields.extend(["source_id", "latitude", "longitude", "anb_domain", "nest_status"])
+
+            # Serialize the observation with restricted fields as needed
+            row = self.serialize_observation(observation, headers, allowed_fields)
             yield self._csv_line(row)
-
-
-    def serialize_observation(self, obj: Observation) -> list[str]:
+            
+    def parse_location(self, srid_str: str) -> tuple[float, float]:
         """
-        Serialize observation to a list of values in the same order as headers.
-
-        Handles potential data misconfigurations, such as missing attributes or
-        inconsistent formats, to ensure robust data handling.
+        Parse SRID string to extract latitude and longitude.
         """
-        try:
-            return [
-                str(getattr(obj, field, "")) or "" for field in [
-                    "id", "created_datetime", "modified_datetime", "location", "source",
-                    "nest_height", "nest_size", "nest_location", "nest_type",
-                    "observation_datetime", "modified_by_id", "created_by_id", "province_id",
-                    "eradication_date", "municipality_id", "images", "public_domain",
-                    "municipality_name", "modified_by_first_name", "created_by_first_name",
-                    "wn_notes", "eradication_result", "wn_id", "wn_validation_status"
-                ]
-            ]
-        except Exception as e:
-            # Log and handle any serialization issues
-            logger.exception(f"Error serializing observation {obj.id}: {e}")
-            return [""] * len(CSV_HEADERS)
+        # Convert the SRID location string to GEOSGeometry
+        geom = GEOSGeometry(srid_str)
+        
+        # Extract latitude and longitude
+        longitude = geom.x
+        latitude = geom.y
+        return latitude, longitude
+    
+    def serialize_observation(self, obj: Observation, headers: list[str], allowed_fields: list[str]) -> list[str]:
+        """Serialize an observation for CSV export with specified fields."""
+        data = []
+        logger.info('Serializing observation %s', obj)
+        logger.info("allowed_fields: %s", allowed_fields)
+        for field in headers:
+            if field not in allowed_fields:
+                data.append("")  # Add empty string for restricted fields
+                continue
+
+            # Handle custom formatting for certain fields
+            if field == "latitude" or field == "longitude":
+                if obj.location:
+                    srid_location_str = f"SRID=4326;POINT ({obj.location.x} {obj.location.y})"
+                    latitude, longitude = self.parse_location(srid_location_str)
+                    logger.info('Latitude: %s, Longitude: %s', latitude, longitude)
+                    if field == "latitude":
+                        data.append(str(latitude))
+                    elif field == "longitude":
+                        data.append(str(longitude))
+                else:
+                    data.append("")
+            elif field in ["created_datetime", "modified_datetime", "observation_datetime"]:
+                datetime_val = getattr(obj, field, None)
+                if datetime_val:
+                    # Remove milliseconds and ensure ISO format with 'T' and 'Z'
+                    datetime_val = datetime_val.replace(microsecond=0)
+                    data.append(datetime_val.isoformat() + "Z")
+                else:
+                    data.append("")
+            elif field == "province":
+                data.append(obj.province.name if obj.province else "")
+            elif field == "municipality":
+                data.append(obj.municipality.name if obj.municipality else "")
+            elif field == "anb_domain":
+                data.append(str(obj.anb))
+            elif field == "eradication_result":
+                data.append(obj.eradication_result.value if obj.eradication_result else "")
+            elif field == "nest_status":
+                logger.info("Getting status for observation %s", obj.eradication_result)
+                # This is handled as requested with eradication result
+                data.append(self.get_status(obj))
+            elif field == "source_id":
+                data.append(str(obj.source_id) if obj.source_id is not None else "")
+            else:
+                value = getattr(obj, field, "")
+                data.append(str(value) if value is not None else "")
+        return data
+    
+    def get_status(self, observation: Observation) -> str:
+        """Determine observation status based on eradication data."""
+        logger.info("Getting status for observation %s", observation.eradication_result)
+        if observation.eradication_result == EradicationResultEnum.SUCCESSFUL:
+            return "eradicated"
+        if observation.reserved_by:
+            return "reserved"
+        return "untreated"
 
     def _csv_line(self, row: list[str]) -> bytes:
-        """
-        Converts a list of strings into a CSV-encoded line.
-        
-        Ensures each row is CSV-compatible and byte-encoded for StreamingHttpResponse.
-        """
+        """Convert a list of strings to a CSV-compatible line in bytes."""
         buffer = io.StringIO()
         writer = csv.writer(buffer)
         writer.writerow(row)
         return buffer.getvalue().encode("utf-8")
-        
+    
 @require_GET
 def search_address(request: Request) -> JsonResponse:
     """

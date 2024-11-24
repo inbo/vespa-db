@@ -123,7 +123,6 @@ export default {
       try {
         await vespaStore.fetchObservationDetails(properties.id);
         if (vespaStore.selectedObservation && !vespaStore.selectedObservation.visible) {
-          console.error("Observation is not visible");
           return;
         }
         vespaStore.isDetailsPaneOpen = true;

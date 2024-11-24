@@ -284,7 +284,6 @@ export const useVespaStore = defineStore('vespaStore', {
                 }
             } catch (error) {
                 console.error('Error fetching observation details:', error);
-                this.error = 'Het ophalen van observatiedetails is mislukt.';
             }
         },
         formatToISO8601(datetime) {
@@ -293,17 +292,10 @@ export const useVespaStore = defineStore('vespaStore', {
             return date.toISOString();
         },
         async updateObservation(observation) {
-            if (observation.observation_datetime) {
-                observation.observation_datetime = this.formatToISO8601(observation.observation_datetime);
-            }
-            if (observation.eradication_date) {
-                observation.eradication_date = this.formatDateWithEndOfDayTime(observation.eradication_date);
-            }
             try {
                 const response = await ApiService.patch(`/observations/${observation.id}/`, observation);
                 if (response.status === 200) {
                     this.selectedObservation = response.data;
-
                     const colorByResult = this.getColorByStatus(response.data.eradication_result);
                     this.updateMarkerColor(observation.id, colorByResult, '#ea792a', 4, 'active-marker');
                     return response.data;

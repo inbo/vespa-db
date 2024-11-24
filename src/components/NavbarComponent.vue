@@ -6,15 +6,14 @@
         Vespa-Watch
       </a>
       <div class="d-flex align-items-center">
-        <!-- View Mode Toggle -->
-        <div class="btn-group me-2" role="group">
-          <router-link to="/map" class="btn btn-outline-dark" active-class="active"
-            aria-current="page">Map</router-link>
+        <!-- View Mode Toggle (Hidden on Medium Devices and below)-->
+        <div class="btn-group me-2 d-none d-md-inline-flex" role="group">
+          <router-link to="/map" class="btn btn-outline-dark" active-class="active" aria-current="page">Map</router-link>
           <router-link to="/table" class="btn btn-outline-dark" active-class="active">Tabel</router-link>
         </div>
 
         <!-- Export Toggle (Hidden on Medium Devices and below) -->
-        <div class="btn-group me-2 d-md-inline-flex">
+        <div class="btn-group me-2 d-none d-md-inline-flex">
           <button type="button" class="btn btn-outline-dark dropdown-toggle" data-bs-toggle="dropdown"
             aria-expanded="false">
             Export
@@ -44,7 +43,7 @@
     </div>
   </nav>
   <ModalMessage :title="modalTitle" :message="modalMessage" :isVisible="isModalVisible"
-    @close="isModalVisible = false" />
+  @close="isModalVisible = false" />
 </template>
 
 <script>

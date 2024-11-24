@@ -221,8 +221,9 @@ class Observation(models.Model):
     modified_datetime = models.DateTimeField(auto_now=True, help_text="Datetime when the observation was last modified")
     location = gis_models.PointField(help_text="Geographical location of the observation")
     source = models.CharField(max_length=255, blank=True, null=True, help_text="Source of the observation")
+    source_id = models.IntegerField(blank=True, null=True, help_text="Original identifier when importing data")
 
-    wn_notes = models.TextField(blank=True, null=True, help_text="Notes about the observation")
+    notes = models.TextField(blank=True, null=True, help_text="Notes about the observation")
     wn_admin_notes = models.TextField(blank=True, null=True, help_text="Admin notes about the observation")
     wn_validation_status = models.CharField(
         max_length=50,

@@ -17,7 +17,7 @@ class IsAdminOrSelf(permissions.BasePermission):
 
 SYSTEM_USER_OBSERVATION_FIELDS_TO_UPDATE = [
     "location",
-    "wn_notes",
+    "notes",
     "wn_admin_notes",
     "nest_height",
     "nest_size",

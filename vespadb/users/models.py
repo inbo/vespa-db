@@ -1,5 +1,3 @@
-"""."""
-
 import logging
 from enum import Enum
 
@@ -9,7 +7,6 @@ from django.db import models
 from vespadb.observations.models import Municipality
 
 logger = logging.getLogger(__name__)
-
 
 class UserType(Enum):
     """User Type Enum."""
@@ -23,7 +20,6 @@ class UserType(Enum):
         """Return choices for the enum."""
         return [(key.value, key.name) for key in cls]
 
-
 class VespaUser(AbstractUser):
     """Model for the Vespa user."""
 
@@ -32,10 +28,22 @@ class VespaUser(AbstractUser):
         choices=UserType.choices(),
         default=UserType.REGULAR.value,
     )
-    personal_data_access = models.BooleanField(default=False)
     municipalities = models.ManyToManyField(
         Municipality,
         blank=True,
         related_name="users",
     )
     reservation_count = models.IntegerField(default=0)
+
+    def has_assigned_municipality(self) -> bool:
+        """Check if user has assigned municipalities."""
+        return bool(self.municipalities.exists())
+
+    def get_permission_level(self) -> str:
+        """Return the permission level based on user's assigned municipalities."""
+        if self.is_superuser:
+            return "admin"
+        elif self.has_assigned_municipality():
+            return "logged_in_with_municipality"
+        else:
+            return "logged_in_without_municipality"

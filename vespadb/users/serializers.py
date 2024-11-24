@@ -31,14 +31,12 @@ class UserSerializer(serializers.ModelSerializer):
             "municipalities",
             "date_joined",
             "permissions",
-            "personal_data_access",
             "reservation_count",
             "is_superuser",
         ]
         extra_kwargs = {
             "password": {"write_only": True, "required": False},
             "date_joined": {"read_only": True},
-            "personal_data_access": {"required": False},
         }
 
     def get_permissions(self, obj: User) -> list[str]:
@@ -52,7 +50,7 @@ class UserSerializer(serializers.ModelSerializer):
         -------
             List[str]: A list of permission strings associated with the user.
         """
-        return list(obj.get_all_permissions())
+        return [obj.get_permission_level()]
 
     def create(self, validated_data: dict[str, Any]) -> User:
         """

@@ -646,23 +646,23 @@ export default {
                 ];
                 const hasEradicationData = eradicationFields.some(field => editableObservation.value[field]);
 
-                // if (
-                //     editableObservation.value.eradication_result &&
-                //     !editableObservation.value.eradication_date
-                // ) {
-                //     const today = new Date();
-                //     editableObservation.value.eradication_date = today.toISOString().split('T')[0];
-                // }
+                if (
+                    editableObservation.value.eradication_result &&
+                    !editableObservation.value.eradication_date
+                ) {
+                    const today = new Date();
+                    editableObservation.value.eradication_date = today.toISOString().split('T')[0];
+                }
 
                 // Format eradication_date if provided, and check for valid eradication result
-                // if (editableObservation.value.eradication_date) {
-                //     const date = new Date(editableObservation.value.eradication_date);
-                //     if (!isNaN(date.getTime())) {
-                //         editableObservation.value.eradication_date = date.toISOString().split('T')[0];
-                //     } else {
-                //         throw new Error("Invalid eradication date format");
-                //     }
-                // }
+                if (editableObservation.value.eradication_date) {
+                    const date = new Date(editableObservation.value.eradication_date);
+                    if (!isNaN(date.getTime())) {
+                        editableObservation.value.eradication_date = date.toISOString().split('T')[0];
+                    } else {
+                        throw new Error("Invalid eradication date format");
+                    }
+                }
 
                 if (hasEradicationData && !editableObservation.value.eradication_result) {
                     eradicationResultError.value = 'Resultaat is verplicht wanneer andere bestrijdingsgegevens zijn ingevuld.';

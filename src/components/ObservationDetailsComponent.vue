@@ -322,8 +322,7 @@
                             <div class="row mb-2">
                                 <label class="col-4 col-form-label">Telefoon</label>
                                 <div class="col-8">
-                                    <p class="form-control-plaintext">{{ selectedObservation.observer_phone_number }}
-                                    </p>
+                                    <p class="form-control-plaintext">{{ selectedObservation.observer_phone_number }}</p>
                                 </div>
                             </div>
                         </div>
@@ -653,7 +652,6 @@ export default {
                     const today = new Date();
                     editableObservation.value.eradication_date = today.toISOString().split('T')[0];
                 }
-
                 // Format eradication_date if provided, and check for valid eradication result
                 if (editableObservation.value.eradication_date) {
                     const date = new Date(editableObservation.value.eradication_date);

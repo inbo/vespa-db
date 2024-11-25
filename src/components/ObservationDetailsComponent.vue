@@ -29,7 +29,7 @@
                     class="btn btn-sm btn-outline-danger" @click="cancelReservation">Reservatie annuleren</button>
             </div>
 
-            <div v-if="canViewRestrictedFields && canEdit" class="mb-3" id="edit">
+            <div v-if="canViewRestrictedFields" class="mb-3" id="edit">
                 <button class="btn btn-sm btn-outline-success" @click="confirmUpdate">Wijzigingen opslaan</button>
             </div>
             <div v-if="successMessage" class="alert alert-success alert-dismissible fade show" role="alert">
@@ -59,8 +59,9 @@
                                         :class="{ 'is-invalid': eradicationResultError }" :disabled="!canEdit">
                                         <option :value="null">Geen</option>
                                         <option v-for="(label, value) in eradicationResultEnum" :key="value"
-                                            :value="value">{{ label
-                                            }}</option>
+                                            :value="value">
+                                            {{ label }}
+                                        </option>
                                     </select>
                                     <div v-if="eradicationResultError" class="invalid-feedback">
                                         {{ eradicationResultError }}
@@ -266,14 +267,15 @@
                             </div>
                             <div>
                                 <div class="row mb-2">
-                                    <label class="col-4 col-form-label">Validatiestatus</label>
-                                    <div class="col-8" v-if="selectedObservation.wn_validation_status !== undefined">
-                                        <p :value="null">Geen</p>
-                                        <p v-for="(label, value) in validationStatusEnum" :key="value" :value="value">{{
-                                            label }}</p>
+                                    <label class="col-4 col-form-label">Validatie</label>
+                                    <div class="col-8">
+                                        <p>
+                                            {{ validationStatusEnum[selectedObservation.wn_validation_status] || "Geen"
+                                            }}
+                                        </p>
                                     </div>
                                 </div>
-                                <div v-if="canViewRestrictedFields" class="row mb-2">
+                                <div class="row mb-2">
                                     <label class="col-4 col-form-label">Opmerking validator</label>
                                     <div class="col-8">
                                         <p class="form-control-plaintext">{{ selectedObservation.notes }}</p>
@@ -320,7 +322,8 @@
                             <div class="row mb-2">
                                 <label class="col-4 col-form-label">Telefoon</label>
                                 <div class="col-8">
-                                    <p class="form-control-plaintext">{{ selectedObservation.observer_phone_number }}</p>
+                                    <p class="form-control-plaintext">{{ selectedObservation.observer_phone_number }}
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -528,7 +531,7 @@ export default {
             }
         });
         const canViewRestrictedFields = computed(() => {
-            return vespaStore.isAdmin || 
+            return vespaStore.isAdmin ||
                 (isLoggedIn.value && vespaStore.userMunicipalities.includes(selectedObservation.value?.municipality_name));
         });
 
@@ -650,7 +653,7 @@ export default {
                     const today = new Date();
                     editableObservation.value.eradication_date = today.toISOString().split('T')[0];
                 }
-                
+
                 // Format eradication_date if provided, and check for valid eradication result
                 if (editableObservation.value.eradication_date) {
                     const date = new Date(editableObservation.value.eradication_date);
@@ -679,7 +682,7 @@ export default {
                     errorMessage.value = 'Er is een fout opgetreden bij het opslaan van de wijzigingen.';
                 }
                 console.error('Error updating observation:', error);
-            }finally {
+            } finally {
                 isUpdating.value = false;
             }
         };
@@ -769,7 +772,8 @@ export default {
             editableObservation,
             errorMessage,
             eradicationResultError,
-            canViewRestrictedFields
+            canViewRestrictedFields,
+            validationStatusEnum
         };
     }
 };

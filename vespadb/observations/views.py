@@ -46,7 +46,7 @@ from vespadb.observations.serializers import user_read_fields, public_read_field
 from vespadb.observations.cache import invalidate_geojson_cache, invalidate_observation_cache
 from vespadb.observations.filters import ObservationFilter
 from vespadb.observations.helpers import parse_and_convert_to_utc
-from vespadb.observations.models import Municipality, Observation, Province
+from vespadb.observations.models import Municipality, Observation, Province, EradicationResultEnum
 from vespadb.observations.serializers import (
     MunicipalitySerializer,
     ObservationSerializer,
@@ -393,7 +393,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                     "properties": {
                         "id": obs.id,
                         "status": "eradicated"
-                        if obs.eradication_result == "successful"
+                        if obs.eradication_result is not None
                         else "reserved"
                         if obs.reserved_by
                         else "default",
@@ -744,7 +744,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             elif field == "anb_domain":
                 data.append(str(obj.anb))
             elif field == "eradication_result":
-                data.append(obj.eradication_result.value if obj.eradication_result else "")
+                data.append(obj.eradication_result if obj.eradication_result else "")
             elif field == "nest_status":
                 logger.info("Getting status for observation %s", obj.eradication_result)
                 # This is handled as requested with eradication result

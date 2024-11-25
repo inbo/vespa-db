@@ -54,8 +54,7 @@ export const useVespaStore = defineStore('vespaStore', {
             )?.name;
             return (
                 state.isLoggedIn &&
-                state.userMunicipalities.includes(municipalityName) &&
-                !observation.reserved_by
+                state.userMunicipalities.includes(municipalityName)
             );
         },
         canEditAdminFields: (state) => state.isAdmin,
@@ -456,6 +455,8 @@ export const useVespaStore = defineStore('vespaStore', {
             if (status === 'successful') {
                 return '#198754';
             } else if (status === 'eradicated') {
+                return '#198754';
+            } else if (status === 'unsuccessful') {
                 return '#198754';
             } else if (status === 'reserved') {
                 return '#ea792a';

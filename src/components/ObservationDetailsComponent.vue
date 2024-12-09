@@ -269,7 +269,7 @@
                                 <div class="row mb-2">
                                     <label class="col-4 col-form-label">Validatie</label>
                                     <div class="col-8">
-                                        <p>
+                                        <p class="form-control-plaintext">
                                             {{ validationStatusEnum[selectedObservation.wn_validation_status] || "Geen"
                                             }}
                                         </p>

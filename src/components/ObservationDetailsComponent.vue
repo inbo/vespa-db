@@ -276,7 +276,7 @@
                                     </div>
                                 </div>
                                 <div class="row mb-2">
-                                    <label class="col-4 col-form-label">Opmerking validator</label>
+                                    <label class="col-4 col-form-label">Opmerking</label>
                                     <div class="col-8">
                                         <p class="form-control-plaintext">{{ selectedObservation.notes }}</p>
                                     </div>

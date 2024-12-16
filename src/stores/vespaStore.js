@@ -456,6 +456,10 @@ export const useVespaStore = defineStore('vespaStore', {
                 return '#198754';
             } else if (status === 'eradicated') {
                 return '#198754';
+            } else if (status === 'untreated') {
+                return '#198754';
+            } else if (status === 'unknown') {
+                return '#198754';
             } else if (status === 'unsuccessful') {
                 return '#198754';
             } else if (status === 'reserved') {

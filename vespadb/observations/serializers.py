@@ -197,11 +197,11 @@ class ObservationSerializer(serializers.ModelSerializer):
 
     def get_status(self, obj: Observation) -> str:
         """Determine the status of the observation based on its properties."""
-        if obj.eradication_date:
+        if obj.eradication_result:
             return "eradicated"
-        if obj.reserved_datetime:
+        if obj.reserved_by:
             return "reserved"
-        return "default"
+        return "untreated"
 
     def get_reserved_by_first_name(self, obj: Observation) -> str | None:
         """Retrieve the first name of the user who reserved the observation."""
@@ -335,7 +335,7 @@ class ObservationSerializer(serializers.ModelSerializer):
         # Eradication result logic
         eradication_result = validated_data.get("eradication_result")
 
-        # Check if any eradication-related fields are present without eradication_result
+        # Define eradication-related fields
         eradication_related_fields = [
             "eradication_date",
             "eradicator_name",
@@ -345,9 +345,17 @@ class ObservationSerializer(serializers.ModelSerializer):
             "eradication_aftercare",
             "eradication_problems",
             "eradication_notes",
+            "eradication_product",
         ]
 
-        if any(field in validated_data for field in eradication_related_fields) and eradication_result is None:
+        # Only check for eradication fields that have non-null values
+        has_eradication_fields = any(
+            field in validated_data 
+            and validated_data[field] is not None 
+            for field in eradication_related_fields
+        )
+        
+        if has_eradication_fields and eradication_result is None:
             raise serializers.ValidationError(
                 "Eradication result is required when providing eradication-related fields."
             )
@@ -360,7 +368,6 @@ class ObservationSerializer(serializers.ModelSerializer):
         if eradication_result == EradicationResultEnum.SUCCESSFUL:
             validated_data["reserved_datetime"] = None
             validated_data["reserved_by"] = None
-            #validated_data["eradication_date"] = datetime.now(timezone("EST")).date()
 
         if not user.is_superuser:
             # Non-admins cannot update admin-specific fields, so remove them
@@ -398,7 +405,6 @@ class ObservationSerializer(serializers.ModelSerializer):
             validated_data.pop(field)
         instance = super().update(instance, validated_data)
         return instance
-
     def to_internal_value(self, data: dict[str, Any]) -> dict[str, Any]:
         """Convert the incoming data to a Python native representation."""
         logger.info("Raw input data: %s", data)

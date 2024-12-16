@@ -22,35 +22,15 @@
           </v-autocomplete>
         </div>
         <div class="col-12">
-        <v-text-field
-          :model-value="formattedMinDate"
-          label="Observaties vanaf"
-          prepend-icon="mdi-calendar"
-          readonly
-          @click="toggleMenu1"
-        ></v-text-field>
-        <v-date-picker
-          v-model="minDate"
-          v-show="menu1"
-          @input="closeMenu1"
-          @change="closeMenu1"
-        ></v-date-picker>
-      </div>
-      <div class="col-12">
-        <v-text-field
-          :model-value="formattedMaxDate"
-          label="Observaties tot"
-          prepend-icon="mdi-calendar"
-          readonly
-          @click="toggleMenu2"
-        ></v-text-field>
-        <v-date-picker
-          v-model="maxDate"
-          v-show="menu2"
-          @input="closeMenu2"
-          @change="closeMenu2"
-        ></v-date-picker>
-      </div>
+          <v-text-field v-model="minDate" label="Observaties vanaf" prepend-icon="mdi-calendar" readonly
+            @click="toggleMenu1"></v-text-field>
+          <v-date-picker v-model="minDate" v-show="menu1" @input="closeMenu1" @change="closeMenu1"></v-date-picker>
+        </div>
+        <div class="col-12">
+          <v-text-field v-model="maxDate" label="Observaties tot" prepend-icon="mdi-calendar" readonly
+            @click="toggleMenu2"></v-text-field>
+          <v-date-picker v-model="maxDate" v-show="menu2" @input="closeMenu2" @change="closeMenu2"></v-date-picker>
+        </div>
         <div class="col-12">
           <v-autocomplete v-model="selectedNestType" :items="nestType.length ? nestType.map(nesttype => ({
             title: nesttype.name,

@@ -710,8 +710,6 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
     def serialize_observation(self, obj: Observation, headers: list[str], allowed_fields: list[str]) -> list[str]:
         """Serialize an observation for CSV export with specified fields."""
         data = []
-        logger.info('Serializing observation %s', obj)
-        logger.info("allowed_fields: %s", allowed_fields)
         for field in headers:
             if field not in allowed_fields:
                 data.append("")  # Add empty string for restricted fields
@@ -732,9 +730,15 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             elif field in ["created_datetime", "modified_datetime", "observation_datetime"]:
                 datetime_val = getattr(obj, field, None)
                 if datetime_val:
-                    # Remove milliseconds and ensure ISO format with 'T' and 'Z'
+                    # Remove milliseconds and ensure ISO format with 'Z'
                     datetime_val = datetime_val.replace(microsecond=0)
-                    data.append(datetime_val.isoformat() + "Z")
+                    # Convert to ISO format and replace +00:00 with Z if present
+                    iso_datetime = datetime_val.isoformat()
+                    if iso_datetime.endswith('+00:00'):
+                        iso_datetime = iso_datetime[:-6] + 'Z'
+                    elif not iso_datetime.endswith('Z'):
+                        iso_datetime += 'Z'
+                    data.append(iso_datetime)
                 else:
                     data.append("")
             elif field == "province":
@@ -747,7 +751,6 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 data.append(obj.eradication_result if obj.eradication_result else "")
             elif field == "nest_status":
                 logger.info("Getting status for observation %s", obj.eradication_result)
-                # This is handled as requested with eradication result
                 data.append(self.get_status(obj))
             elif field == "source_id":
                 data.append(str(obj.source_id) if obj.source_id is not None else "")

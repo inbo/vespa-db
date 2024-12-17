@@ -6,7 +6,6 @@ import logging
 import json
 import csv
 from typing import TYPE_CHECKING, Any, Any, Union, TextIO, Union, List, Set, Optional
-from _csv import _writer
 import datetime
 import tempfile
 import os
@@ -642,7 +641,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
     )
     def write_batch_to_file(
         self, 
-        writer: '_writer',  # Explicitly type the csv writer
+        writer: Any,
         batch: List[Observation], 
         is_admin: bool, 
         user_municipality_ids: Set[str]

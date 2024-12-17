@@ -9,6 +9,13 @@ import logging
 import csv
 import json
 from typing import TYPE_CHECKING, Any, Generator, Any, Union
+from django.http import FileResponse
+import os 
+import tempfile
+from typing import List, Optional, Generator
+from tenacity import retry, stop_after_attempt, wait_exponential
+import contextlib
+from _csv import _writer 
 
 from django.contrib.gis.db.models.functions import Transform
 from django.contrib.gis.geos import GEOSGeometry
@@ -627,73 +634,200 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 {"error": f"An error occurred during bulk import: {e!s}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
-    @swagger_auto_schema(
-        method="get",
-        manual_parameters=[
-            openapi.Parameter(
-                "export_format",
-                in_=openapi.IN_QUERY,
-                description="Format of the exported data",
-                type=openapi.TYPE_STRING,
-                enum=["csv"],
-                default="csv",
-            ),
-        ],
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=4, max=10),
+        retry_error_callback=lambda retry_state: None
     )
-    @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
-    @action(detail=False, methods=["get"], permission_classes=[AllowAny])
-    def export(self, request: HttpRequest) -> Union[StreamingHttpResponse, JsonResponse]:
+    def write_batch_to_file(
+        self, 
+        writer: '_writer',  # Explicitly type the csv writer
+        batch: List[Observation], 
+        is_admin: bool, 
+        user_municipality_ids: set[str]
+    ) -> int:
         """
-        Export observations as CSV with dynamically controlled fields based on user permissions.
-
-        Observations from municipalities the user has access to will display full details;
-        others will show limited fields as per public access.
+        Write a batch of observations to the CSV file with retry logic.
+        Returns number of successfully written records.
         """
-        if request.query_params.get("export_format", "csv").lower() != "csv":
-            return JsonResponse({"error": "Only CSV export is supported"}, status=400)
+        successful_writes = 0
+        for observation in batch:
+            try:
+                row_data = self._prepare_row_data(observation, is_admin, user_municipality_ids)
+                writer.writerow(row_data)
+                successful_writes += 1
+            except Exception as e:
+                logger.error(f"Error processing observation {observation.id}: {str(e)}")
+                continue
+        return successful_writes
 
-        # Determine user permissions
-        if request.user.is_authenticated:
-            user_municipality_ids = set(request.user.municipalities.values_list("id", flat=True))
-            is_admin = request.user.is_superuser
-        else:
-            user_municipality_ids = set()
-            is_admin = False
-
-        # Set CSV headers directly from CSV_HEADERS as a base
-        dynamic_csv_headers = CSV_HEADERS
-
-        # Prepare response
-        queryset = self.filter_queryset(self.get_queryset())
-        response = StreamingHttpResponse(
-            self.generate_csv_rows(queryset, dynamic_csv_headers, user_municipality_ids, is_admin),
-            content_type="text/csv"
-        )
-        response["Content-Disposition"] = 'attachment; filename="observations_export.csv"'
-        return response
-
-    def generate_csv_rows(
-        self, queryset: QuerySet, headers: list[str], user_municipality_ids: set, is_admin: bool
-    ) -> Generator[bytes, None, None]:
-        """Generate CSV rows with headers and filtered data according to user permissions."""
-        # Yield headers
-        yield self._csv_line(headers)
-
-        for observation in queryset.iterator(chunk_size=500):
-            # Determine fields to include based on user permissions for each observation
+    def _prepare_row_data(
+        self, 
+        observation: Observation,
+        is_admin: bool,
+        user_municipality_ids: set[str]
+    ) -> list[str]:
+        """
+        Prepare a single row of data for the CSV export with error handling.
+        """
+        try:
+            # Determine allowed fields based on permissions
             if is_admin or (observation.municipality_id in user_municipality_ids):
-                # Full access for admins and assigned municipalities
                 allowed_fields = user_read_fields
             else:
-                # Restricted access for other municipalities
                 allowed_fields = public_read_fields
-
-            # Add essential fields for export
+                
             allowed_fields.extend(["source_id", "latitude", "longitude", "anb_domain", "nest_status"])
+            
+            row_data = []
+            for field in CSV_HEADERS:
+                try:
+                    if field not in allowed_fields:
+                        row_data.append("")
+                        continue
 
-            # Serialize the observation with restricted fields as needed
-            row = self.serialize_observation(observation, headers, allowed_fields)
-            yield self._csv_line(row)
+                    if field == "latitude":
+                        row_data.append(str(observation.location.y) if observation.location else "")
+                    elif field == "longitude":
+                        row_data.append(str(observation.location.x) if observation.location else "")
+                    elif field in ["created_datetime", "modified_datetime", "observation_datetime"]:
+                        datetime_val = getattr(observation, field, None)
+                        if datetime_val:
+                            datetime_val = datetime_val.replace(microsecond=0)
+                            row_data.append(datetime_val.isoformat() + "Z")
+                        else:
+                            row_data.append("")
+                    elif field == "province":
+                        row_data.append(observation.province.name if observation.province else "")
+                    elif field == "municipality":
+                        row_data.append(observation.municipality.name if observation.municipality else "")
+                    elif field == "anb_domain":
+                        row_data.append(str(observation.anb))
+                    elif field == "nest_status":
+                        row_data.append(self.get_status(observation))
+                    elif field == "source_id":
+                        row_data.append(str(observation.source_id) if observation.source_id is not None else "")
+                    else:
+                        value = getattr(observation, field, "")
+                        row_data.append(str(value) if value is not None else "")
+                except Exception as e:
+                    logger.warning(f"Error processing field {field} for observation {observation.id}: {str(e)}")
+                    row_data.append("")
+                    
+            return row_data
+        except Exception as e:
+            logger.error(f"Error preparing row data for observation {observation.id}: {str(e)}")
+            return [""] * len(CSV_HEADERS)  # Return empty row in case of error
+
+
+    @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
+    @action(detail=False, methods=["get"], permission_classes=[AllowAny])
+    def export(self, request: HttpRequest) -> Union[FileResponse, JsonResponse]:
+        """
+        Export observations as CSV using batch processing with improved error handling.
+        """
+        temp_file = None
+        try:
+            # Validate export format
+            if request.query_params.get("export_format", "csv").lower() != "csv":
+                return JsonResponse({"error": "Only CSV export is supported"}, status=400)
+
+            # Get user permissions
+            if request.user.is_authenticated:
+                user_municipality_ids = set(request.user.municipalities.values_list("id", flat=True))
+                is_admin = request.user.is_superuser
+            else:
+                user_municipality_ids = set()
+                is_admin = False
+
+            # Create temporary file
+            temp_file = tempfile.NamedTemporaryFile(mode='w+', newline='', delete=False, suffix='.csv')
+            writer = csv.writer(temp_file)
+            writer.writerow(CSV_HEADERS)
+
+            # Get filtered queryset with timeout protection
+            total_count = None
+            try:
+                with transaction.atomic(), connection.cursor() as cursor:
+                    cursor.execute('SET statement_timeout TO 30000')  # 30 seconds timeout
+                    queryset = self.filter_queryset(self.get_queryset())
+                    total_count = queryset.count()
+            except Exception as e:
+                logger.error(f"Error getting total count: {str(e)}")
+                # Continue with None total_count
+
+            # Process in batches with progress tracking
+            total_processed = 0
+            successful_records = 0
+            offset = 0
+            batch_size = 1000
+
+            while True:
+                try:
+                    # Get batch with timeout protection
+                    with transaction.atomic(), connection.cursor() as cursor:
+                        cursor.execute('SET statement_timeout TO 30000')
+                        batch = list(queryset[offset:offset + batch_size])
+                        if not batch:  # No more records
+                            break
+                        
+                        # Process batch with retry logic
+                        successful_writes = self.write_batch_to_file(writer, batch, is_admin, user_municipality_ids)
+                        successful_records += successful_writes
+                        
+                        batch_count = len(batch)
+                        total_processed += batch_count
+                        offset += batch_size
+                        
+                        # Log progress if we know the total
+                        if total_count:
+                            progress = (total_processed / total_count) * 100
+                            logger.info(f"Export progress: {progress:.1f}% ({total_processed}/{total_count})")
+                        else:
+                            logger.info(f"Processed {total_processed} records")
+                        
+                except Exception as e:
+                    logger.error(f"Error processing batch at offset {offset}: {str(e)}")
+                    offset += batch_size  # Skip problematic batch
+                    continue
+
+            # Ensure all data is written
+            temp_file.flush()
+            
+            # Create response
+            try:
+                response = FileResponse(
+                    open(temp_file.name, 'rb'),
+                    content_type='text/csv',
+                    as_attachment=True,
+                    filename=f"observations_export_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+                )
+                
+                # Log export statistics
+                if total_count:
+                    logger.info(f"Export completed: {successful_records} successful records out of {total_count} total")
+                else:
+                    logger.info(f"Export completed: {successful_records} successful records")
+                
+                # Clean up temp file after sending
+                response.close = lambda: os.unlink(temp_file.name)
+                return response
+
+            except Exception as e:
+                logger.exception("Error creating response")
+                if temp_file and os.path.exists(temp_file.name):
+                    os.unlink(temp_file.name)
+                return JsonResponse({"error": "Error creating export file"}, status=500)
+
+        except Exception as e:
+            logger.exception("Export failed")
+            # Clean up temp file in case of error
+            if temp_file and os.path.exists(temp_file.name):
+                os.unlink(temp_file.name)
+            return JsonResponse(
+                {"error": "Export failed. Please try again or contact support."}, 
+                status=500
+            )
             
     def parse_location(self, srid_str: str) -> tuple[float, float]:
         """

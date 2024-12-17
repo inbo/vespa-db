@@ -2,7 +2,6 @@
 
 import logging
 from datetime import datetime
-from difflib import get_close_matches
 from typing import Any, cast
 
 import pytz
@@ -28,8 +27,10 @@ logger = logging.getLogger("vespadb.observations.tasks")
 
 mapping_dict: dict[int, dict[str, str]] = {
     329: {
+        "hoger_dan_4_meter": "hoger_dan_4_meter",
         "Hoger dan 4 meter": "hoger_dan_4_meter",
         "Higher than 4 meters": "hoger_dan_4_meter",
+        "lager_dan_4_meter": "lager_dan_4_meter",
         "Lager dan 4 meter": "lager_dan_4_meter",
         "Lower than 4 meters": "lager_dan_4_meter",
     },
@@ -39,7 +40,7 @@ mapping_dict: dict[int, dict[str, str]] = {
         "Larger than 25cm": "groter_dan_25_cm",
         "Smaller than 25cm": "kleiner_dan_25_cm",
     },
-    331 : {
+    331: {
         "Binnen, in gebouw of constructie": "binnen_in_gebouw_of_constructie",
         "Buiten, maar overdekt door constructie": "buiten_maar_overdekt_door_constructie",
         "Buiten, natuurlijk overdekt": "buiten_natuurlijk_overdekt",
@@ -50,7 +51,28 @@ mapping_dict: dict[int, dict[str, str]] = {
         "Outside, natural cover": "buiten_natuurlijk_overdekt",
         "Outside, uncovered in a tree or bush": "buiten_onbedekt_in_boom_of_struik",
         "Outside, uncovered on building": "buiten_onbedekt_op_gebouw",
-    }
+    },
+    368: {
+        "Actief embryonaal nest": "actief_embryonaal_nest",
+        "Actief embryonaal nest (van maart tot eind juni, nest met enkel koningin)": "actief_embryonaal_nest",
+        "Actief primair nest": "actief_primair_nest",
+        "Actief primair nest (van juni tot eind november, nest met werksters op lage hoogte (tot 6 meter))": "actief_primair_nest",
+        "Actief secundair nest": "actief_secundair_nest",
+        "Actief secundair nest (van augustus tot eind november, nest met werksters op grote hoogte (tot 30m))": "actief_secundair_nest",
+        "Active embryonic nest": "actief_embryonaal_nest",
+        "Active embryonic nest (from march to the end of june, nest with queen only)": "actief_embryonaal_nest",
+        "Active primary nest": "actief_primair_nest",
+        "Active primary nest (from june to the end of november, nest with workers at low altitude (up to 6m))": "actief_primair_nest",
+        "Active secondary nest": "actief_secundair_nest",
+        "Active secondary nest (from aug. to the end of nov., nest with workers at high altitude (up to 30m))": "actief_secundair_nest",
+        "Inactief/leeg nest (typisch tijdens wintermaanden, een leeg nest hoog in een boom)": "inactief_leeg_nest",
+        "Inactief/leeg nest (typisch tijdens wintermaanden, een leeg netst oog in een boom)": "inactief_leeg_nest",
+        "Inactive/empty nest": "inactief_leeg_nest",
+        "Inactive/empty nest (typically during the winter months, an empty nest high in a tree)": "inactief_leeg_nest",
+        "Potential nest": None,
+        "Potentieel nest": None,
+        "Potentieel nest (onzeker van de soort)": None,
+    },
 }
 
 ENUMS_MAPPING: dict[str, type[TextChoices]] = {
@@ -67,6 +89,7 @@ ENUM_FIELD_MAPPING: dict[int, str] = {
     329: "nest_height",
     330: "nest_size",
     331: "nest_location",
+    368: "nest_type",
 }
 # Literal mapping functions
 def map_nest_height_attribute_to_enum(value: str) -> Any | None:
@@ -81,6 +104,10 @@ def map_nest_location_attribute_to_enum(value: str) -> str | None:
     """Maps Nest location values to enums based on literal mapping."""
     return mapping_dict[331].get(value.strip())
 
+def map_nest_type_attribute_to_enum(value: str) -> str | None:
+    """Maps Nest location values to enums based on literal mapping."""
+    return mapping_dict[368].get(value.strip())
+
 def map_attribute_to_enum(attribute_id: int, value: str) -> str | None:
     """
     Maps a single attribute value to an enum using literal mapping functions.
@@ -91,6 +118,8 @@ def map_attribute_to_enum(attribute_id: int, value: str) -> str | None:
         return map_nest_size_attribute_to_enum(value)
     elif attribute_id == 331:
         return map_nest_location_attribute_to_enum(value)
+    elif attribute_id == 368:
+        return map_nest_type_attribute_to_enum(value)
     else:
         return None
 

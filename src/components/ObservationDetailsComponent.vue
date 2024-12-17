@@ -205,53 +205,42 @@
                                     <span class="visually-hidden">Volgende</span>
                                 </button>
                             </div>
-
                             <div class="row mb-2">
                                 <label class="col-4 col-form-label">Type</label>
                                 <div class="col-8">
-                                    <select v-if="selectedObservation.nest_type !== undefined"
-                                        v-model="editableObservation.nest_type" class="form-select"
-                                        :disabled="!canEdit">
-                                        <option :value="null">Geen</option>
-                                        <option v-for="(label, value) in nestTypeEnum" :key="value" :value="value">{{
-                                            label }}</option>
-                                    </select>
+                                    <p class="form-control-plaintext">
+                                        {{ selectedObservation.nest_type ? nestTypeEnum[selectedObservation.nest_type] :
+                                        'Geen' }}
+                                    </p>
                                 </div>
                             </div>
                             <div class="row mb-2">
                                 <label class="col-4 col-form-label">Locatie</label>
                                 <div class="col-8">
-                                    <select v-if="selectedObservation.nest_location !== undefined"
-                                        v-model="editableObservation.nest_location" class="form-select"
-                                        :disabled="!canEdit">
-                                        <option :value="null">Geen</option>
-                                        <option v-for="(label, value) in nestLocationEnum" :key="value" :value="value">
-                                            {{ label }}</option>
-                                    </select>
+                                    <p class="form-control-plaintext">
+                                        {{ selectedObservation.nest_location ?
+                                            nestLocationEnum[selectedObservation.nest_location] :
+                                        'Geen' }}
+                                    </p>
                                 </div>
                             </div>
                             <div class="row mb-2">
                                 <label class="col-4 col-form-label">Grootte</label>
                                 <div class="col-8">
-                                    <select v-if="selectedObservation.nest_size !== undefined"
-                                        v-model="editableObservation.nest_size" class="form-select"
-                                        :disabled="!canEdit">
-                                        <option :value="null">Geen</option>
-                                        <option v-for="(label, value) in nestSizeEnum" :key="value" :value="value">{{
-                                            label }}</option>
-                                    </select>
+                                    <p class="form-control-plaintext">
+                                        {{ selectedObservation.nest_size ? nestSizeEnum[selectedObservation.nest_size] :
+                                        'Geen' }}
+                                    </p>
                                 </div>
                             </div>
                             <div class="row mb-2">
                                 <label class="col-4 col-form-label">Hoogte</label>
                                 <div class="col-8">
-                                    <select v-if="selectedObservation.nest_height !== undefined"
-                                        v-model="editableObservation.nest_height" class="form-select"
-                                        :disabled="!canEdit">
-                                        <option :value="null">Geen</option>
-                                        <option v-for="(label, value) in nestHeightEnum" :key="value" :value="value">{{
-                                            label }}</option>
-                                    </select>
+                                    <p class="form-control-plaintext">
+                                        {{ selectedObservation.nest_height ?
+                                            nestHeightEnum[selectedObservation.nest_height] :
+                                        'Geen' }}
+                                    </p>
                                 </div>
                             </div>
                             <div class="row mb-2">
@@ -322,7 +311,8 @@
                             <div class="row mb-2">
                                 <label class="col-4 col-form-label">Telefoon</label>
                                 <div class="col-8">
-                                    <p class="form-control-plaintext">{{ selectedObservation.observer_phone_number }}</p>
+                                    <p class="form-control-plaintext">{{ selectedObservation.observer_phone_number }}
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -498,10 +488,6 @@ export default {
         };
 
         const editableFields = [
-            "nest_height",
-            "nest_size",
-            "nest_location",
-            "nest_type",
             "observation_datetime",
             "eradication_date",
             "admin_notes",

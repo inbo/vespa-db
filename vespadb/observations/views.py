@@ -9,6 +9,9 @@ import logging
 import csv
 import json
 from typing import TYPE_CHECKING, Any, Generator, Any, Union
+from django.http import FileResponse
+import os 
+import tempfile
 
 from django.contrib.gis.db.models.functions import Transform
 from django.contrib.gis.geos import GEOSGeometry
@@ -62,13 +65,14 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 BBOX_LENGTH = 4
 GEOJSON_REDIS_CACHE_EXPIRATION = 900  # 15 minutes
 GET_REDIS_CACHE_EXPIRATION = 86400  # 1 day
-BATCH_SIZE = 150
 CSV_HEADERS = [
     "id", "created_datetime", "modified_datetime", "latitude", "longitude", "source", "source_id",
     "nest_height", "nest_size", "nest_location", "nest_type", "observation_datetime",
     "province", "eradication_date", "municipality", "images", "anb_domain",
     "notes", "eradication_result", "wn_id", "wn_validation_status", "nest_status"
 ]
+BATCH_SIZE = 1000
+
 class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
     """ViewSet for the Observation model."""
 
@@ -642,59 +646,125 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
     )
     @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
     @action(detail=False, methods=["get"], permission_classes=[AllowAny])
-    def export(self, request: HttpRequest) -> Union[StreamingHttpResponse, JsonResponse]:
+    def export(self, request: HttpRequest) -> FileResponse:
         """
-        Export observations as CSV with dynamically controlled fields based on user permissions.
-
-        Observations from municipalities the user has access to will display full details;
-        others will show limited fields as per public access.
+        Export observations as CSV using batch processing.
         """
-        if request.query_params.get("export_format", "csv").lower() != "csv":
-            return JsonResponse({"error": "Only CSV export is supported"}, status=400)
+        try:
+            # Validate export format
+            if request.query_params.get("export_format", "csv").lower() != "csv":
+                return JsonResponse({"error": "Only CSV export is supported"}, status=400)
 
-        # Determine user permissions
-        if request.user.is_authenticated:
-            user_municipality_ids = set(request.user.municipalities.values_list("id", flat=True))
-            is_admin = request.user.is_superuser
-        else:
-            user_municipality_ids = set()
-            is_admin = False
-
-        # Set CSV headers directly from CSV_HEADERS as a base
-        dynamic_csv_headers = CSV_HEADERS
-
-        # Prepare response
-        queryset = self.filter_queryset(self.get_queryset())
-        response = StreamingHttpResponse(
-            self.generate_csv_rows(queryset, dynamic_csv_headers, user_municipality_ids, is_admin),
-            content_type="text/csv"
-        )
-        response["Content-Disposition"] = 'attachment; filename="observations_export.csv"'
-        return response
-
-    def generate_csv_rows(
-        self, queryset: QuerySet, headers: list[str], user_municipality_ids: set, is_admin: bool
-    ) -> Generator[bytes, None, None]:
-        """Generate CSV rows with headers and filtered data according to user permissions."""
-        # Yield headers
-        yield self._csv_line(headers)
-
-        for observation in queryset.iterator(chunk_size=500):
-            # Determine fields to include based on user permissions for each observation
-            if is_admin or (observation.municipality_id in user_municipality_ids):
-                # Full access for admins and assigned municipalities
-                allowed_fields = user_read_fields
+            # Get user permissions
+            if request.user.is_authenticated:
+                user_municipality_ids = set(request.user.municipalities.values_list("id", flat=True))
+                is_admin = request.user.is_superuser
             else:
-                # Restricted access for other municipalities
-                allowed_fields = public_read_fields
+                user_municipality_ids = set()
+                is_admin = False
 
-            # Add essential fields for export
-            allowed_fields.extend(["source_id", "latitude", "longitude", "anb_domain", "nest_status"])
-
-            # Serialize the observation with restricted fields as needed
-            row = self.serialize_observation(observation, headers, allowed_fields)
-            yield self._csv_line(row)
+            # Get filtered queryset
+            queryset = self.filter_queryset(self.get_queryset())
             
+            # Create temporary file
+            with tempfile.NamedTemporaryFile(mode='w+', newline='', delete=False, suffix='.csv') as temp_file:
+                writer = csv.writer(temp_file)
+                
+                # Write headers
+                writer.writerow(CSV_HEADERS)
+                
+                # Process in batches
+                total_processed = 0
+                while True:
+                    # Get batch of observations
+                    batch = queryset[total_processed:total_processed + BATCH_SIZE]
+                    if not batch:
+                        break
+                        
+                    # Process each observation in the batch
+                    for observation in batch:
+                        row_data = self._prepare_row_data(
+                            observation,
+                            is_admin,
+                            user_municipality_ids
+                        )
+                        writer.writerow(row_data)
+                        
+                    total_processed += len(batch)
+                    logger.info(f"Processed {total_processed} observations")
+
+            # Create response with the temporary file
+            response = FileResponse(
+                open(temp_file.name, 'rb'),
+                content_type='text/csv',
+                as_attachment=True,
+                filename=f"observations_export_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            )
+            
+            # Delete the temporary file after it's sent
+            response.close = lambda: os.unlink(temp_file.name)
+            
+            return response
+
+        except Exception as e:
+            logger.exception("Export failed")
+            return JsonResponse(
+                {"error": "Export failed. Please try again or contact support."}, 
+                status=500
+            )
+    def _prepare_row_data(
+        self, 
+        observation: Observation,
+        is_admin: bool,
+        user_municipality_ids: set[str]
+    ) -> list[str]:
+        """
+        Prepare a single row of data for the CSV export.
+        """
+        # Determine allowed fields based on permissions
+        if is_admin or (observation.municipality_id in user_municipality_ids):
+            allowed_fields = user_read_fields
+        else:
+            allowed_fields = public_read_fields
+            
+        # Add essential fields
+        allowed_fields.extend(["source_id", "latitude", "longitude", "anb_domain", "nest_status"])
+        
+        row_data = []
+        for field in CSV_HEADERS:
+            if field not in allowed_fields:
+                row_data.append("")
+                continue
+
+            # Handle special fields
+            if field == "latitude":
+                row_data.append(str(observation.location.y) if observation.location else "")
+            elif field == "longitude":
+                row_data.append(str(observation.location.x) if observation.location else "")
+            elif field in ["created_datetime", "modified_datetime", "observation_datetime"]:
+                datetime_val = getattr(observation, field, None)
+                if datetime_val:
+                    datetime_val = datetime_val.replace(microsecond=0)
+                    row_data.append(datetime_val.isoformat() + "Z")
+                else:
+                    row_data.append("")
+            elif field == "province":
+                row_data.append(observation.province.name if observation.province else "")
+            elif field == "municipality":
+                row_data.append(observation.municipality.name if observation.municipality else "")
+            elif field == "anb_domain":
+                row_data.append(str(observation.anb))
+            elif field == "nest_status":
+                row_data.append(self.get_status(observation))
+            elif field == "source_id":
+                row_data.append(str(observation.source_id) if observation.source_id is not None else "")
+            else:
+                value = getattr(observation, field, "")
+                row_data.append(str(value) if value is not None else "")
+                
+        return row_data
+    
+ 
     def parse_location(self, srid_str: str) -> tuple[float, float]:
         """
         Parse SRID string to extract latitude and longitude.
@@ -707,62 +777,10 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         latitude = geom.y
         return latitude, longitude
     
-    def serialize_observation(self, obj: Observation, headers: list[str], allowed_fields: list[str]) -> list[str]:
-        """Serialize an observation for CSV export with specified fields."""
-        data = []
-        for field in headers:
-            if field not in allowed_fields:
-                data.append("")  # Add empty string for restricted fields
-                continue
-
-            # Handle custom formatting for certain fields
-            if field == "latitude" or field == "longitude":
-                if obj.location:
-                    srid_location_str = f"SRID=4326;POINT ({obj.location.x} {obj.location.y})"
-                    latitude, longitude = self.parse_location(srid_location_str)
-                    logger.info('Latitude: %s, Longitude: %s', latitude, longitude)
-                    if field == "latitude":
-                        data.append(str(latitude))
-                    elif field == "longitude":
-                        data.append(str(longitude))
-                else:
-                    data.append("")
-            elif field in ["created_datetime", "modified_datetime", "observation_datetime"]:
-                datetime_val = getattr(obj, field, None)
-                if datetime_val:
-                    # Remove milliseconds and ensure ISO format with 'Z'
-                    datetime_val = datetime_val.replace(microsecond=0)
-                    # Convert to ISO format and replace +00:00 with Z if present
-                    iso_datetime = datetime_val.isoformat()
-                    if iso_datetime.endswith('+00:00'):
-                        iso_datetime = iso_datetime[:-6] + 'Z'
-                    elif not iso_datetime.endswith('Z'):
-                        iso_datetime += 'Z'
-                    data.append(iso_datetime)
-                else:
-                    data.append("")
-            elif field == "province":
-                data.append(obj.province.name if obj.province else "")
-            elif field == "municipality":
-                data.append(obj.municipality.name if obj.municipality else "")
-            elif field == "anb_domain":
-                data.append(str(obj.anb))
-            elif field == "eradication_result":
-                data.append(obj.eradication_result if obj.eradication_result else "")
-            elif field == "nest_status":
-                logger.info("Getting status for observation %s", obj.eradication_result)
-                data.append(self.get_status(obj))
-            elif field == "source_id":
-                data.append(str(obj.source_id) if obj.source_id is not None else "")
-            else:
-                value = getattr(obj, field, "")
-                data.append(str(value) if value is not None else "")
-        return data
-    
     def get_status(self, observation: Observation) -> str:
         """Determine observation status based on eradication data."""
-        logger.info("Getting status for observation %s", observation.eradication_result)
-        if observation.eradication_result == EradicationResultEnum.SUCCESSFUL:
+        logger.debug("Getting status for observation %s", observation.eradication_result)
+        if observation.eradication_result:
             return "eradicated"
         if observation.reserved_by:
             return "reserved"

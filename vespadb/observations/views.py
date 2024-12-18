@@ -899,15 +899,18 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
 
     @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
     @action(detail=False, methods=["get"], permission_classes=[AllowAny])
-    def export(self, request: HttpRequest) -> StreamingHttpResponse:
-        """
-        Export observations as CSV using streaming response with improved error handling
-        and performance optimizations.
-        """
+    def export(self, request: HttpRequest) -> Union[FileResponse, JsonResponse]:
+        """Export observations as CSV using temporary file approach."""
+        temp_file = None
+        temp_file_path = None
+        
         try:
-            # Validate export format
-            if request.query_params.get("export_format", "csv").lower() != "csv":
-                return JsonResponse({"error": "Only CSV export is supported"}, status=400)
+            # Create temporary file
+            temp_file = tempfile.NamedTemporaryFile(mode='w+', delete=False)
+            temp_file_path = temp_file.name
+            
+            writer = csv.writer(temp_file)
+            writer.writerow(CSV_HEADERS)
 
             # Get user permissions
             if request.user.is_authenticated:
@@ -917,32 +920,82 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 user_municipality_ids = set()
                 is_admin = False
 
-            # Get filtered queryset
-            queryset = self.filter_queryset(self.get_queryset())
-            
-            # Create the StreamingHttpResponse
-            response = StreamingHttpResponse(
-                streaming_content=self._generate_csv_content(
-                    queryset, is_admin, user_municipality_ids
-                ),
-                content_type='text/csv'
+            # Get filtered queryset with optimizations
+            queryset = self.filter_queryset(
+                self.get_queryset().select_related('province', 'municipality', 'reserved_by')
             )
+
+            # Set a smaller chunk size for better memory management
+            chunk_size = 500
+            total_count = queryset.count()
+            processed = 0
+
+            # Process in chunks
+            for start in range(0, total_count, chunk_size):
+                chunk = queryset[start:start + chunk_size]
+                
+                for observation in chunk:
+                    try:
+                        row_data = self._prepare_row_data(
+                            observation, 
+                            is_admin, 
+                            user_municipality_ids
+                        )
+                        writer.writerow(row_data)
+                    except Exception as e:
+                        logger.error(f"Error processing observation {observation.id}: {str(e)}")
+                        continue
+
+                processed += len(chunk)
+                logger.info(f"Export progress: {(processed/total_count)*100:.1f}%")
+
+            # Make sure all data is written and file is closed
+            temp_file.flush()
+            os.fsync(temp_file.fileno())
+            temp_file.close()
             
-            # Important headers
-            filename = f"observations_export_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-            response['Content-Disposition'] = f'attachment; filename="{filename}"'
-            response['X-Accel-Buffering'] = 'no'
+            # Open the file for reading and create response
+            response = FileResponse(
+                open(temp_file_path, 'rb'),
+                content_type='text/csv',
+                as_attachment=True,
+                filename=f"observations_export_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            )
+            # Set headers more explicitly
+            response['Content-Disposition'] = f'attachment; filename="{filename}"; filename*=UTF-8\'\'{filename}'
+            response['Content-Type'] = 'text/csv; charset=utf-8'
+            response['Content-Length'] = os.path.getsize(temp_file_path)
             response['Cache-Control'] = 'no-cache'
+            response['X-Accel-Buffering'] = 'no'
+            
+            # Schedule file cleanup after response is sent
+            def cleanup_temp_file(response: FileResponse) -> Any:
+                """."""
+                try:
+                    os.unlink(temp_file_path)
+                except:
+                    pass
+                return response
+                
+            response.close = cleanup_temp_file.__get__(response, FileResponse)
             
             return response
 
         except Exception as e:
             logger.exception("Export failed")
+            # Cleanup in case of error
+            if temp_file:
+                temp_file.close()
+            if temp_file_path and os.path.exists(temp_file_path):
+                try:
+                    os.unlink(temp_file_path)
+                except:
+                    pass
             return JsonResponse(
                 {"error": "Export failed. Please try again or contact support."}, 
                 status=500
             )
-
+            
     def get_status(self, observation: Observation) -> str:
         """Determine observation status based on eradication data."""
         logger.debug("Getting status for observation %s", observation.eradication_result)

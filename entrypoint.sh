@@ -33,7 +33,11 @@ echo "Load waarnemingen observation data via: python manage.py load_waarnemingen
 
 # Start Gunicorn
 echo "Starting Gunicorn..."
-gunicorn --workers 3 --bind 0.0.0.0:8000 vespadb.wsgi:application &
+gunicorn --workers 3 \
+         --timeout 300 \
+         --keep-alive 65 \
+         --bind 0.0.0.0:8000 \
+         vespadb.wsgi:application &
 
 # Wait for Gunicorn to start
 sleep 5

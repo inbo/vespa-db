@@ -955,11 +955,13 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             temp_file.close()
             
             # Open the file for reading and create response
+            filename=f"observations_export_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            
             response = FileResponse(
                 open(temp_file_path, 'rb'),
                 content_type='text/csv',
                 as_attachment=True,
-                filename=f"observations_export_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+                filename=filename
             )
             # Set headers more explicitly
             response['Content-Disposition'] = f'attachment; filename="{filename}"; filename*=UTF-8\'\'{filename}'

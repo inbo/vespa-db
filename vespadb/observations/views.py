@@ -906,7 +906,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         
         try:
             # Create temporary file
-            temp_file = tempfile.NamedTemporaryFile(mode='w+', delete=False)
+            temp_file = tempfile.NamedTemporaryFile(mode='w+', delete=False, encoding='utf-8-sig')
             temp_file_path = temp_file.name
             
             writer = csv.writer(temp_file)
@@ -925,12 +925,12 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 self.get_queryset().select_related('province', 'municipality', 'reserved_by')
             )
 
-            # Set a smaller chunk size for better memory management
-            chunk_size = 500
+            # Use much smaller chunk size
+            chunk_size = 100
             total_count = queryset.count()
             processed = 0
 
-            # Process in chunks
+            # Process in chunks with periodic flushes
             for start in range(0, total_count, chunk_size):
                 chunk = queryset[start:start + chunk_size]
                 
@@ -946,6 +946,10 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                         logger.error(f"Error processing observation {observation.id}: {str(e)}")
                         continue
 
+                # Flush after each chunk
+                temp_file.flush()
+                os.fsync(temp_file.fileno())
+                
                 processed += len(chunk)
                 logger.info(f"Export progress: {(processed/total_count)*100:.1f}%")
 
@@ -955,24 +959,23 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             temp_file.close()
             
             # Open the file for reading and create response
-            filename=f"observations_export_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-            
             response = FileResponse(
                 open(temp_file_path, 'rb'),
-                content_type='text/csv',
-                as_attachment=True,
-                filename=filename
+                content_type='text/csv'
             )
-            # Set headers more explicitly
+            
+            # Set explicit headers
+            filename = f"observations_export_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
             response['Content-Disposition'] = f'attachment; filename="{filename}"; filename*=UTF-8\'\'{filename}'
             response['Content-Type'] = 'text/csv; charset=utf-8'
             response['Content-Length'] = os.path.getsize(temp_file_path)
-            response['Cache-Control'] = 'no-cache'
+            response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            response['Pragma'] = 'no-cache'
+            response['Expires'] = '0'
             response['X-Accel-Buffering'] = 'no'
             
             # Schedule file cleanup after response is sent
-            def cleanup_temp_file(response: FileResponse) -> Any:
-                """."""
+            def cleanup_temp_file(response):
                 try:
                     os.unlink(temp_file_path)
                 except:
@@ -994,7 +997,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 except:
                     pass
             return JsonResponse(
-                {"error": "Export failed. Please try again or contact support."}, 
+                {"error": f"Export failed: {str(e)}. Please try again or contact support."}, 
                 status=500
             )
             

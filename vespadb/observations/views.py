@@ -19,6 +19,7 @@ from tenacity import (
     before_log,
     after_log,
 )
+import time
 from typing import Generator, Optional
 from django.db import OperationalError, connection, transaction
 from django.core.exceptions import ValidationError
@@ -783,6 +784,52 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 time.sleep(wait_time)
         return None
 
+    def _generate_csv_content(
+        self, 
+        queryset: QuerySet,
+        is_admin: bool,
+        user_municipality_ids: Set[str]
+    ) -> Generator[str, None, None]:
+        """Generate CSV content in smaller chunks."""
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        
+        # Write headers first
+        writer.writerow(CSV_HEADERS)
+        data = buffer.getvalue()
+        buffer.seek(0)
+        buffer.truncate()
+        yield data
+
+        # Process in smaller chunks
+        chunk_size = 100  # Kleinere chunk size
+        total = queryset.count()
+        
+        for start in range(0, total, chunk_size):
+            chunk = queryset.select_related(
+                'province', 
+                'municipality', 
+                'reserved_by'
+            )[start:start + chunk_size]
+
+            for observation in chunk:
+                try:
+                    row_data = self._prepare_row_data(
+                        observation, 
+                        is_admin, 
+                        user_municipality_ids
+                    )
+                    writer.writerow(row_data)
+                    data = buffer.getvalue()
+                    buffer.seek(0)
+                    buffer.truncate()
+                    yield data
+                except Exception as e:
+                    logger.error(f"Error processing observation {observation.id}: {str(e)}")
+                    continue
+
+        buffer.close()
+        
     def create_csv_generator(
         self,
         queryset: QuerySet,
@@ -857,11 +904,9 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         Export observations as CSV using streaming response with improved error handling
         and performance optimizations.
         """
-        export_format = request.query_params.get("export_format", "csv").lower()
-        
         try:
-            # Input validation
-            if export_format != "csv":
+            # Validate export format
+            if request.query_params.get("export_format", "csv").lower() != "csv":
                 return JsonResponse({"error": "Only CSV export is supported"}, status=400)
 
             # Get user permissions
@@ -875,39 +920,26 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             # Get filtered queryset
             queryset = self.filter_queryset(self.get_queryset())
             
-            # Create streaming response
+            # Create the StreamingHttpResponse
             response = StreamingHttpResponse(
-                streaming_content=self.create_csv_generator(
-                    queryset=queryset,
-                    is_admin=is_admin,
-                    user_municipality_ids=user_municipality_ids
+                streaming_content=self._generate_csv_content(
+                    queryset, is_admin, user_municipality_ids
                 ),
                 content_type='text/csv'
             )
             
-            # Set headers
+            # Important headers
             filename = f"observations_export_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
             response['Content-Disposition'] = f'attachment; filename="{filename}"'
-            response['X-Accel-Buffering'] = 'no'  # Disable nginx buffering
+            response['X-Accel-Buffering'] = 'no'
+            response['Cache-Control'] = 'no-cache'
             
             return response
 
-        except QueryTimeoutError:
-            logger.exception("Query timeout during export")
-            return JsonResponse(
-                {"error": "Export timed out. Please try with a smaller date range or fewer filters."},
-                status=503
-            )
-        except ExportError as e:
-            logger.exception("Export error")
-            return JsonResponse(
-                {"error": f"Export failed: {str(e)}. Please try again or contact support."},
-                status=500
-            )
         except Exception as e:
-            logger.exception("Unexpected error during export")
+            logger.exception("Export failed")
             return JsonResponse(
-                {"error": "An unexpected error occurred. Please try again or contact support."},
+                {"error": "Export failed. Please try again or contact support."}, 
                 status=500
             )
 

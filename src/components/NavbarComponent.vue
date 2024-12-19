@@ -19,7 +19,15 @@
             Export
           </button>
           <ul class="dropdown-menu">
-            <li><button class="dropdown-item" @click="exportData('csv')">CSV</button></li>
+              <li>
+                  <button 
+                      class="dropdown-item" 
+                      @click="exportData('csv')"
+                      :disabled="isExporting"
+                  >
+                      CSV
+                  </button>
+              </li>
           </ul>
         </div>
 
@@ -67,6 +75,7 @@ export default {
     const isModalVisible = ref(false);
     const modalTitle = ref('');
     const modalMessage = ref('');
+    const isExporting = computed(() => vespaStore.isExporting);
 
     watch(() => vespaStore.error, (newError) => {
       if (newError) {
@@ -94,10 +103,18 @@ export default {
     };
 
     const exportData = async (format) => {
-      await vespaStore.exportData(format);
-    };
+      try {
+          if (vespaStore.isExporting) return;
+          
+          await vespaStore.exportData(format);
+      } catch (error) {
+          modalTitle.value = 'Error';
+          modalMessage.value = 'Er is een fout opgetreden tijdens het exporteren.';
+          isModalVisible.value = true;
+      }
+  };
 
-    return { isLoggedIn, loadingAuth, username, logout, navigateToChangePassword, exportData, fileInput, isModalVisible, modalTitle, modalMessage };
+    return { isLoggedIn, loadingAuth, username, logout, navigateToChangePassword, exportData, fileInput, isModalVisible, modalTitle, modalMessage, isExporting };
   },
   mounted() {
     var dropdownElementList = [].slice.call(document.querySelectorAll('.dropdown-toggle'));

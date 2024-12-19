@@ -27,6 +27,7 @@ export const useVespaStore = defineStore('vespaStore', {
         isEditing: false,
         map: null,
         viewMode: 'map',
+        isExporting: false,
         filters: {
             municipalities: [],
             provinces: [],
@@ -307,21 +308,55 @@ export const useVespaStore = defineStore('vespaStore', {
             }
         },
         async exportData(format) {
-            const filterQuery = this.createFilterQuery();
-            const url = `/observations/export?export_format=${format}&${filterQuery}`;
-
             try {
-                const response = await ApiService.get(url, { responseType: 'blob' });
-                const blob = new Blob([response.data], { type: response.headers['content-type'] });
-                const downloadUrl = window.URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = downloadUrl;
-                link.setAttribute('download', `export.${format}`);
-                document.body.appendChild(link);
-                link.click();
-                link.remove();
+                this.isExporting = true;  // Start loading indicator
+                const response = await ApiService.get(
+                    `/observations/export?${this.createFilterQuery()}`
+                );
+
+                if (response.status === 200) {
+                    const { export_id } = response.data;
+
+                    const checkStatus = async () => {
+                        const statusResponse = await ApiService.get(
+                            `/observations/export_status?export_id=${export_id}`
+                        );
+
+                        if (statusResponse.data.status === 'completed') {
+                            const downloadResponse = await ApiService.get(
+                                `/observations/download_export/?export_id=${export_id}`,
+                                { responseType: 'blob' }
+                            );
+
+                            const blob = new Blob([downloadResponse.data], { type: 'text/csv' });
+                            const url = window.URL.createObjectURL(blob);
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.setAttribute('download', `observations_export_${new Date().getTime()}.csv`);
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            window.URL.revokeObjectURL(url);
+                            this.isExporting = false;  // Stop loading indicator
+                            return true;
+                        } else if (statusResponse.data.status === 'failed') {
+                            this.isExporting = false;  // Stop loading indicator on error
+                            throw new Error(statusResponse.data.error || 'Export failed');
+                        }
+
+                        return new Promise(resolve => {
+                            setTimeout(async () => {
+                                resolve(await checkStatus());
+                            }, 2000);
+                        });
+                    };
+
+                    await checkStatus();
+                }
             } catch (error) {
+                this.isExporting = false;  // Stop loading indicator on error
                 console.error('Error exporting data:', error);
+                throw error;
             }
         },
         async fetchMunicipalitiesByProvinces(provinceIds) {

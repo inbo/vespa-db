@@ -1,50 +1,36 @@
 """Views for the observations app."""
+
+import csv
 import datetime
 import io
 import json
-import logging
-import json
-import csv
-from typing import TYPE_CHECKING, Any, Any, Union, TextIO, Union, List, Set, Optional
-import datetime
-import tempfile
-import os
-import logging
-from tenacity import retry, stop_after_attempt, wait_exponential
-from tenacity import (
-    retry,
-    stop_after_attempt,
-    wait_exponential,
-    retry_if_exception_type,
-    before_log,
-    after_log,
-)
 import time
-from typing import Generator, Optional
-from django.db import OperationalError, connection, transaction
-from django.core.exceptions import ValidationError
-import psycopg2
-from django.http import FileResponse
-import os 
-import tempfile
+import logging
+import csv
+import json
+from typing import TYPE_CHECKING, Any, Union, Optional
+from django.conf import settings
+from django.http import FileResponse, HttpResponseNotFound
+import os
+from django.conf import settings
 
 from django.contrib.gis.db.models.functions import Transform
 from django.contrib.gis.geos import GEOSGeometry
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files.uploadedfile import InMemoryUploadedFile
-from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import CharField, OuterRef, QuerySet, Subquery, Value
 from django.db.models.functions import Coalesce
 from django.db.utils import IntegrityError
-from django.http import HttpResponse, JsonResponse, StreamingHttpResponse, HttpRequest
+from django.http import HttpResponse, JsonResponse, HttpRequest
 from django.db import connection
 from django.utils.decorators import method_decorator
 from django.utils.timezone import now
 from django.views.decorators.http import require_GET
 from django_filters.rest_framework import DjangoFilterBackend
 from django_ratelimit.decorators import ratelimit
+from django.http import StreamingHttpResponse, HttpResponseBadRequest, HttpResponseNotFound, HttpResponseServerError
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from geopy.exc import GeocoderServiceError, GeocoderTimedOut
@@ -59,17 +45,20 @@ from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_gis.filters import DistanceToPointFilter
-from vespadb.observations.serializers import user_read_fields, public_read_fields
 
 from vespadb.observations.cache import invalidate_geojson_cache, invalidate_observation_cache
 from vespadb.observations.filters import ObservationFilter
 from vespadb.observations.helpers import parse_and_convert_to_utc
-from vespadb.observations.models import Municipality, Observation, Province, EradicationResultEnum
-from vespadb.observations.serializers import (
-    MunicipalitySerializer,
-    ObservationSerializer,
-    ProvinceSerializer,
-)
+from vespadb.observations.models import Municipality, Observation, Province, Export
+from vespadb.observations.models import Export
+from vespadb.observations.tasks.generate_export import generate_export
+from vespadb.observations.serializers import ObservationSerializer, MunicipalitySerializer, ProvinceSerializer
+
+from django.utils.decorators import method_decorator
+from django_ratelimit.decorators import ratelimit
+from rest_framework.decorators import action
+from rest_framework.permissions import AllowAny
+from django.shortcuts import get_object_or_404
 
 if TYPE_CHECKING:
     from geopy.location import Location
@@ -77,24 +66,23 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
+class Echo:
+    """An object that implements just the write method of the file-like interface."""
+    def write(self, value):
+        """Write the value by returning it, instead of storing in a buffer."""
+        return value
+
+
 BBOX_LENGTH = 4
 GEOJSON_REDIS_CACHE_EXPIRATION = 900  # 15 minutes
 GET_REDIS_CACHE_EXPIRATION = 86400  # 1 day
+BATCH_SIZE = 150
 CSV_HEADERS = [
     "id", "created_datetime", "modified_datetime", "latitude", "longitude", "source", "source_id",
     "nest_height", "nest_size", "nest_location", "nest_type", "observation_datetime",
     "province", "eradication_date", "municipality", "images", "anb_domain",
     "notes", "eradication_result", "wn_id", "wn_validation_status", "nest_status"
 ]
-BATCH_SIZE = 1000
-class ExportError(Exception):
-    """Custom exception for export-related errors."""
-    pass
-
-class QueryTimeoutError(Exception):
-    """Custom exception for query timeout errors."""
-    pass
-
 class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
     """ViewSet for the Observation model."""
 
@@ -653,362 +641,130 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 {"error": f"An error occurred during bulk import: {e!s}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=4, max=10),
-        retry_error_callback=lambda retry_state: None
-    )
-    def write_batch_to_file(
-        self, 
-        writer: Any,
-        batch: List[Observation], 
-        is_admin: bool, 
-        user_municipality_ids: Set[str]
-    ) -> int:
-        """
-        Write a batch of observations to the CSV file with retry logic.
-        Returns number of successfully written records.
-        """
-        successful_writes = 0
-        for observation in batch:
-            try:
-                row_data = self._prepare_row_data(observation, is_admin, user_municipality_ids)
-                writer.writerow(row_data)
-                successful_writes += 1
-            except Exception as e:
-                logger.error(f"Error processing observation {observation.id}: {str(e)}")
-                continue
-        return successful_writes
-
-    def _prepare_row_data(
-        self, 
-        observation: Observation,
-        is_admin: bool,
-        user_municipality_ids: set[str]
-    ) -> list[str]:
-        """
-        Prepare a single row of data for the CSV export with error handling.
-        """
-        try:
-            # Determine allowed fields based on permissions
-            if is_admin or (observation.municipality_id in user_municipality_ids):
-                allowed_fields = user_read_fields
-            else:
-                allowed_fields = public_read_fields
-                
-            allowed_fields.extend(["source_id", "latitude", "longitude", "anb_domain", "nest_status"])
-            
-            row_data = []
-            for field in CSV_HEADERS:
-                try:
-                    if field not in allowed_fields:
-                        row_data.append("")
-                        continue
-
-                    if field == "latitude":
-                        row_data.append(str(observation.location.y) if observation.location else "")
-                    elif field == "longitude":
-                        row_data.append(str(observation.location.x) if observation.location else "")
-                    elif field in ["created_datetime", "modified_datetime", "observation_datetime"]:
-                        datetime_val = getattr(observation, field, None)
-                        if datetime_val:
-                            datetime_val = datetime_val.replace(microsecond=0)
-                            row_data.append(datetime_val.isoformat() + "Z")
-                        else:
-                            row_data.append("")
-                    elif field == "province":
-                        row_data.append(observation.province.name if observation.province else "")
-                    elif field == "municipality":
-                        row_data.append(observation.municipality.name if observation.municipality else "")
-                    elif field == "anb_domain":
-                        row_data.append(str(observation.anb))
-                    elif field == "nest_status":
-                        row_data.append(self.get_status(observation))
-                    elif field == "source_id":
-                        row_data.append(str(observation.source_id) if observation.source_id is not None else "")
-                    else:
-                        value = getattr(observation, field, "")
-                        row_data.append(str(value) if value is not None else "")
-                except Exception as e:
-                    logger.warning(f"Error processing field {field} for observation {observation.id}: {str(e)}")
-                    row_data.append("")
-                    
-            return row_data
-        except Exception as e:
-            logger.error(f"Error preparing row data for observation {observation.id}: {str(e)}")
-            return [""] * len(CSV_HEADERS)  # Return empty row in case of error
-
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=4, max=10),
-        retry=retry_if_exception_type((OperationalError, psycopg2.OperationalError)),
-        before=before_log(logger, logging.INFO),
-        after=before_log(logger, logging.INFO)
-    )
-    def get_queryset_count(self, queryset: QuerySet) -> int:
-        """Get queryset count with retry logic."""
-        try:
-            with transaction.atomic(), connection.cursor() as cursor:
-                cursor.execute('SET statement_timeout TO 30000')  # 30 seconds timeout
-                return int(queryset.count())
-        except (OperationalError, psycopg2.OperationalError) as e:
-            logger.error(f"Error getting queryset count: {str(e)}")
-            raise QueryTimeoutError("Query timed out while getting count") from e
-
-    def get_chunk_with_retries(
-        self,
-        queryset: QuerySet,
-        start: int,
-        batch_size: int,
-        max_retries: int = 3
-    ) -> Optional[List[Observation]]:
-        """Get a chunk of data with retries and error handling."""
-        for attempt in range(max_retries):
-            try:
-                with transaction.atomic(), connection.cursor() as cursor:
-                    cursor.execute('SET statement_timeout TO 30000')
-                    chunk = list(
-                        queryset.select_related(
-                            'province',
-                            'municipality',
-                            'reserved_by'
-                        )[start:start + batch_size]
-                    )
-                    return chunk
-            except (OperationalError, psycopg2.OperationalError) as e:
-                if attempt == max_retries - 1:
-                    logger.error(f"Failed to get chunk after {max_retries} attempts: {str(e)}")
-                    return None
-                wait_time = (2 ** attempt) * 1  # Exponential backoff
-                logger.warning(f"Retry {attempt + 1}/{max_retries} after {wait_time}s")
-                time.sleep(wait_time)
-        return None
-
-    def _generate_csv_content(
-        self, 
-        queryset: QuerySet,
-        is_admin: bool,
-        user_municipality_ids: Set[str]
-    ) -> Generator[str, None, None]:
-        """Generate CSV content in smaller chunks."""
-        buffer = io.StringIO()
-        writer = csv.writer(buffer)
-        
-        # Write headers first
-        writer.writerow(CSV_HEADERS)
-        data = buffer.getvalue()
-        buffer.seek(0)
-        buffer.truncate()
-        yield data
-
-        # Process in smaller chunks
-        chunk_size = 100  # Kleinere chunk size
-        total = queryset.count()
-        
-        for start in range(0, total, chunk_size):
-            chunk = queryset.select_related(
-                'province', 
-                'municipality', 
-                'reserved_by'
-            )[start:start + chunk_size]
-
-            for observation in chunk:
-                try:
-                    row_data = self._prepare_row_data(
-                        observation, 
-                        is_admin, 
-                        user_municipality_ids
-                    )
-                    writer.writerow(row_data)
-                    data = buffer.getvalue()
-                    buffer.seek(0)
-                    buffer.truncate()
-                    yield data
-                except Exception as e:
-                    logger.error(f"Error processing observation {observation.id}: {str(e)}")
-                    continue
-
-        buffer.close()
-        
-    def create_csv_generator(
-        self,
-        queryset: QuerySet,
-        is_admin: bool,
-        user_municipality_ids: Set[str],
-        batch_size: int = BATCH_SIZE
-    ) -> Generator[str, None, None]:
-        """Create a generator for CSV streaming with improved error handling."""
-        buffer = io.StringIO()
-        writer = csv.writer(buffer)
-        
-        # Write headers
-        writer.writerow(CSV_HEADERS)
-        yield buffer.getvalue()
-        buffer.seek(0)
-        buffer.truncate(0)
-
-        total_processed = 0
-        successful_writes = 0
-        error_count = 0
-        
-        try:
-            total_count = self.get_queryset_count(queryset)
-            
-            # Process in chunks
-            start = 0
-            while True:
-                chunk = self.get_chunk_with_retries(queryset, start, batch_size)
-                if not chunk:
-                    break
-                    
-                for observation in chunk:
-                    try:
-                        row_data = self._prepare_row_data(
-                            observation,
-                            is_admin,
-                            user_municipality_ids
-                        )
-                        writer.writerow(row_data)
-                        successful_writes += 1
-                    except Exception as e:
-                        error_count += 1
-                        logger.error(f"Error processing observation {observation.id}: {str(e)}")
-                        if error_count > total_count * 0.1:  # If more than 10% errors
-                            raise ExportError("Too many errors during export")
-                        continue
-                    
-                    data = buffer.getvalue()
-                    yield data
-                    buffer.seek(0)
-                    buffer.truncate(0)
-                
-                total_processed += len(chunk)
-                progress = (total_processed / total_count) * 100 if total_count else 0
-                logger.info(
-                    f"Export progress: {progress:.1f}% ({total_processed}/{total_count}). "
-                    f"Successful: {successful_writes}, Errors: {error_count}"
-                )
-                
-                start += batch_size
-                
-        except Exception as e:
-            logger.exception("Error in CSV generator")
-            raise ExportError(f"Export failed: {str(e)}") from e
-        finally:
-            buffer.close()
-
     @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
     @action(detail=False, methods=["get"], permission_classes=[AllowAny])
-    def export(self, request: HttpRequest) -> Union[FileResponse, JsonResponse]:
-        """Export observations as CSV using temporary file approach."""
-        temp_file = None
-        temp_file_path = None
+    def export(self, request: HttpRequest) -> JsonResponse:
+        """Initiate the export of observations and trigger a Celery task."""
+        # Initialize the filterset
+        filterset = self.filterset_class(data=request.GET, queryset=self.get_queryset())
+
+        # Validate the filterset
+        if not filterset.is_valid():
+            return JsonResponse({"error": filterset.errors}, status=400)
+
+        # Prepare the filter parameters
+        filters = {key: value for key, value in request.GET.items()}
+
+        # Create an Export record
+        export = Export.objects.create(
+            user=request.user if request.user.is_authenticated else None,
+            filters=filters,
+            status='pending',
+        )
+
+        # Trigger the Celery task
+        task = generate_export.delay(
+            export.id,
+            filters,
+            user_id=request.user.id if request.user.is_authenticated else None
+        )
+
+        # Update the Export record with the task ID
+        export.task_id = task.id
+        export.save()
+
+        return JsonResponse({
+            'export_id': export.id,
+            'task_id': task.id,
+        })
+
+    @swagger_auto_schema(
+        operation_description="Check the status of an export.",
+        manual_parameters=[
+            openapi.Parameter(
+                'export_id',
+                openapi.IN_QUERY,
+                description="The ID of the export to check the status of.",
+                type=openapi.TYPE_INTEGER,
+                required=True,
+            )
+        ],
+        responses={
+            200: openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'progress': openapi.Schema(type=openapi.TYPE_INTEGER),
+                    'error': openapi.Schema(type=openapi.TYPE_STRING, nullable=True),
+                    'download_url': openapi.Schema(type=openapi.TYPE_STRING, nullable=True),
+                },
+            ),
+            400: "Bad Request",
+            404: "Export not found",
+        },
+    )
+    @action(detail=False, methods=["get"])
+    def export_status(self, request: HttpRequest) -> JsonResponse:
+        """Check export status."""
+        export_id = request.GET.get('export_id')
+        if not export_id:
+            logger.error("Export ID not provided")
+            return JsonResponse({"error": "Export ID is required"}, status=400)
         
         try:
-            # Create temporary file
-            temp_file = tempfile.NamedTemporaryFile(mode='w+', delete=False, encoding='utf-8-sig')
-            temp_file_path = temp_file.name
-            
-            writer = csv.writer(temp_file)
-            writer.writerow(CSV_HEADERS)
+            export = get_object_or_404(Export, id=export_id)
+        except Exception as e:
+            logger.exception(f"Export ID {export_id} not found or invalid: {str(e)}")
+            return JsonResponse({"error": f"Export ID {export_id} not found"}, status=404)
+        
+        if export.status == 'completed':
+            download_url = request.build_absolute_uri(f'/observations/download_export/?export_id={export_id}')
+            return JsonResponse({
+                'status': 'completed',
+                'download_url': download_url
+            })
 
-            # Get user permissions
-            if request.user.is_authenticated:
-                user_municipality_ids = set(request.user.municipalities.values_list("id", flat=True))
-                is_admin = request.user.is_superuser
-            else:
-                user_municipality_ids = set()
-                is_admin = False
+        return JsonResponse({
+            'status': export.status,
+            'progress': export.progress,
+            'error': export.error_message
+        })
 
-            # Get filtered queryset with optimizations
-            queryset = self.filter_queryset(
-                self.get_queryset().select_related('province', 'municipality', 'reserved_by')
-            )
+    @action(detail=False, methods=["get"])
+    def download_export(self, request: HttpRequest) -> Union[StreamingHttpResponse, HttpResponse]:
+        """Stream the export directly to the user."""
+        export_id = request.GET.get('export_id')
+        if not export_id:
+            return HttpResponseBadRequest("Export ID is required")
 
-            # Use much smaller chunk size
-            chunk_size = 100
-            total_count = queryset.count()
-            processed = 0
+        try:
+            export = Export.objects.get(id=export_id)
+            if export.status != 'completed':
+                return HttpResponseBadRequest("Export is not ready")
 
-            # Process in chunks with periodic flushes
-            for start in range(0, total_count, chunk_size):
-                chunk = queryset[start:start + chunk_size]
-                
-                for observation in chunk:
-                    try:
-                        row_data = self._prepare_row_data(
-                            observation, 
-                            is_admin, 
-                            user_municipality_ids
-                        )
-                        writer.writerow(row_data)
-                    except Exception as e:
-                        logger.error(f"Error processing observation {observation.id}: {str(e)}")
-                        continue
+            # Get the data iterator from cache
+            cache_key = f'export_{export_id}_data'
+            rows = cache.get(cache_key)
+            if not rows:
+                return HttpResponseNotFound("Export data not found or expired")
 
-                # Flush after each chunk
-                temp_file.flush()
-                os.fsync(temp_file.fileno())
-                
-                processed += len(chunk)
-                logger.info(f"Export progress: {(processed/total_count)*100:.1f}%")
-
-            # Make sure all data is written and file is closed
-            temp_file.flush()
-            os.fsync(temp_file.fileno())
-            temp_file.close()
-            
-            # Open the file for reading and create response
-            response = FileResponse(
-                open(temp_file_path, 'rb'),
+            # Create the streaming response
+            pseudo_buffer = Echo()
+            writer = csv.writer(pseudo_buffer)
+            response = StreamingHttpResponse(
+                (writer.writerow(row) for row in rows),
                 content_type='text/csv'
             )
             
-            # Set explicit headers
-            filename = f"observations_export_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-            response['Content-Disposition'] = f'attachment; filename="{filename}"; filename*=UTF-8\'\'{filename}'
-            response['Content-Type'] = 'text/csv; charset=utf-8'
-            response['Content-Length'] = os.path.getsize(temp_file_path)
-            response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-            response['Pragma'] = 'no-cache'
-            response['Expires'] = '0'
-            response['X-Accel-Buffering'] = 'no'
-            
-            # Schedule file cleanup after response is sent
-            def cleanup_temp_file(response):
-                try:
-                    os.unlink(temp_file_path)
-                except:
-                    pass
-                return response
-                
-            response.close = cleanup_temp_file.__get__(response, FileResponse)
-            
+            timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+            response['Content-Disposition'] = f'attachment; filename="observations_export_{timestamp}.csv"'
             return response
 
+        except Export.DoesNotExist:
+            return HttpResponseNotFound("Export not found")
         except Exception as e:
-            logger.exception("Export failed")
-            # Cleanup in case of error
-            if temp_file:
-                temp_file.close()
-            if temp_file_path and os.path.exists(temp_file_path):
-                try:
-                    os.unlink(temp_file_path)
-                except:
-                    pass
-            return JsonResponse(
-                {"error": f"Export failed: {str(e)}. Please try again or contact support."}, 
-                status=500
-            )
-            
-    def get_status(self, observation: Observation) -> str:
-        """Determine observation status based on eradication data."""
-        logger.debug("Getting status for observation %s", observation.eradication_result)
-        if observation.eradication_result:
-            return "eradicated"
-        if observation.reserved_by:
-            return "reserved"
-        return "untreated"
+            logger.error(f"Error streaming export: {str(e)}")
+            return HttpResponseServerError("Error generating export")
 
 @require_GET
 def search_address(request: Request) -> JsonResponse:

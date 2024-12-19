@@ -15,6 +15,9 @@
       <div class="loading-screen" v-if="isMapLoading">
         Observaties laden...
       </div>
+      <div class="loading-screen" v-if="isExporting">
+        Exporteren...
+      </div>
       <div class="map-legend" v-if="map && !isMapLoading">
         <div>
           <span class="legend-icon bg-reported"></span> Gerapporteerd nest
@@ -61,6 +64,7 @@ export default {
   setup() {
     const vespaStore = useVespaStore();
     const searchQuery = ref('');
+    const isExporting = computed(() => vespaStore.isExporting);
     const router = useRouter();
     const selectedObservation = computed(() => vespaStore.selectedObservation);
     const isEditing = computed(() => vespaStore.isEditing);
@@ -327,6 +331,7 @@ export default {
       updateMarkerColor,
       searchQuery,
       searchAddress,
+      isExporting,
     };
   },
 };

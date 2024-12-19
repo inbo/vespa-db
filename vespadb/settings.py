@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django_filters",
+    'django_extensions',
     "django_celery_beat",
     "django_celery_results",
     "rest_framework",
@@ -269,3 +270,6 @@ AWS_SES_REGION_NAME = "eu-west-1"
 AWS_SES_REGION_ENDPOINT = "email.eu-west-1.amazonaws.com"
 DEFAULT_FROM_EMAIL = secrets["DEFAULT_FROM_EMAIL"]
 SERVER_EMAIL = secrets["DEFAULT_FROM_EMAIL"]
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+EXPORTS_DIR = os.path.join(MEDIA_ROOT, 'exports')

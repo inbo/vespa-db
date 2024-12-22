@@ -27,20 +27,33 @@ logger = logging.getLogger("vespadb.observations.tasks")
 
 mapping_dict: dict[int, dict[str, str]] = {
     329: {
+        # Controlled values
         "hoger_dan_4_meter": "hoger_dan_4_meter",
+        "lager_dan_4_meter": "lager_dan_4_meter",
+        # others
         "Hoger dan 4 meter": "hoger_dan_4_meter",
         "Higher than 4 meters": "hoger_dan_4_meter",
-        "lager_dan_4_meter": "lager_dan_4_meter",
         "Lager dan 4 meter": "lager_dan_4_meter",
         "Lower than 4 meters": "lager_dan_4_meter",
     },
     330: {
+        # Controlled values
+        "groter_dan_25_cm": "groter_dan_25_cm",
+        "kleiner_dan_25_cm": "kleiner_dan_25_cm",
+        # others
         "Groter dan 25 cm": "groter_dan_25_cm",
         "Kleiner dan 25 cm": "kleiner_dan_25_cm",
         "Larger than 25cm": "groter_dan_25_cm",
         "Smaller than 25cm": "kleiner_dan_25_cm",
     },
     331: {
+        # Controlled values
+        "buiten_onbedekt_op_gebouw": "buiten_onbedekt_op_gebouw",
+        "buiten_onbedekt_in_boom_of_struik": "buiten_onbedekt_in_boom_of_struik",
+        "buiten_natuurlijk_overdekt": "buiten_natuurlijk_overdekt",
+        "buiten_maar_overdekt_door_constructie": "buiten_maar_overdekt_door_constructie",
+        "binnen_in_gebouw_of_constructie": "binnen_in_gebouw_of_constructie",
+        # others
         "Binnen, in gebouw of constructie": "binnen_in_gebouw_of_constructie",
         "Buiten, maar overdekt door constructie": "buiten_maar_overdekt_door_constructie",
         "Buiten, natuurlijk overdekt": "buiten_natuurlijk_overdekt",
@@ -53,6 +66,12 @@ mapping_dict: dict[int, dict[str, str]] = {
         "Outside, uncovered on building": "buiten_onbedekt_op_gebouw",
     },
     368: {
+        # Controlled values
+        "actief_embryonaal_nest": "actief_embryonaal_nest",
+        "actief_primair_nest": "actief_primair_nest",
+        "actief_secundair_nest": "actief_secundair_nest",
+        "inactief_leeg_nest": "inactief_leeg_nest",
+        # others
         "Actief embryonaal nest": "actief_embryonaal_nest",
         "Actief embryonaal nest (van maart tot eind juni, nest met enkel koningin)": "actief_embryonaal_nest",
         "Actief primair nest": "actief_primair_nest",

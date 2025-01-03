@@ -33,8 +33,18 @@ echo "Load waarnemingen observation data via: python manage.py load_waarnemingen
 
 # Start Gunicorn
 echo "Starting Gunicorn..."
-gunicorn --workers 3 --bind 0.0.0.0:8000 vespadb.wsgi:application &
-
+gunicorn --workers 3 \
+         --worker-class gthread \
+         --threads 4 \
+         --worker-connections 1000 \
+         --timeout 1800 \
+         --graceful-timeout 300 \
+         --keep-alive 65 \
+         --max-requests 1000 \
+         --max-requests-jitter 50 \
+         --bind 0.0.0.0:8000 \
+         vespadb.wsgi:application &
+         
 # Wait for Gunicorn to start
 sleep 5
 

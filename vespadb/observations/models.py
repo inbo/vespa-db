@@ -389,3 +389,29 @@ class Observation(models.Model):
             self.province = municipality.province if municipality else None
 
         super().save(*args, **kwargs)
+
+class Export(models.Model):
+    """Model for tracking observation exports."""
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+    )
+
+    id = models.AutoField(primary_key=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="User who requested the export",
+    )
+    filters = models.JSONField(default=dict, help_text="Filters applied to the export")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', help_text="Status of the export")
+    progress = models.IntegerField(default=0, help_text="Progress percentage of the export")
+    file_path = models.CharField(max_length=255, blank=True, null=True, help_text="Path to the exported file")
+    created_at = models.DateTimeField(auto_now_add=True, help_text="Datetime when the export was created")
+    completed_at = models.DateTimeField(blank=True, null=True, help_text="Datetime when the export was completed")
+    error_message = models.TextField(blank=True, null=True, help_text="Error message if the export failed")
+    task_id = models.CharField(max_length=255, blank=True, null=True, help_text="Celery task ID for the export")

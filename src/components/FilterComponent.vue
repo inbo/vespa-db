@@ -98,7 +98,7 @@ export default {
       { name: 'Zichtbaar', value: true },
       { name: 'Niet zichtbaar', value: false }
     ]);
-    const minDate = ref(new Date(new Date().getFullYear(), 3, 1));
+    const minDate = ref(new Date(2024, 3, 1));
     const maxDate = ref(null);
     const selectedObservationStart = ref(false);
     const selectedObservationEnd = ref(false);
@@ -121,7 +121,7 @@ export default {
         max_observation_date: maxDateCET,
         visible: visibleActief.value
       });
-      
+
     }, 300);
 
     const toggleMenu1 = () => {
@@ -156,11 +156,11 @@ export default {
 
     watch([selectedMunicipalities, selectedProvinces, selectedNestType, selectedNestStatus, anbAreasActief, selectedObservationStart, selectedObservationEnd, visibleActief], () => {
       emitFilterUpdate();
-    }, { deep: true});
-    
+    }, { deep: true });
+
     watch(() => vespaStore.filters, (newFilters, oldFilters) => {
       const hasChanged = JSON.stringify(newFilters) !== JSON.stringify(oldFilters);
-      
+
       if (hasChanged) {
         selectedMunicipalities.value = newFilters.municipalities || [];
         selectedProvinces.value = newFilters.provinces || [];
@@ -178,7 +178,7 @@ export default {
       anbAreasActief.value = vespaStore.filters.anbAreasActief;
       selectedNestType.value = vespaStore.filters.nestType || [];
       selectedNestStatus.value = vespaStore.filters.nestStatus || [];
-      minDate.value = vespaStore.filters.min_observation_date ? new Date(vespaStore.filters.min_observation_date) : new Date(new Date().getFullYear(), 3, 1);
+      minDate.value = vespaStore.filters.min_observation_date ? new Date(vespaStore.filters.min_observation_date) : new Date(2024, 3, 1);
       maxDate.value = vespaStore.filters.max_observation_date ? new Date(vespaStore.filters.max_observation_date) : null;
       if (!vespaStore.municipalitiesFetched) await vespaStore.fetchMunicipalities();
       if (!vespaStore.provincesFetched) await vespaStore.fetchProvinces();

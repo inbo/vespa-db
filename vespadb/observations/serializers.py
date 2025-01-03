@@ -13,7 +13,7 @@ from rest_framework import serializers
 from rest_framework.request import Request
 
 from vespadb.observations.helpers import parse_and_convert_to_cet, parse_and_convert_to_utc
-from vespadb.observations.models import EradicationResultEnum, Municipality, Observation, Province
+from vespadb.observations.models import EradicationResultEnum, Municipality, Observation, Province, Export
 from vespadb.observations.utils import get_municipality_from_coordinates
 from vespadb.users.models import VespaUser
 
@@ -484,3 +484,9 @@ class ProvinceSerializer(serializers.ModelSerializer):
 
         model = Province
         fields = ["id", "name"]
+
+
+class ExportSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Export
+        fields = '__all__'

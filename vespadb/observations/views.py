@@ -8,25 +8,29 @@ import time
 import logging
 import csv
 import json
-from typing import TYPE_CHECKING, Any, Generator, Any, Union
+from typing import TYPE_CHECKING, Any, Union, Optional
+from django.conf import settings
+from django.http import FileResponse, HttpResponseNotFound
+import os
+from django.conf import settings
 
 from django.contrib.gis.db.models.functions import Transform
 from django.contrib.gis.geos import GEOSGeometry
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files.uploadedfile import InMemoryUploadedFile
-from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import CharField, OuterRef, QuerySet, Subquery, Value
 from django.db.models.functions import Coalesce
 from django.db.utils import IntegrityError
-from django.http import HttpResponse, JsonResponse, StreamingHttpResponse, HttpRequest
+from django.http import HttpResponse, JsonResponse, HttpRequest
 from django.db import connection
 from django.utils.decorators import method_decorator
 from django.utils.timezone import now
 from django.views.decorators.http import require_GET
 from django_filters.rest_framework import DjangoFilterBackend
 from django_ratelimit.decorators import ratelimit
+from django.http import StreamingHttpResponse, HttpResponseBadRequest, HttpResponseNotFound, HttpResponseServerError
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from geopy.exc import GeocoderServiceError, GeocoderTimedOut
@@ -41,23 +45,33 @@ from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_gis.filters import DistanceToPointFilter
-from vespadb.observations.serializers import user_read_fields, public_read_fields
 
 from vespadb.observations.cache import invalidate_geojson_cache, invalidate_observation_cache
 from vespadb.observations.filters import ObservationFilter
 from vespadb.observations.helpers import parse_and_convert_to_utc
-from vespadb.observations.models import Municipality, Observation, Province, EradicationResultEnum
-from vespadb.observations.serializers import (
-    MunicipalitySerializer,
-    ObservationSerializer,
-    ProvinceSerializer,
-)
+from vespadb.observations.models import Municipality, Observation, Province, Export
+from vespadb.observations.models import Export
+from vespadb.observations.tasks.generate_export import generate_export
+from vespadb.observations.serializers import ObservationSerializer, MunicipalitySerializer, ProvinceSerializer
+
+from django.utils.decorators import method_decorator
+from django_ratelimit.decorators import ratelimit
+from rest_framework.decorators import action
+from rest_framework.permissions import AllowAny
+from django.shortcuts import get_object_or_404
 
 if TYPE_CHECKING:
     from geopy.location import Location
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+class Echo:
+    """An object that implements just the write method of the file-like interface."""
+    def write(self, value):
+        """Write the value by returning it, instead of storing in a buffer."""
+        return value
+
 
 BBOX_LENGTH = 4
 GEOJSON_REDIS_CACHE_EXPIRATION = 900  # 15 minutes
@@ -627,154 +641,142 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 {"error": f"An error occurred during bulk import: {e!s}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
-    @swagger_auto_schema(
-        method="get",
-        manual_parameters=[
-            openapi.Parameter(
-                "export_format",
-                in_=openapi.IN_QUERY,
-                description="Format of the exported data",
-                type=openapi.TYPE_STRING,
-                enum=["csv"],
-                default="csv",
-            ),
-        ],
-    )
     @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
     @action(detail=False, methods=["get"], permission_classes=[AllowAny])
-    def export(self, request: HttpRequest) -> Union[StreamingHttpResponse, JsonResponse]:
-        """
-        Export observations as CSV with dynamically controlled fields based on user permissions.
+    def export(self, request: HttpRequest) -> JsonResponse:
+        """Initiate the export of observations and trigger a Celery task."""
+        # Initialize the filterset
+        filterset = self.filterset_class(data=request.GET, queryset=self.get_queryset())
 
-        Observations from municipalities the user has access to will display full details;
-        others will show limited fields as per public access.
-        """
-        if request.query_params.get("export_format", "csv").lower() != "csv":
-            return JsonResponse({"error": "Only CSV export is supported"}, status=400)
+        # Validate the filterset
+        if not filterset.is_valid():
+            return JsonResponse({"error": filterset.errors}, status=400)
 
-        # Determine user permissions
-        if request.user.is_authenticated:
-            user_municipality_ids = set(request.user.municipalities.values_list("id", flat=True))
-            is_admin = request.user.is_superuser
-        else:
-            user_municipality_ids = set()
-            is_admin = False
+        # Get the filtered queryset count first
+        filtered_count = filterset.qs.count()
+        if filtered_count > 10000:
+            return JsonResponse({
+                "error": f"Export too large. Found {filtered_count} records, maximum allowed is 10,000"
+            }, status=400)
 
-        # Set CSV headers directly from CSV_HEADERS as a base
-        dynamic_csv_headers = CSV_HEADERS
+        # Prepare the filter parameters - only include valid filters
+        filters = {}
+        for key, value in request.GET.items():
+            if key in filterset.filters and value:
+                filters[key] = value
 
-        # Prepare response
-        queryset = self.filter_queryset(self.get_queryset())
-        response = StreamingHttpResponse(
-            self.generate_csv_rows(queryset, dynamic_csv_headers, user_municipality_ids, is_admin),
-            content_type="text/csv"
+        # Create an Export record
+        export = Export.objects.create(
+            user=request.user if request.user.is_authenticated else None,
+            filters=filters,
+            status='pending',
         )
-        response["Content-Disposition"] = 'attachment; filename="observations_export.csv"'
-        return response
 
-    def generate_csv_rows(
-        self, queryset: QuerySet, headers: list[str], user_municipality_ids: set, is_admin: bool
-    ) -> Generator[bytes, None, None]:
-        """Generate CSV rows with headers and filtered data according to user permissions."""
-        # Yield headers
-        yield self._csv_line(headers)
+        # Trigger the Celery task
+        task = generate_export.delay(
+            export.id,
+            filters,
+            user_id=request.user.id if request.user.is_authenticated else None
+        )
 
-        for observation in queryset.iterator(chunk_size=500):
-            # Determine fields to include based on user permissions for each observation
-            if is_admin or (observation.municipality_id in user_municipality_ids):
-                # Full access for admins and assigned municipalities
-                allowed_fields = user_read_fields
-            else:
-                # Restricted access for other municipalities
-                allowed_fields = public_read_fields
+        # Update the Export record with the task ID
+        export.task_id = task.id
+        export.save()
 
-            # Add essential fields for export
-            allowed_fields.extend(["source_id", "latitude", "longitude", "anb_domain", "nest_status"])
-
-            # Serialize the observation with restricted fields as needed
-            row = self.serialize_observation(observation, headers, allowed_fields)
-            yield self._csv_line(row)
-            
-    def parse_location(self, srid_str: str) -> tuple[float, float]:
-        """
-        Parse SRID string to extract latitude and longitude.
-        """
-        # Convert the SRID location string to GEOSGeometry
-        geom = GEOSGeometry(srid_str)
+        return JsonResponse({
+            'export_id': export.id,
+            'task_id': task.id,
+            'total_records': filtered_count
+        })
         
-        # Extract latitude and longitude
-        longitude = geom.x
-        latitude = geom.y
-        return latitude, longitude
-    
-    def serialize_observation(self, obj: Observation, headers: list[str], allowed_fields: list[str]) -> list[str]:
-        """Serialize an observation for CSV export with specified fields."""
-        data = []
-        for field in headers:
-            if field not in allowed_fields:
-                data.append("")  # Add empty string for restricted fields
-                continue
+    @swagger_auto_schema(
+        operation_description="Check the status of an export.",
+        manual_parameters=[
+            openapi.Parameter(
+                'export_id',
+                openapi.IN_QUERY,
+                description="The ID of the export to check the status of.",
+                type=openapi.TYPE_INTEGER,
+                required=True,
+            )
+        ],
+        responses={
+            200: openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'status': openapi.Schema(type=openapi.TYPE_STRING),
+                    'progress': openapi.Schema(type=openapi.TYPE_INTEGER),
+                    'error': openapi.Schema(type=openapi.TYPE_STRING, nullable=True),
+                    'download_url': openapi.Schema(type=openapi.TYPE_STRING, nullable=True),
+                },
+            ),
+            400: "Bad Request",
+            404: "Export not found",
+        },
+    )
+    @action(detail=False, methods=["get"])
+    def export_status(self, request: HttpRequest) -> JsonResponse:
+        """Check export status."""
+        export_id = request.GET.get('export_id')
+        if not export_id:
+            logger.error("Export ID not provided")
+            return JsonResponse({"error": "Export ID is required"}, status=400)
+        
+        try:
+            export = get_object_or_404(Export, id=export_id)
+        except Exception as e:
+            logger.exception(f"Export ID {export_id} not found or invalid: {str(e)}")
+            return JsonResponse({"error": f"Export ID {export_id} not found"}, status=404)
+        
+        if export.status == 'completed':
+            download_url = request.build_absolute_uri(f'/observations/download_export/?export_id={export_id}')
+            return JsonResponse({
+                'status': 'completed',
+                'download_url': download_url
+            })
 
-            # Handle custom formatting for certain fields
-            if field == "latitude" or field == "longitude":
-                if obj.location:
-                    srid_location_str = f"SRID=4326;POINT ({obj.location.x} {obj.location.y})"
-                    latitude, longitude = self.parse_location(srid_location_str)
-                    logger.info('Latitude: %s, Longitude: %s', latitude, longitude)
-                    if field == "latitude":
-                        data.append(str(latitude))
-                    elif field == "longitude":
-                        data.append(str(longitude))
-                else:
-                    data.append("")
-            elif field in ["created_datetime", "modified_datetime", "observation_datetime"]:
-                datetime_val = getattr(obj, field, None)
-                if datetime_val:
-                    # Remove milliseconds and ensure ISO format with 'Z'
-                    datetime_val = datetime_val.replace(microsecond=0)
-                    # Convert to ISO format and replace +00:00 with Z if present
-                    iso_datetime = datetime_val.isoformat()
-                    if iso_datetime.endswith('+00:00'):
-                        iso_datetime = iso_datetime[:-6] + 'Z'
-                    elif not iso_datetime.endswith('Z'):
-                        iso_datetime += 'Z'
-                    data.append(iso_datetime)
-                else:
-                    data.append("")
-            elif field == "province":
-                data.append(obj.province.name if obj.province else "")
-            elif field == "municipality":
-                data.append(obj.municipality.name if obj.municipality else "")
-            elif field == "anb_domain":
-                data.append(str(obj.anb))
-            elif field == "eradication_result":
-                data.append(obj.eradication_result if obj.eradication_result else "")
-            elif field == "nest_status":
-                logger.info("Getting status for observation %s", obj.eradication_result)
-                data.append(self.get_status(obj))
-            elif field == "source_id":
-                data.append(str(obj.source_id) if obj.source_id is not None else "")
-            else:
-                value = getattr(obj, field, "")
-                data.append(str(value) if value is not None else "")
-        return data
-    
-    def get_status(self, observation: Observation) -> str:
-        """Determine observation status based on eradication data."""
-        logger.info("Getting status for observation %s", observation.eradication_result)
-        if observation.eradication_result == EradicationResultEnum.SUCCESSFUL:
-            return "eradicated"
-        if observation.reserved_by:
-            return "reserved"
-        return "untreated"
+        return JsonResponse({
+            'status': export.status,
+            'progress': export.progress,
+            'error': export.error_message
+        })
 
-    def _csv_line(self, row: list[str]) -> bytes:
-        """Convert a list of strings to a CSV-compatible line in bytes."""
-        buffer = io.StringIO()
-        writer = csv.writer(buffer)
-        writer.writerow(row)
-        return buffer.getvalue().encode("utf-8")
-    
+    @action(detail=False, methods=["get"])
+    def download_export(self, request: HttpRequest) -> Union[StreamingHttpResponse, HttpResponse]:
+        """Stream the export directly to the user."""
+        export_id = request.GET.get('export_id')
+        if not export_id:
+            return HttpResponseBadRequest("Export ID is required")
+
+        try:
+            export = Export.objects.get(id=export_id)
+            if export.status != 'completed':
+                return HttpResponseBadRequest("Export is not ready")
+
+            # Get the data iterator from cache
+            cache_key = f'export_{export_id}_data'
+            rows = cache.get(cache_key)
+            if not rows:
+                return HttpResponseNotFound("Export data not found or expired")
+
+            # Create the streaming response
+            pseudo_buffer = Echo()
+            writer = csv.writer(pseudo_buffer)
+            response = StreamingHttpResponse(
+                (writer.writerow(row) for row in rows),
+                content_type='text/csv'
+            )
+            
+            timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+            response['Content-Disposition'] = f'attachment; filename="observations_export_{timestamp}.csv"'
+            return response
+
+        except Export.DoesNotExist:
+            return HttpResponseNotFound("Export not found")
+        except Exception as e:
+            logger.error(f"Error streaming export: {str(e)}")
+            return HttpResponseServerError("Error generating export")
+
 @require_GET
 def search_address(request: Request) -> JsonResponse:
     """

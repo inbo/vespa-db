@@ -45,6 +45,8 @@ types-python-dateutil = "^2.9.0.20240316"
 
 whitenoise = "^6.6.0"
 django-ses = "^4.2.0"
+tenacity = "^9.0.0"
+django-extensions = "^3.2.3"
 [tool.poetry.group.dev.dependencies]  # https://python-poetry.org/docs/master/managing-dependencies/
 coverage = { extras = ["toml"], version = ">=7.4.1" }
 ipython = ">=8.20.0"

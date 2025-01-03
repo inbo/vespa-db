@@ -652,8 +652,18 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         if not filterset.is_valid():
             return JsonResponse({"error": filterset.errors}, status=400)
 
-        # Prepare the filter parameters
-        filters = {key: value for key, value in request.GET.items()}
+        # Get the filtered queryset count first
+        filtered_count = filterset.qs.count()
+        if filtered_count > 10000:
+            return JsonResponse({
+                "error": f"Export too large. Found {filtered_count} records, maximum allowed is 10,000"
+            }, status=400)
+
+        # Prepare the filter parameters - only include valid filters
+        filters = {}
+        for key, value in request.GET.items():
+            if key in filterset.filters and value:
+                filters[key] = value
 
         # Create an Export record
         export = Export.objects.create(
@@ -676,8 +686,9 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         return JsonResponse({
             'export_id': export.id,
             'task_id': task.id,
+            'total_records': filtered_count
         })
-
+        
     @swagger_auto_schema(
         operation_description="Check the status of an export.",
         manual_parameters=[

@@ -1,123 +1,15 @@
-import csv
-import logging
-from datetime import datetime, timedelta
-from typing import Optional, Dict, Any, List, Set, Iterator
-from django.core.cache import cache
-from django.db import models, transaction
-from django.utils import timezone
 from celery import shared_task
-from vespadb.observations.models import Observation, Export
+from django.core.cache import cache
+from django.db import transaction
+from django.utils import timezone
+from datetime import timedelta
+import logging
+from typing import Dict, Any, Optional, Set
 from vespadb.users.models import VespaUser as User
-from vespadb.observations.serializers import user_read_fields, public_read_fields
+from vespadb.observations.models import Export
+from .export_utils import CSV_HEADERS, prepare_row_data
 
 logger = logging.getLogger(__name__)
-
-CSV_HEADERS = [
-    "id", "created_datetime", "modified_datetime", "latitude", "longitude", 
-    "source", "source_id", "nest_height", "nest_size", "nest_location", 
-    "nest_type", "observation_datetime", "province", "eradication_date", 
-    "municipality", "images", "anb_domain", "notes", "eradication_result", 
-    "wn_id", "wn_validation_status", "nest_status"
-]
-
-class Echo:
-    """An object that implements just the write method of the file-like interface."""
-    def write(self, value):
-        """Write the value by returning it, instead of storing in a buffer."""
-        return value
-
-def get_status(observation: Observation) -> str:
-    """Get observation status string."""
-    if observation.eradication_result:
-        return "eradicated"
-    if observation.reserved_by:
-        return "reserved"
-    return "untreated"
-
-def _prepare_row_data(
-    observation: Observation,
-    is_admin: bool,
-    user_municipality_ids: Set[str]
-) -> List[str]:
-    """
-    Prepare a single row of data for the CSV export with error handling.
-    """
-    try:
-        # Determine allowed fields based on permissions
-        if is_admin or (observation.municipality_id in user_municipality_ids):
-            allowed_fields = user_read_fields
-        else:
-            allowed_fields = public_read_fields
-            
-        allowed_fields.extend(["source_id", "latitude", "longitude", "anb_domain", "nest_status"])
-        
-        row_data = []
-        for field in CSV_HEADERS:
-            try:
-                if field not in allowed_fields:
-                    row_data.append("")
-                    continue
-
-                if field == "latitude":
-                    row_data.append(str(observation.location.y) if observation.location else "")
-                elif field == "longitude":
-                    row_data.append(str(observation.location.x) if observation.location else "")
-                elif field in ["created_datetime", "modified_datetime", "observation_datetime"]:
-                    datetime_val = getattr(observation, field, None)
-                    if datetime_val:
-                        datetime_val = datetime_val.replace(microsecond=0)
-                        row_data.append(datetime_val.isoformat() + "Z")
-                    else:
-                        row_data.append("")
-                elif field == "province":
-                    row_data.append(observation.province.name if observation.province else "")
-                elif field == "municipality":
-                    row_data.append(observation.municipality.name if observation.municipality else "")
-                elif field == "anb_domain":
-                    row_data.append(str(observation.anb))
-                elif field == "nest_status":
-                    row_data.append(get_status(observation))
-                elif field == "source_id":
-                    row_data.append(str(observation.source_id) if observation.source_id is not None else "")
-                else:
-                    value = getattr(observation, field, "")
-                    row_data.append(str(value) if value is not None else "")
-            except Exception as e:
-                logger.warning(f"Error processing field {field} for observation {observation.id}: {str(e)}")
-                row_data.append("")
-                
-        return row_data
-    except Exception as e:
-        logger.error(f"Error preparing row data for observation {observation.id}: {str(e)}")
-        return [""] * len(CSV_HEADERS)
-
-def parse_boolean(value: str) -> bool:
-    """
-    Convert a string value to a boolean.
-    """
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str):
-        value_lower = value.lower()
-        if value_lower in {"true", "1"}:
-            return True
-        elif value_lower in {"false", "0"}:
-            return False
-    raise ValueError(f"Invalid boolean value: {value}")
-
-def generate_rows(queryset, is_admin: bool, user_municipality_ids: set) -> Iterator[List[str]]:
-    """Generate rows for CSV streaming."""
-    # First yield the headers
-    yield CSV_HEADERS
-    
-    # Then yield the data rows
-    for observation in queryset:
-        try:
-            row = _prepare_row_data(observation, is_admin, user_municipality_ids)
-            yield row
-        except Exception as e:
-            logger.error(f"Error processing observation {observation.id}: {str(e)}")
-            continue
 
 @shared_task(
     name="generate_export",
@@ -137,33 +29,9 @@ def generate_export(export_id: int, filters: Dict[str, Any], user_id: Optional[i
         export.status = 'processing'
         export.save()
 
-        # Clean and validate filters before applying
-        valid_fields = {field.name: field for field in Observation._meta.get_fields()}
-        processed_filters = {}
-        
-        # Log the incoming filters
-        logger.info(f"Processing filters: {filters}")
-        
-        for key, value in filters.items():
-            # Skip pagination and ordering parameters
-            if key in ['page', 'page_size', 'ordering']:
-                continue
-                
-            if key in valid_fields:
-                field = valid_fields[key]
-                try:
-                    if isinstance(field, models.BooleanField):
-                        processed_filters[key] = parse_boolean(value)
-                    elif value:  # Only add non-empty values
-                        processed_filters[key] = value
-                except ValueError as e:
-                    logger.warning(f"Skipping invalid filter {key}: {value}, error: {e}")
-                    continue
-        
-        logger.info(f"Processed filters: {processed_filters}")
-
+        from ..models import Observation  # Import here to avoid circular imports
         # Apply filters and get initial count
-        queryset = Observation.objects.filter(**processed_filters)
+        queryset = Observation.objects.filter(**filters)
         initial_count = queryset.count()
         logger.info(f"Initial queryset count: {initial_count}")
 
@@ -177,8 +45,9 @@ def generate_export(export_id: int, filters: Dict[str, Any], user_id: Optional[i
         processed = 0
         rows = [CSV_HEADERS]  # Start with headers
         
+        # Get user permissions
         is_admin = False
-        user_municipality_ids = set()
+        user_municipality_ids: Set[str] = set()
         if user_id:
             try:
                 user = User.objects.get(id=user_id)
@@ -194,7 +63,7 @@ def generate_export(export_id: int, filters: Dict[str, Any], user_id: Optional[i
             
             for observation in batch:
                 try:
-                    row = _prepare_row_data(observation, is_admin, user_municipality_ids)
+                    row = prepare_row_data(observation, is_admin, user_municipality_ids)
                     batch_rows.append(row)
                     processed += 1
                     
@@ -235,7 +104,7 @@ def generate_export(export_id: int, filters: Dict[str, Any], user_id: Optional[i
         export.error_message = str(e)
         export.save()
         raise
-    
+     
 @shared_task
 def cleanup_old_exports() -> None:
     """Clean up exports older than 24 hours."""

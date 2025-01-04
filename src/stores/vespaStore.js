@@ -309,54 +309,60 @@ export const useVespaStore = defineStore('vespaStore', {
         },
         async exportData(format) {
             try {
-                this.isExporting = true;  // Start loading indicator
+                this.isExporting = true;
+
+                // Get the current filter query
+                const filterQuery = this.createFilterQuery();
+
+                // Make the export request
                 const response = await ApiService.get(
-                    `/observations/export?${this.createFilterQuery()}`
+                    `/observations/export_direct?${filterQuery}`,
+                    {
+                        responseType: 'blob',
+                        timeout: 300000, // 5 minute timeout
+                        headers: {
+                            'Accept': 'text/csv',
+                        }
+                    }
                 );
 
-                if (response.status === 200) {
-                    const { export_id } = response.data;
+                // Create and trigger download
+                const blob = new Blob([response.data], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.setAttribute(
+                    'download',
+                    `observations_export_${new Date().getTime()}.csv`
+                );
 
-                    const checkStatus = async () => {
-                        const statusResponse = await ApiService.get(
-                            `/observations/export_status?export_id=${export_id}`
-                        );
+                // Trigger download
+                document.body.appendChild(link);
+                link.click();
 
-                        if (statusResponse.data.status === 'completed') {
-                            const downloadResponse = await ApiService.get(
-                                `/observations/download_export/?export_id=${export_id}`,
-                                { responseType: 'blob' }
-                            );
+                // Cleanup
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(url);
+                this.isExporting = false;
 
-                            const blob = new Blob([downloadResponse.data], { type: 'text/csv' });
-                            const url = window.URL.createObjectURL(blob);
-                            const link = document.createElement('a');
-                            link.href = url;
-                            link.setAttribute('download', `observations_export_${new Date().getTime()}.csv`);
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                            window.URL.revokeObjectURL(url);
-                            this.isExporting = false;  // Stop loading indicator
-                            return true;
-                        } else if (statusResponse.data.status === 'failed') {
-                            this.isExporting = false;  // Stop loading indicator on error
-                            throw new Error(statusResponse.data.error || 'Export failed');
-                        }
-
-                        return new Promise(resolve => {
-                            setTimeout(async () => {
-                                resolve(await checkStatus());
-                            }, 2000);
-                        });
-                    };
-
-                    await checkStatus();
-                }
             } catch (error) {
-                this.isExporting = false;  // Stop loading indicator on error
+                this.isExporting = false;
                 console.error('Error exporting data:', error);
-                throw error;
+
+                // Handle specific error cases
+                let errorMessage = 'Export failed. Please try again.';
+
+                if (error.response) {
+                    if (error.response.status === 400) {
+                        errorMessage = error.response.data.error || 'Invalid export request';
+                    } else if (error.response.status === 403) {
+                        errorMessage = 'You do not have permission to export data';
+                    } else if (error.response.status === 504) {
+                        errorMessage = 'Export timed out. Please try with fewer filters';
+                    }
+                }
+
+                throw new Error(errorMessage);
             }
         },
         async fetchMunicipalitiesByProvinces(provinceIds) {

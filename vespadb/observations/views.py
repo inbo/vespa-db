@@ -8,12 +8,16 @@ import time
 import logging
 import csv
 import json
-from typing import TYPE_CHECKING, Any, Union, Optional
-from django.conf import settings
-from django.http import FileResponse, HttpResponseNotFound
+from typing import TYPE_CHECKING, Any, Union
+from django.http import HttpResponseNotFound
 import os
-from django.conf import settings
+from typing import Iterator, Set
+from django.db.models.query import QuerySet
+from django.db.models import Model
+from csv import writer as _writer
+from django.db.models.query import QuerySet
 
+from django.views.decorators.csrf import csrf_exempt
 from django.contrib.gis.db.models.functions import Transform
 from django.contrib.gis.geos import GEOSGeometry
 from django.core.cache import cache
@@ -68,7 +72,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 class Echo:
     """An object that implements just the write method of the file-like interface."""
-    def write(self, value):
+    def write(self, value: Any) -> Any:
         """Write the value by returning it, instead of storing in a buffer."""
         return value
 
@@ -776,7 +780,69 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         except Exception as e:
             logger.error(f"Error streaming export: {str(e)}")
             return HttpResponseServerError("Error generating export")
+        
+    @method_decorator(csrf_exempt)
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
+    def export_direct(self, request: HttpRequest) -> Union[StreamingHttpResponse, JsonResponse]:
+        """Stream observations directly as CSV without using Celery."""
+        try:
+            # Initialize the filterset with request parameters
+            filterset = self.filterset_class(
+                data=request.GET,
+                queryset=self.get_queryset().select_related(
+                    'province', 
+                    'municipality'
+                )
+            )
 
+            if not filterset.is_valid():
+                return JsonResponse({"error": filterset.errors}, status=400)
+
+            # Get filtered queryset
+            queryset = filterset.qs
+
+            # Check count
+            total_count = queryset.count()
+            if total_count > 10000:
+                return JsonResponse({
+                    "error": f"Export too large. Found {total_count} records, maximum allowed is 10,000"
+                }, status=400)
+
+            # Determine user permissions
+            is_admin = request.user.is_authenticated and request.user.is_superuser
+            user_municipality_ids = set()
+            if request.user.is_authenticated:
+                user_municipality_ids = set(
+                    request.user.municipalities.values_list('id', flat=True)
+                )
+
+            # Create the streaming response with data from the task module
+            from .tasks.export_utils import generate_rows
+            pseudo_buffer = Echo()
+            writer = csv.writer(pseudo_buffer)
+            
+            # Stream response with appropriate headers
+            response = StreamingHttpResponse(
+                generate_rows(queryset, writer, is_admin, user_municipality_ids),
+                content_type='text/csv'
+            )
+            
+            # Set filename with timestamp
+            timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+            response['Content-Disposition'] = f'attachment; filename="observations_export_{timestamp}.csv"'
+            
+            # Add CORS headers
+            response["Access-Control-Allow-Origin"] = request.META.get('HTTP_ORIGIN', '*')
+            response["Access-Control-Allow-Credentials"] = "true"
+            response["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+            response["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+            
+            return response
+
+        except Exception as e:
+            logger.exception("Export failed")
+            return JsonResponse({"error": str(e)}, status=500)
+    
 @require_GET
 def search_address(request: Request) -> JsonResponse:
     """

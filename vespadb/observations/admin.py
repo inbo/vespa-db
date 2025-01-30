@@ -157,7 +157,6 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         "created_by",
         "wn_modified_datetime",
         "wn_created_datetime",
-        "species",
         "wn_cluster_id",
         "modified_by",
         "modified_datetime",

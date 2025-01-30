@@ -505,6 +505,8 @@ export const useVespaStore = defineStore('vespaStore', {
                 return '#198754';
             } else if (status === 'reserved') {
                 return '#ea792a';
+            } else if (status === 'untreatable') {
+                return '#198754';
             }
             return '#212529';
         },

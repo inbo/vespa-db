@@ -33,15 +33,19 @@ echo "Load waarnemingen observation data via: python manage.py load_waarnemingen
 
 # Start Gunicorn
 echo "Starting Gunicorn..."
-gunicorn --workers 3 \
+gunicorn --workers 4 \
          --worker-class gthread \
          --threads 4 \
          --worker-connections 1000 \
-         --timeout 1800 \
+         --timeout 3600 \
          --graceful-timeout 300 \
          --keep-alive 65 \
-         --max-requests 1000 \
+         --max-requests 500 \
          --max-requests-jitter 50 \
+         --worker-tmp-dir /dev/shm \
+         --log-level info \
+         --access-logfile /workspaces/vespadb/logs/gunicorn-access.log \
+         --error-logfile /workspaces/vespadb/logs/gunicorn-error.log \
          --bind 0.0.0.0:8000 \
          vespadb.wsgi:application &
          

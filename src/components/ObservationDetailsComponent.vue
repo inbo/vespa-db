@@ -209,8 +209,7 @@
                                 <label class="col-4 col-form-label">Type</label>
                                 <div class="col-8">
                                     <p class="form-control-plaintext">
-                                        {{ selectedObservation.nest_type ? nestTypeEnum[selectedObservation.nest_type] :
-                                        'Geen' }}
+                                        {{ selectedObservation.nest_type ? nestTypeEnum[selectedObservation.nest_type] : 'Geen' }}
                                     </p>
                                 </div>
                             </div>
@@ -218,9 +217,7 @@
                                 <label class="col-4 col-form-label">Locatie</label>
                                 <div class="col-8">
                                     <p class="form-control-plaintext">
-                                        {{ selectedObservation.nest_location ?
-                                            nestLocationEnum[selectedObservation.nest_location] :
-                                        'Geen' }}
+                                        {{ selectedObservation.nest_location ? nestLocationEnum[selectedObservation.nest_location] : 'Geen' }}
                                     </p>
                                 </div>
                             </div>
@@ -228,8 +225,7 @@
                                 <label class="col-4 col-form-label">Grootte</label>
                                 <div class="col-8">
                                     <p class="form-control-plaintext">
-                                        {{ selectedObservation.nest_size ? nestSizeEnum[selectedObservation.nest_size] :
-                                        'Geen' }}
+                                        {{ selectedObservation.nest_size ? nestSizeEnum[selectedObservation.nest_size] : 'Geen' }}
                                     </p>
                                 </div>
                             </div>
@@ -237,9 +233,7 @@
                                 <label class="col-4 col-form-label">Hoogte</label>
                                 <div class="col-8">
                                     <p class="form-control-plaintext">
-                                        {{ selectedObservation.nest_height ?
-                                            nestHeightEnum[selectedObservation.nest_height] :
-                                        'Geen' }}
+                                        {{ selectedObservation.nest_height ? nestHeightEnum[selectedObservation.nest_height] : 'Geen' }}
                                     </p>
                                 </div>
                             </div>
@@ -259,8 +253,7 @@
                                     <label class="col-4 col-form-label">Validatie</label>
                                     <div class="col-8">
                                         <p class="form-control-plaintext">
-                                            {{ validationStatusEnum[selectedObservation.wn_validation_status] || "Geen"
-                                            }}
+                                            {{ validationStatusEnum[selectedObservation.wn_validation_status] || "Geen" }}
                                         </p>
                                     </div>
                                 </div>
@@ -277,8 +270,7 @@
                                         <input v-if="selectedObservation.public_domain !== undefined"
                                             v-model="editableObservation.public_domain" class="form-check-input"
                                             type="checkbox" id="public-domain" :disabled="!canViewRestrictedFields" />
-                                        <label class="form-check-label" for="public-domain">Nest op publiek
-                                            terrein</label>
+                                        <label class="form-check-label" for="public-domain">Nest op publiek terrein</label>
                                     </div>
                                 </div>
                             </div>
@@ -476,7 +468,7 @@ export default {
 
         const eradicationAfterCareEnum = {
             "nest_volledig_verwijderd": "Nest volledig verwijderd",
-            "nest_gedeeltelijk verwijderd": "Nest gedeeltelijk verwijderd",
+            "nest_gedeeltelijk_verwijderd": "Nest gedeeltelijk verwijderd",
             "nest_laten_hangen": "Nest laten hangen"
         };
 

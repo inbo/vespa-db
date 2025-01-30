@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
 from django.contrib.gis.geos import GEOSGeometry, Point
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from pytz import timezone
 from rest_framework import serializers
 from rest_framework.request import Request
@@ -307,6 +307,17 @@ class ObservationSerializer(serializers.ModelSerializer):
     def update(self, instance: Observation, validated_data: dict[Any, Any]) -> Observation:  # noqa: C901
         """Update method to handle observation reservations."""
         user = self.context["request"].user
+
+        # Check if someone is trying to update a nest reserved by another user
+        if instance.reserved_by and instance.reserved_by != user and not user.is_superuser:
+            raise serializers.ValidationError("You cannot edit an observation reserved by another user.")
+
+        # Only proceed if user has appropriate permissions
+        if not user.is_superuser:
+            user_municipality_ids = user.municipalities.values_list("id", flat=True)
+            if instance.municipality and instance.municipality.id not in user_municipality_ids:
+                raise PermissionDenied("You do not have permission to update nests in this municipality.")
+
         allowed_admin_fields = [
             "location",
             "nest_height",
@@ -377,9 +388,6 @@ class ObservationSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError(f"Field(s) {field}' can not be updated by non-admin users.")
 
         error_fields = []
-        # Check if 'species' is in validated_data and if it has changed
-        if "species" in validated_data and validated_data["species"] != instance.species:
-            error_fields.append("species")
 
         # Check if 'wn_cluster_id' is in validated_data and if it has changed
         if "wn_cluster_id" in validated_data and validated_data["wn_cluster_id"] != instance.wn_cluster_id:
@@ -390,21 +398,18 @@ class ObservationSerializer(serializers.ModelSerializer):
             error_message = f"Following field(s) cannot be updated by any user: {', '.join(error_fields)}"
             raise serializers.ValidationError(error_message)
 
-        # Conditionally set `reserved_by` and `reserved_datetime` for all users
-        if "reserved_by" in validated_data and instance.reserved_by is None:
-            validated_data["reserved_datetime"] = (
-                datetime.now(timezone("EST")) if validated_data["reserved_by"] else None
-            )
-            instance.reserved_by = user
-
-        # Prevent non-admin users from updating observations reserved by others
-        if not user.is_superuser and instance.reserved_by and instance.reserved_by != user:
-            raise serializers.ValidationError("You cannot edit an observation reserved by another user.")
+        # Conditionally set `reserved_by` and `reserved_datetime`
+        if "reserved_by" in validated_data:
+            if validated_data["reserved_by"] is not None:
+                validated_data["reserved_datetime"] = datetime.now(timezone("EST"))
+            else:
+                validated_data["reserved_datetime"] = None
 
         for field in set(validated_data) - set(allowed_admin_fields):
             validated_data.pop(field)
         instance = super().update(instance, validated_data)
         return instance
+    
     def to_internal_value(self, data: dict[str, Any]) -> dict[str, Any]:
         """Convert the incoming data to a Python native representation."""
         logger.info("Raw input data: %s", data)

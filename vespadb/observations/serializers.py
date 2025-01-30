@@ -127,70 +127,7 @@ class ObservationSerializer(serializers.ModelSerializer):
 
         model = Observation
         fields = "__all__"
-        extra_kwargs = {
-            "id": {"read_only": True, "help_text": "Unique ID for the observation."},
-            "wn_id": {
-                "required": False,
-                "allow_null": True,
-                "help_text": "Unique ID for the observation in the source system.",
-            },
-            "created_datetime": {"help_text": "Datetime when the observation was created."},
-            "modified_datetime": {"help_text": "Datetime when the observation was last modified."},
-            "location": {"help_text": "Geographical location of the observation as a point."},
-            "source": {"help_text": "Source of the observation."},
-            "notes": {"help_text": "Notes about the observation."},
-            "wn_admin_notes": {"write_only": True},
-            "wn_validation_status": {"help_text": "Validation status of the observation."},
-            "nest_height": {"help_text": "Height of the nest."},
-            "nest_size": {"help_text": "Size of the nest."},
-            "nest_location": {"help_text": "Location of the nest."},
-            "nest_type": {"help_text": "Type of the nest."},
-            "observer_phone_number": {"help_text": "Phone number of the observer."},
-            "observer_email": {"help_text": "Email of the observer."},
-            "observer_received_email": {"help_text": "Flag indicating if observer received email."},
-            "observer_name": {"help_text": "Name of the observer."},
-            "observation_datetime": {"help_text": "Datetime when the observation was made."},
-            "wn_cluster_id": {"required": False, "allow_null": True, "help_text": "Cluster ID of the observation."},
-            "admin_notes": {
-                "required": False,
-                "allow_blank": True,
-                "allow_null": True,
-                "help_text": "Admin notes for the observation.",
-            },
-            "wn_modified_datetime": {"help_text": "Datetime when the observation was modified in the source system."},
-            "wn_created_datetime": {"help_text": "Datetime when the observation was created in the source system."},
-            "visible": {"help_text": "Flag indicating if the observation is visible."},
-            "images": {
-                "required": False,
-                "allow_null": True,
-                "help_text": "List of images associated with the observation.",
-            },
-            "reserved_by": {"required": False, "allow_null": True, "help_text": "User who reserved the observation."},
-            "reserved_datetime": {"help_text": "Datetime when the observation was reserved."},
-            "eradication_date": {
-                "required": False,
-                "allow_null": True,
-                "help_text": "Date when the nest was eradicated.",
-            },
-            "eradicator_name": {"help_text": "Name of the person who eradicated the nest."},
-            "eradication_duration": {
-                "help_text": "Duration of the eradication in minutes",
-                "required": False,
-                "allow_null": True,
-            },
-            "eradication_persons": {"help_text": "Number of persons involved in the eradication."},
-            "eradication_result": {"help_text": "Result of the eradication."},
-            "eradication_product": {"help_text": "Product used for the eradication."},
-            "eradication_method": {"help_text": "Method used for the eradication."},
-            "eradication_aftercare": {"help_text": "Aftercare result of the eradication."},
-            "eradication_problems": {"help_text": "Problems encountered during the eradication."},
-            "eradication_notes": {"help_text": "Notes about the eradication."},
-            "municipality": {"help_text": "Municipality where the observation was made."},
-            "province": {"help_text": "Province where the observation was made."},
-            "anb": {"help_text": "Flag indicating if the observation is in ANB area."},
-            "public_domain": {"help_text": "Flag indicating if the observation is in the public domain."},
-        }
-
+        
     def get_municipality_name(self, obj: Observation) -> str | None:
         """Retrieve the name of the municipality associated with the observation, if any."""
         return obj.municipality.name if obj.municipality else None

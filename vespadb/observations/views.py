@@ -17,6 +17,7 @@ from django.db.models import Model
 from csv import writer as _writer
 from django.db.models.query import QuerySet
 from django.contrib.gis.geos import Point
+from dateutil import parser
 
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.gis.db.models.functions import Transform
@@ -584,6 +585,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             
         valid_observations = []
         errors = []
+        current_time = now()
         
         for data_item in data:
             try:
@@ -606,14 +608,54 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 # Issue #297 - Handle record updates vs inserts
                 observation_id = data_item.pop('id', None)  # Remove id from data_item if it exists
                 
-                if observation_id is not None:  # Explicitly check for None to allow id=0
+                if observation_id is not None:  # Update existing record
                     try:
                         existing_obj = Observation.objects.get(id=observation_id)
                         logger.info(f"Updating existing observation with id {observation_id}")
-                        # Update only provided fields
+                        
+                        # Don't modify created_by and created_datetime for existing records
+                        data_item.pop('created_by', None)
+                        data_item.pop('created_datetime', None)
+                        
+                        # Set modified_by to import user and modified_datetime to current time
+                        data_item['modified_by'] = self.request.user
+                        data_item['modified_datetime'] = current_time
+
+                        # Issue #290 - Auto-determine province, municipality and anb
+                        # Handle coordinates for updates
+                        if 'longitude' in data_item and 'latitude' in data_item:
+                            try:
+                                long = float(data_item.pop('longitude'))
+                                lat = float(data_item.pop('latitude'))
+                                data_item['location'] = Point(long, lat, srid=4326)
+                                logger.info(f"Created point from coordinates: {long}, {lat}")
+                                
+                                # Determine municipality, province and anb status
+                                municipality = get_municipality_from_coordinates(long, lat)
+                                if municipality:
+                                    data_item['municipality'] = municipality.id
+                                    if municipality.province:
+                                        data_item['province'] = municipality.province.id
+                                data_item['anb'] = check_if_point_in_anb_area(long, lat)
+                                
+                                logger.info(f"Municipality ID: {data_item.get('municipality')}, Province ID: {data_item.get('province')}, ANB: {data_item['anb']}")
+                            except (ValueError, TypeError) as e:
+                                logger.error(f"Invalid coordinates: {e}")
+                                errors.append({"error": f"Invalid coordinates: {str(e)}"})
+                                continue
+
+                        # Issue #292 - Fix timezone handling for eradication_date
+                        if 'eradication_date' in data_item:
+                            date_str = data_item['eradication_date']
+                            if isinstance(date_str, str):
+                                try:
+                                    data_item['eradication_date'] = datetime.strptime(date_str, '%Y-%m-%d').date()
+                                except ValueError:
+                                    errors.append({"error": f"Invalid date format for eradication_date: {date_str}"})
+                                    continue
+
                         for key, value in data_item.items():
-                            if key != 'id':  # Don't update the ID
-                                setattr(existing_obj, key, value)
+                            setattr(existing_obj, key, value)
                         existing_obj.save()
                         valid_observations.append(existing_obj)
                         continue
@@ -621,52 +663,62 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                         logger.error(f"Observation with id {observation_id} not found")
                         errors.append({"error": f"Observation with id {observation_id} not found"})
                         continue
-
-                # Issue #290 - Auto-determine province, municipality and anb
-                # Handle coordinates for new records or updates
-                if 'longitude' in data_item and 'latitude' in data_item:
-                    try:
-                        long = float(data_item.pop('longitude'))
-                        lat = float(data_item.pop('latitude'))
-                        data_item['location'] = Point(long, lat, srid=4326)
-                        logger.info(f"Created point from coordinates: {long}, {lat}")
+                else:  # New record
+                    # Set created_by to import user
+                    data_item['created_by'] = self.request.user
+                    
+                    # Set created_datetime to provided value or current time
+                    if 'created_datetime' not in data_item:
+                        data_item['created_datetime'] = current_time
                         
-                        # Determine municipality, province and anb status
-                        municipality = get_municipality_from_coordinates(long, lat)
-                        if municipality:
-                            data_item['municipality'] = municipality.id
-                            if municipality.province:
-                                data_item['province'] = municipality.province.id
-                        data_item['anb'] = check_if_point_in_anb_area(long, lat)
-                        
-                        logger.info(f"Municipality ID: {data_item.get('municipality')}, Province ID: {data_item.get('province')}, ANB: {data_item['anb']}")
-                    except (ValueError, TypeError) as e:
-                        logger.error(f"Invalid coordinates: {e}")
-                        errors.append({"error": f"Invalid coordinates: {str(e)}"})
-                        continue
+                    # Always set modified_by and modified_datetime for new records
+                    data_item['modified_by'] = self.request.user
+                    data_item['modified_datetime'] = current_time
 
-                # Issue #292 - Fix timezone handling for eradication_date
-                if 'eradication_date' in data_item:
-                    date_str = data_item['eradication_date']
-                    if isinstance(date_str, str):
+                    # Handle coordinates for new records
+                    if 'longitude' in data_item and 'latitude' in data_item:
                         try:
-                            data_item['eradication_date'] = datetime.strptime(date_str, '%Y-%m-%d').date()
-                        except ValueError:
-                            errors.append({"error": f"Invalid date format for eradication_date: {date_str}"})
+                            long = float(data_item.pop('longitude'))
+                            lat = float(data_item.pop('latitude'))
+                            data_item['location'] = Point(long, lat, srid=4326)
+                            logger.info(f"Created point from coordinates: {long}, {lat}")
+                            
+                            # Determine municipality, province and anb status
+                            municipality = get_municipality_from_coordinates(long, lat)
+                            if municipality:
+                                data_item['municipality'] = municipality.id
+                                if municipality.province:
+                                    data_item['province'] = municipality.province.id
+                            data_item['anb'] = check_if_point_in_anb_area(long, lat)
+                            
+                            logger.info(f"Municipality ID: {data_item.get('municipality')}, Province ID: {data_item.get('province')}, ANB: {data_item['anb']}")
+                        except (ValueError, TypeError) as e:
+                            logger.error(f"Invalid coordinates: {e}")
+                            errors.append({"error": f"Invalid coordinates: {str(e)}"})
                             continue
 
-                cleaned_item = self.clean_data(data_item)
-                serializer = ObservationSerializer(data=cleaned_item)
-                if serializer.is_valid():
-                    valid_observations.append(serializer.validated_data)
-                else:
-                    errors.append(serializer.errors)
+                    # Issue #292 - Fix timezone handling for eradication_date
+                    if 'eradication_date' in data_item:
+                        date_str = data_item['eradication_date']
+                        if isinstance(date_str, str):
+                            try:
+                                data_item['eradication_date'] = datetime.strptime(date_str, '%Y-%m-%d').date()
+                            except ValueError:
+                                errors.append({"error": f"Invalid date format for eradication_date: {date_str}"})
+                                continue
+
+                    cleaned_item = self.clean_data(data_item)
+                    serializer = ObservationSerializer(data=cleaned_item)
+                    if serializer.is_valid():
+                        valid_observations.append(serializer.validated_data)
+                    else:
+                        errors.append(serializer.errors)
             except Exception as e:
                 logger.exception(f"Error processing data item: {data_item} - {e}")
                 errors.append({"error": str(e)})
                 
         return valid_observations, errors
-
+    
     def clean_data(self, data_dict: dict[str, Any]) -> dict[str, Any]:
         """Clean the incoming data and remove empty or None values."""
         logger.info("Original data item: %s", data_dict)
@@ -682,13 +734,15 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         ]
         for field in datetime_fields:
             if data_dict.get(field):
+                # Keep ISO format strings as-is
                 if isinstance(data_dict[field], str):
                     try:
-                        data_dict[field] = parse_and_convert_to_utc(data_dict[field]).isoformat()
+                        # Just validate the format but keep original value
+                        parser.parse(data_dict[field])
                     except (ValueError, TypeError):
                         logger.exception(f"Invalid datetime format for {field}: {data_dict[field]}")
                         data_dict.pop(field, None)
-                elif isinstance(data_dict[field], datetime.datetime):
+                elif isinstance(data_dict[field], datetime):
                     data_dict[field] = data_dict[field].isoformat()
                 else:
                     data_dict.pop(field, None)
@@ -699,7 +753,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             if not data_dict.get(field):
                 data_dict[field] = None
 
-        cleaned_data = {k: v for k, v in data_dict.items() if v not in [None, ""]}  # noqa: PLR6201
+        cleaned_data = {k: v for k, v in data_dict.items() if v not in [None, ""]}
         logger.info("Cleaned data item: %s", cleaned_data)
         return cleaned_data
 

@@ -6,10 +6,11 @@
         <div class="container mt-2">
             <text class="text-muted text-uppercase small">
                 Melding <span id="identifier">{{ selectedObservation.id }}</span>
-                <template v-if="selectedObservation.wn_id">
-                    (WAARNEMING
-                    <a :href="'https://waarnemingen.be/observation/' + selectedObservation.wn_id" target="_blank">{{
-                        selectedObservation.wn_id }}</a>)
+                <template v-if="sourceUrl">
+                    (<a :href="sourceUrl" target="_blank">{{ selectedObservation.source }}</a>)
+                </template>
+                <template v-else>
+                    {{ selectedObservation.source }}
                 </template>
             </text>
             <h3 class="mt-3 mb-3">
@@ -17,7 +18,6 @@
                     formatDate(selectedObservation.observation_datetime) : '' }}</span>,
                 <span id="municipality-name">{{ selectedObservation.municipality_name || '' }}</span>
             </h3>
-
             <div class="d-flex justify-content-between mb-3" id="reservation">
                 <button v-if="canReserve && isAuthorizedToReserve && !selectedObservation.reserved_by"
                     class="btn btn-sm btn-outline-primary" @click="reserveObservation">
@@ -392,6 +392,17 @@ export default {
         const errorMessage = ref('');
         const eradicationResultError = ref('');
         const editableObservation = ref({});
+        const sourceUrl = computed(() => {
+            if (!selectedObservation.value) return '';
+            const { source, source_id, wn_id } = selectedObservation.value;
+            if ((source === 'Vespa-Watch' || source === 'iNaturalist') && source_id) {
+                return `https://www.inaturalist.org/observations/${source_id}`;
+            }
+            if (source === 'Waarnemingen.be' && wn_id) {
+                return `https://waarnemingen.be/observation/${wn_id}`;
+            }
+            return '';
+        });
 
         const isAuthorizedToReserve = computed(() => {
             if (vespaStore.isAdmin) return true;
@@ -749,7 +760,8 @@ export default {
             errorMessage,
             eradicationResultError,
             canViewRestrictedFields,
-            validationStatusEnum
+            validationStatusEnum,
+            sourceUrl
         };
     }
 };

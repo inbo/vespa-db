@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
 from django.contrib.gis.geos import GEOSGeometry, Point
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from pytz import timezone
 from rest_framework import serializers
 from rest_framework.request import Request
@@ -127,70 +127,7 @@ class ObservationSerializer(serializers.ModelSerializer):
 
         model = Observation
         fields = "__all__"
-        extra_kwargs = {
-            "id": {"read_only": True, "help_text": "Unique ID for the observation."},
-            "wn_id": {
-                "required": False,
-                "allow_null": True,
-                "help_text": "Unique ID for the observation in the source system.",
-            },
-            "created_datetime": {"help_text": "Datetime when the observation was created."},
-            "modified_datetime": {"help_text": "Datetime when the observation was last modified."},
-            "location": {"help_text": "Geographical location of the observation as a point."},
-            "source": {"help_text": "Source of the observation."},
-            "notes": {"help_text": "Notes about the observation."},
-            "wn_admin_notes": {"write_only": True},
-            "wn_validation_status": {"help_text": "Validation status of the observation."},
-            "nest_height": {"help_text": "Height of the nest."},
-            "nest_size": {"help_text": "Size of the nest."},
-            "nest_location": {"help_text": "Location of the nest."},
-            "nest_type": {"help_text": "Type of the nest."},
-            "observer_phone_number": {"help_text": "Phone number of the observer."},
-            "observer_email": {"help_text": "Email of the observer."},
-            "observer_received_email": {"help_text": "Flag indicating if observer received email."},
-            "observer_name": {"help_text": "Name of the observer."},
-            "observation_datetime": {"help_text": "Datetime when the observation was made."},
-            "wn_cluster_id": {"required": False, "allow_null": True, "help_text": "Cluster ID of the observation."},
-            "admin_notes": {
-                "required": False,
-                "allow_blank": True,
-                "allow_null": True,
-                "help_text": "Admin notes for the observation.",
-            },
-            "wn_modified_datetime": {"help_text": "Datetime when the observation was modified in the source system."},
-            "wn_created_datetime": {"help_text": "Datetime when the observation was created in the source system."},
-            "visible": {"help_text": "Flag indicating if the observation is visible."},
-            "images": {
-                "required": False,
-                "allow_null": True,
-                "help_text": "List of images associated with the observation.",
-            },
-            "reserved_by": {"required": False, "allow_null": True, "help_text": "User who reserved the observation."},
-            "reserved_datetime": {"help_text": "Datetime when the observation was reserved."},
-            "eradication_date": {
-                "required": False,
-                "allow_null": True,
-                "help_text": "Date when the nest was eradicated.",
-            },
-            "eradicator_name": {"help_text": "Name of the person who eradicated the nest."},
-            "eradication_duration": {
-                "help_text": "Duration of the eradication in minutes",
-                "required": False,
-                "allow_null": True,
-            },
-            "eradication_persons": {"help_text": "Number of persons involved in the eradication."},
-            "eradication_result": {"help_text": "Result of the eradication."},
-            "eradication_product": {"help_text": "Product used for the eradication."},
-            "eradication_method": {"help_text": "Method used for the eradication."},
-            "eradication_aftercare": {"help_text": "Aftercare result of the eradication."},
-            "eradication_problems": {"help_text": "Problems encountered during the eradication."},
-            "eradication_notes": {"help_text": "Notes about the eradication."},
-            "municipality": {"help_text": "Municipality where the observation was made."},
-            "province": {"help_text": "Province where the observation was made."},
-            "anb": {"help_text": "Flag indicating if the observation is in ANB area."},
-            "public_domain": {"help_text": "Flag indicating if the observation is in the public domain."},
-        }
-
+        
     def get_municipality_name(self, obj: Observation) -> str | None:
         """Retrieve the name of the municipality associated with the observation, if any."""
         return obj.municipality.name if obj.municipality else None
@@ -307,6 +244,17 @@ class ObservationSerializer(serializers.ModelSerializer):
     def update(self, instance: Observation, validated_data: dict[Any, Any]) -> Observation:  # noqa: C901
         """Update method to handle observation reservations."""
         user = self.context["request"].user
+
+        # Check if someone is trying to update a nest reserved by another user
+        if instance.reserved_by and instance.reserved_by != user and not user.is_superuser:
+            raise serializers.ValidationError("You cannot edit an observation reserved by another user.")
+
+        # Only proceed if user has appropriate permissions
+        if not user.is_superuser:
+            user_municipality_ids = user.municipalities.values_list("id", flat=True)
+            if instance.municipality and instance.municipality.id not in user_municipality_ids:
+                raise PermissionDenied("You do not have permission to update nests in this municipality.")
+
         allowed_admin_fields = [
             "location",
             "nest_height",
@@ -377,9 +325,6 @@ class ObservationSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError(f"Field(s) {field}' can not be updated by non-admin users.")
 
         error_fields = []
-        # Check if 'species' is in validated_data and if it has changed
-        if "species" in validated_data and validated_data["species"] != instance.species:
-            error_fields.append("species")
 
         # Check if 'wn_cluster_id' is in validated_data and if it has changed
         if "wn_cluster_id" in validated_data and validated_data["wn_cluster_id"] != instance.wn_cluster_id:
@@ -390,21 +335,18 @@ class ObservationSerializer(serializers.ModelSerializer):
             error_message = f"Following field(s) cannot be updated by any user: {', '.join(error_fields)}"
             raise serializers.ValidationError(error_message)
 
-        # Conditionally set `reserved_by` and `reserved_datetime` for all users
-        if "reserved_by" in validated_data and instance.reserved_by is None:
-            validated_data["reserved_datetime"] = (
-                datetime.now(timezone("EST")) if validated_data["reserved_by"] else None
-            )
-            instance.reserved_by = user
-
-        # Prevent non-admin users from updating observations reserved by others
-        if not user.is_superuser and instance.reserved_by and instance.reserved_by != user:
-            raise serializers.ValidationError("You cannot edit an observation reserved by another user.")
+        # Conditionally set `reserved_by` and `reserved_datetime`
+        if "reserved_by" in validated_data:
+            if validated_data["reserved_by"] is not None:
+                validated_data["reserved_datetime"] = datetime.now(timezone("EST"))
+            else:
+                validated_data["reserved_datetime"] = None
 
         for field in set(validated_data) - set(allowed_admin_fields):
             validated_data.pop(field)
         instance = super().update(instance, validated_data)
         return instance
+    
     def to_internal_value(self, data: dict[str, Any]) -> dict[str, Any]:
         """Convert the incoming data to a Python native representation."""
         logger.info("Raw input data: %s", data)

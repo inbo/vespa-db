@@ -7,7 +7,7 @@ import logging
 from typing import Dict, Any, Optional, Set
 from vespadb.users.models import VespaUser as User
 from vespadb.observations.models import Export
-from .export_utils import CSV_HEADERS, prepare_row_data
+from .export_utils import PUBLIC_FIELDS, prepare_row_data
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ def generate_export(export_id: int, filters: Dict[str, Any], user_id: Optional[i
         # Process in batches
         batch_size = 1000
         processed = 0
-        rows = [CSV_HEADERS]  # Start with headers
+        rows = [PUBLIC_FIELDS]  # Start with headers
         
         # Get user permissions
         is_admin = False

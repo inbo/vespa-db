@@ -649,7 +649,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                             date_str = data_item['eradication_date']
                             if isinstance(date_str, str):
                                 try:
-                                    data_item['eradication_date'] = datetime.strptime(date_str, '%Y-%m-%d').date()
+                                    data_item['eradication_date'] = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
                                 except ValueError:
                                     errors.append({"error": f"Invalid date format for eradication_date: {date_str}"})
                                     continue
@@ -702,7 +702,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                         date_str = data_item['eradication_date']
                         if isinstance(date_str, str):
                             try:
-                                data_item['eradication_date'] = datetime.strptime(date_str, '%Y-%m-%d').date()
+                                data_item['eradication_date'] = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
                             except ValueError:
                                 errors.append({"error": f"Invalid date format for eradication_date: {date_str}"})
                                 continue
@@ -757,16 +757,21 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         logger.info("Cleaned data item: %s", cleaned_data)
         return cleaned_data
 
-    def save_observations(self, valid_data: list[dict[str, Any]]) -> Response:
+    def save_observations(self, valid_data: list[Union[dict[str, Any], Observation]]) -> Response:
         """Save the valid observations to the database."""
         try:
             logger.info(f"Saving {len(valid_data)} valid observations")
             with transaction.atomic():
                 created_count = 0
                 for data in valid_data:
-                    obs = Observation(**data)
-                    obs.save()  # This ensures the save() method in the model is called
+                    if isinstance(data, Observation):
+                        # If it's already an Observation instance, just save it
+                        data.save()
+                    else:
+                        # If it's a dictionary, create a new Observation instance
+                        obs = Observation.objects.create(**data)
                     created_count += 1
+            
             invalidate_geojson_cache()
             return Response(
                 {"message": f"Successfully imported {created_count} observations."},

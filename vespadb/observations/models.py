@@ -395,6 +395,9 @@ class Observation(models.Model):
             logger.info(f"Save method for observation {self.id if self.id else 'new'}: Setting municipality={self.municipality}, province={self.province}, anb={self.anb}")
 
         super().save(*args, **kwargs)
+    
+    class Meta:
+        ordering = ['id']
 
 class Export(models.Model):
     """Model for tracking observation exports."""

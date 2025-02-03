@@ -154,6 +154,8 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         Unauthenticated users see only unreserved observations.
         """
         base_queryset = super().get_queryset()
+        if not self.request.query_params.get("ordering"):
+            base_queryset = base_queryset.order_by("id")
         order_params = self.request.query_params.get("ordering", "")
 
         if "municipality_name" in order_params:
@@ -404,7 +406,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             if bbox:
                 queryset = queryset.filter(location__within=bbox)
 
-            queryset = queryset.annotate(point=Transform("location", 4326))
+            queryset = queryset.order_by("id").annotate(point=Transform("location", 4326))
 
             features = [
                 {

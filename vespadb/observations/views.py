@@ -368,7 +368,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         },
     )
     @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
-    @action(detail=False, methods=["get"], url_path="dynamic-geojson")
+    @action(detail=False, methods=["get"], url_path="dynamic-geojson", permission_classes=[AllowAny])
     def geojson(self, request: Request) -> HttpResponse:
         """Generate GeoJSON data for the observations."""
         try:
@@ -382,50 +382,59 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             cached_data = cache.get(cache_key)
             if cached_data:
                 logger.info("Cache hit - Returning cached response")
-                return JsonResponse(cached_data, safe=False)
-
-            bbox_str = request.GET.get("bbox")
-            if bbox_str:
-                try:
-                    bbox_coords = list(map(float, bbox_str.split(",")))
-                    if len(bbox_coords) == BBOX_LENGTH:
-                        xmin, ymin, xmax, ymax = bbox_coords
-                        bbox_wkt = (
-                            f"POLYGON(({xmin} {ymin}, {xmin} {ymax}, {xmax} {ymax}, {xmax} {ymin}, {xmin} {ymin}))"
-                        )
-                        bbox = GEOSGeometry(bbox_wkt, srid=4326)
-                    else:
-                        return HttpResponse("Invalid bbox format", status=status.HTTP_400_BAD_REQUEST)
-                except ValueError:
-                    return HttpResponse("Invalid bbox values", status=status.HTTP_400_BAD_REQUEST)
+                response = JsonResponse(cached_data, safe=False)
             else:
-                bbox = None
+                bbox_str = request.GET.get("bbox")
+                if bbox_str:
+                    try:
+                        bbox_coords = list(map(float, bbox_str.split(",")))
+                        if len(bbox_coords) == BBOX_LENGTH:
+                            xmin, ymin, xmax, ymax = bbox_coords
+                            bbox_wkt = (
+                                f"POLYGON(({xmin} {ymin}, {xmin} {ymax}, {xmax} {ymax}, {xmax} {ymin}, {xmin} {ymin}))"
+                            )
+                            bbox = GEOSGeometry(bbox_wkt, srid=4326)
+                        else:
+                            return HttpResponse("Invalid bbox format", status=status.HTTP_400_BAD_REQUEST)
+                    except ValueError:
+                        return HttpResponse("Invalid bbox values", status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    bbox = None
 
-            queryset = self.filter_queryset(self.get_queryset())
+                queryset = self.filter_queryset(self.get_queryset())
 
-            if bbox:
-                queryset = queryset.filter(location__within=bbox)
+                if bbox:
+                    queryset = queryset.filter(location__within=bbox)
 
-            queryset = queryset.order_by("id").annotate(point=Transform("location", 4326))
+                queryset = queryset.order_by("id").annotate(point=Transform("location", 4326))
 
-            features = [
-                {
-                    "type": "Feature",
-                    "properties": {
-                        "id": obs.id,
-                        "status": "eradicated"
-                        if obs.eradication_result is not None
-                        else "reserved"
-                        if obs.reserved_by
-                        else "default",
-                    },
-                    "geometry": json.loads(obs.location.geojson) if obs.location else None,
-                }
-                for obs in queryset
-            ]
-            geojson_response = {"type": "FeatureCollection", "features": features}
-            cache.set(cache_key, geojson_response, GEOJSON_REDIS_CACHE_EXPIRATION)
-            return JsonResponse(geojson_response)
+                features = [
+                    {
+                        "type": "Feature",
+                        "properties": {
+                            "id": obs.id,
+                            "status": "eradicated"
+                            if obs.eradication_result is not None
+                            else "reserved"
+                            if obs.reserved_by
+                            else "default",
+                        },
+                        "geometry": json.loads(obs.location.geojson) if obs.location else None,
+                    }
+                    for obs in queryset
+                ]
+                geojson_response = {"type": "FeatureCollection", "features": features}
+                cache.set(cache_key, geojson_response, GEOJSON_REDIS_CACHE_EXPIRATION)
+                response = JsonResponse(geojson_response)
+
+            # Add CORS headers manually
+            response["Access-Control-Allow-Origin"] = request.META.get('HTTP_ORIGIN', '*')
+            response["Access-Control-Allow-Credentials"] = "true"
+            response["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+            response["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+
+            return response
+
         except Exception:
             logger.exception("An error occurred while generating GeoJSON data")
             return HttpResponse(

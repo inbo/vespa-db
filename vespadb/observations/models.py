@@ -233,7 +233,6 @@ class Observation(models.Model):
         help_text="Validation status of the observation",
     )
 
-    species = models.IntegerField(help_text="Species of the observed nest", blank=True, null=True)
     nest_height = models.CharField(
         max_length=50, choices=NestHeightEnum.choices, blank=True, null=True, help_text="Height of the nest"
     )
@@ -374,21 +373,31 @@ class Observation(models.Model):
         :param args: Variable length argument list.
         :param kwargs: Arbitrary keyword arguments.
         """
-        # Only compute the municipality if the location is set and the municipality is not
-        if self.location:
-            # Ensure self.location is a Point instance
+        logger.info(f"Save method called for observation {self.id if self.id else 'new'}")
+        
+        # Issue #290 - Automatically determine municipality, province and anb
+        if self.location and not (self.municipality and self.province and self.anb is not None):
             if not isinstance(self.location, Point):
                 self.location = Point(self.location)
 
             long = self.location.x
             lat = self.location.y
 
-            self.anb = check_if_point_in_anb_area(long, lat)
-            municipality = get_municipality_from_coordinates(long, lat)
-            self.municipality = municipality
-            self.province = municipality.province if municipality else None
+            if self.anb is None:
+                self.anb = check_if_point_in_anb_area(long, lat)
+                
+            if not self.municipality:
+                municipality = get_municipality_from_coordinates(long, lat)
+                self.municipality = municipality
+                if municipality and not self.province:
+                    self.province = municipality.province
+
+            logger.info(f"Save method for observation {self.id if self.id else 'new'}: Setting municipality={self.municipality}, province={self.province}, anb={self.anb}")
 
         super().save(*args, **kwargs)
+    
+    class Meta:
+        ordering = ['id']
 
 class Export(models.Model):
     """Model for tracking observation exports."""

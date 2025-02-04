@@ -101,7 +101,7 @@ export const useVespaStore = defineStore('vespaStore', {
             }
 
             try {
-                const response = await ApiService.get(`/observations/dynamic-geojson?${filterQuery}`);
+                const response = await ApiService.get(`/observations/dynamic-geojson/?${filterQuery}`);
                 if (response.status === 200) {
                     this.observations = response.data.features;
                     this.setLastAppliedFilters();
@@ -505,6 +505,8 @@ export const useVespaStore = defineStore('vespaStore', {
                 return '#198754';
             } else if (status === 'reserved') {
                 return '#ea792a';
+            } else if (status === 'untreatable') {
+                return '#198754';
             }
             return '#212529';
         },

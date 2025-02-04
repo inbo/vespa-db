@@ -33,6 +33,7 @@ echo "Load waarnemingen observation data via: python manage.py load_waarnemingen
 
 # Start Gunicorn
 echo "Starting Gunicorn..."
+echo "Starting Gunicorn..."
 gunicorn --workers 3 \
          --worker-class gthread \
          --threads 4 \

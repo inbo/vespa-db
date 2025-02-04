@@ -6,10 +6,11 @@
         <div class="container mt-2">
             <text class="text-muted text-uppercase small">
                 Melding <span id="identifier">{{ selectedObservation.id }}</span>
-                <template v-if="selectedObservation.wn_id">
-                    (WAARNEMING
-                    <a :href="'https://waarnemingen.be/observation/' + selectedObservation.wn_id" target="_blank">{{
-                        selectedObservation.wn_id }}</a>)
+                <template v-if="sourceUrl">
+                    (<a :href="sourceUrl" target="_blank">{{ selectedObservation.source }}</a>)
+                </template>
+                <template v-else>
+                    {{ selectedObservation.source }}
                 </template>
             </text>
             <h3 class="mt-3 mb-3">
@@ -17,7 +18,6 @@
                     formatDate(selectedObservation.observation_datetime) : '' }}</span>,
                 <span id="municipality-name">{{ selectedObservation.municipality_name || '' }}</span>
             </h3>
-
             <div class="d-flex justify-content-between mb-3" id="reservation">
                 <button v-if="canReserve && isAuthorizedToReserve && !selectedObservation.reserved_by"
                     class="btn btn-sm btn-outline-primary" @click="reserveObservation">
@@ -209,8 +209,7 @@
                                 <label class="col-4 col-form-label">Type</label>
                                 <div class="col-8">
                                     <p class="form-control-plaintext">
-                                        {{ selectedObservation.nest_type ? nestTypeEnum[selectedObservation.nest_type] :
-                                        'Geen' }}
+                                        {{ selectedObservation.nest_type ? nestTypeEnum[selectedObservation.nest_type] : 'Geen' }}
                                     </p>
                                 </div>
                             </div>
@@ -218,9 +217,7 @@
                                 <label class="col-4 col-form-label">Locatie</label>
                                 <div class="col-8">
                                     <p class="form-control-plaintext">
-                                        {{ selectedObservation.nest_location ?
-                                            nestLocationEnum[selectedObservation.nest_location] :
-                                        'Geen' }}
+                                        {{ selectedObservation.nest_location ? nestLocationEnum[selectedObservation.nest_location] : 'Geen' }}
                                     </p>
                                 </div>
                             </div>
@@ -228,8 +225,7 @@
                                 <label class="col-4 col-form-label">Grootte</label>
                                 <div class="col-8">
                                     <p class="form-control-plaintext">
-                                        {{ selectedObservation.nest_size ? nestSizeEnum[selectedObservation.nest_size] :
-                                        'Geen' }}
+                                        {{ selectedObservation.nest_size ? nestSizeEnum[selectedObservation.nest_size] : 'Geen' }}
                                     </p>
                                 </div>
                             </div>
@@ -237,9 +233,7 @@
                                 <label class="col-4 col-form-label">Hoogte</label>
                                 <div class="col-8">
                                     <p class="form-control-plaintext">
-                                        {{ selectedObservation.nest_height ?
-                                            nestHeightEnum[selectedObservation.nest_height] :
-                                        'Geen' }}
+                                        {{ selectedObservation.nest_height ? nestHeightEnum[selectedObservation.nest_height] : 'Geen' }}
                                     </p>
                                 </div>
                             </div>
@@ -259,8 +253,7 @@
                                     <label class="col-4 col-form-label">Validatie</label>
                                     <div class="col-8">
                                         <p class="form-control-plaintext">
-                                            {{ validationStatusEnum[selectedObservation.wn_validation_status] || "Geen"
-                                            }}
+                                            {{ validationStatusEnum[selectedObservation.wn_validation_status] || "Geen" }}
                                         </p>
                                     </div>
                                 </div>
@@ -277,8 +270,7 @@
                                         <input v-if="selectedObservation.public_domain !== undefined"
                                             v-model="editableObservation.public_domain" class="form-check-input"
                                             type="checkbox" id="public-domain" :disabled="!canViewRestrictedFields" />
-                                        <label class="form-check-label" for="public-domain">Nest op publiek
-                                            terrein</label>
+                                        <label class="form-check-label" for="public-domain">Nest op publiek terrein</label>
                                     </div>
                                 </div>
                             </div>
@@ -400,6 +392,17 @@ export default {
         const errorMessage = ref('');
         const eradicationResultError = ref('');
         const editableObservation = ref({});
+        const sourceUrl = computed(() => {
+            if (!selectedObservation.value) return '';
+            const { source, source_id, wn_id } = selectedObservation.value;
+            if ((source === 'Vespa-Watch' || source === 'iNaturalist') && source_id) {
+                return `https://www.inaturalist.org/observations/${source_id}`;
+            }
+            if (source === 'Waarnemingen.be' && wn_id) {
+                return `https://waarnemingen.be/observation/${wn_id}`;
+            }
+            return '';
+        });
 
         const isAuthorizedToReserve = computed(() => {
             if (vespaStore.isAdmin) return true;
@@ -476,7 +479,7 @@ export default {
 
         const eradicationAfterCareEnum = {
             "nest_volledig_verwijderd": "Nest volledig verwijderd",
-            "nest_gedeeltelijk verwijderd": "Nest gedeeltelijk verwijderd",
+            "nest_gedeeltelijk_verwijderd": "Nest gedeeltelijk verwijderd",
             "nest_laten_hangen": "Nest laten hangen"
         };
 
@@ -757,7 +760,8 @@ export default {
             errorMessage,
             eradicationResultError,
             canViewRestrictedFields,
-            validationStatusEnum
+            validationStatusEnum,
+            sourceUrl
         };
     }
 };

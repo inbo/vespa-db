@@ -10,10 +10,18 @@ from rest_framework.permissions import AllowAny, BasePermission, IsAdminUser
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.authtoken.models import Token
+
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 
 from vespadb.permissions import IsAdminOrSelf
 from vespadb.users.models import VespaUser as User
-from vespadb.users.serializers import ChangePasswordSerializer, LoginSerializer, UserSerializer
+from vespadb.users.serializers import (
+    ChangePasswordSerializer,
+    LoginSerializer,
+    UserSerializer,
+)
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -77,26 +85,42 @@ class LoginView(APIView):
     authentication_classes: Sequence[type[BaseAuthentication]] = []
     permission_classes = [permissions.AllowAny]
 
+    @swagger_auto_schema(
+        operation_summary="User Login",
+        operation_description="Authenticate a user by username and password, log them in and return a bearer token.",
+        request_body=LoginSerializer,
+        responses={
+            200: openapi.Response(
+                description="Login successful",
+                examples={
+                    "application/json": {
+                        "detail": "Login successful.",
+                        "token": "0123456789abcdef0123456789abcdef01234567"
+                    }
+                },
+            ),
+            400: "Bad Request",
+        },
+    )
     def post(self, request: Request) -> Response:
-        """
-        Authenticate a user based on username and password.
-
-        Args:
-            request (Request): The HTTP request object.
-
-        Returns
-        -------
-            Response: Status indicating the success or failure of the login attempt.
-        """
-        serializer = LoginSerializer(data=request.data)
-
-        if serializer.is_valid():
-            user = serializer.validated_data
-            login(request, user)
-            return Response({"detail": "Login successful."}, status=status.HTTP_200_OK)
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+            """
+            Authenticate a user based on username and password, log them in and return a bearer token.
+            """
+            serializer = LoginSerializer(data=request.data)
+            if serializer.is_valid():
+                user = serializer.validated_data
+                login(request, user)
+                # Create or retrieve the token for the user
+                token, _ = Token.objects.get_or_create(user=user)
+                return Response(
+                    {
+                        "detail": "Login successful.",
+                        "token": token.key,
+                    },
+                    status=status.HTTP_200_OK,
+                )
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
 
 class LogoutView(APIView):
     """API view for user logout."""

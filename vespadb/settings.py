@@ -20,8 +20,8 @@ load_dotenv()
 
 secrets = {
     "DJANGO_SECRET_KEY": os.getenv("SECRET_KEY"),
-    "CORS_ALLOWED_ORIGINS": os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000").split(",") + ["https://nesten.vespawatch.be", "https://uat-nesten.vespawatch.be", "https://db.vespawatch.be","https://uat-db.vespawatch.be",],
-    "CSRF_TRUSTED_ORIGINS": os.getenv("CSRF_TRUSTED_ORIGINS", "http://localhost:3000").split(",") + ["https://nesten.vespawatch.be", "https://uat-nesten.vespawatch.be", "https://db.vespawatch.be","https://uat-db.vespawatch.be",],
+    "CORS_ALLOWED_ORIGINS": os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000").split(",") + ["https://nesten.vespawatch.be", "https://uat-nesten.vespawatch.be","https://db.vespawatch.be","https://uat-db.vespawatch.be",],
+    "CSRF_TRUSTED_ORIGINS": os.getenv("CSRF_TRUSTED_ORIGINS", "http://localhost:3000").split(",") + ["https://nesten.vespawatch.be", "https://uat-nesten.vespawatch.be","https://db.vespawatch.be","https://uat-db.vespawatch.be",],
     "CSRF_COOKIE_DOMAIN": os.getenv("CSRF_COOKIE_DOMAIN", ".vespawatch.be"),
     "SESSION_COOKIE_DOMAIN": os.getenv("SESSION_COOKIE_DOMAIN", ".vespawatch.be"),
     "POSTGRES_DB": os.getenv("POSTGRES_DB"),

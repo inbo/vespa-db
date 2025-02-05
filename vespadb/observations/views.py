@@ -428,7 +428,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 response = JsonResponse(geojson_response)
 
             # Add CORS headers manually
-            response["Access-Control-Allow-Origin"] = request.META.get('HTTP_ORIGIN', '*')
+            response["Access-Control-Allow-Origin"] = "*"
             response["Access-Control-Allow-Credentials"] = "true"
             response["Access-Control-Allow-Methods"] = "GET, OPTIONS"
             response["Access-Control-Allow-Headers"] = "Content-Type, Authorization"

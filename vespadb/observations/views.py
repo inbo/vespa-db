@@ -406,7 +406,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             if bbox:
                 queryset = queryset.filter(location__within=bbox)
 
-            queryset = queryset.order_by("id").annotate(point=Transform("location", 4326))
+            queryset = queryset.annotate(point=Transform("location", 4326))
 
             features = [
                 {

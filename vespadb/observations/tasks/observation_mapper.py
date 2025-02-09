@@ -286,9 +286,13 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
             eradication_flagged = True
             break
 
-    if eradication_flagged and not check_existing_eradication_date(external_data["id"]):
+    if eradication_flagged:
         mapped_data["eradication_date"] = observation_datetime_utc.date()
         mapped_data["eradicator_name"] = "Gemeld als bestreden"
+
+        # Ensure eradication_result is also set if it's missing
+        if "eradication_result" not in mapped_data or not mapped_data["eradication_result"]:
+            mapped_data["eradication_result"] = "eradicated"
 
     return mapped_data
 

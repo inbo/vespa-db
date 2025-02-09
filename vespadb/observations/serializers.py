@@ -245,10 +245,6 @@ class ObservationSerializer(serializers.ModelSerializer):
         """Update method to handle observation reservations."""
         user = self.context["request"].user
 
-        # Check if someone is trying to update a nest reserved by another user
-        if instance.reserved_by and instance.reserved_by != user and not user.is_superuser:
-            raise serializers.ValidationError("You cannot edit an observation reserved by another user.")
-
         # Only proceed if user has appropriate permissions
         if not user.is_superuser:
             user_municipality_ids = user.municipalities.values_list("id", flat=True)

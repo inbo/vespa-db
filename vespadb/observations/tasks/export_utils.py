@@ -11,10 +11,29 @@ class WriterProtocol(Protocol):
     def writerow(self, row: List[str]) -> Any: ...
 
 PUBLIC_FIELDS = [
-    "id", "created_datetime", "latitude", "longitude", "source",
-    "nest_height", "nest_size", "nest_location", "nest_type",
-    "observation_datetime", "province", "municipality", "nest_status",
-    "source_id", "anb_domain"
+    "id",
+    "observation_datetime",
+    "latitude",
+    "longitude",
+    "province",
+    "municipality",
+    "anb_domain",
+    "nest_status",
+    "eradication_date",
+    "eradication_result",
+    "images",
+    "nest_type",
+    "nest_location",
+    "nest_height",
+    "nest_size",
+    "notes",
+    "source",
+    "source_id",
+    "wn_id",
+    "wn_validation_status",
+    "wn_cluster_id",
+    "created_datetime",
+    "modified_datetime",
 ]
 
 def get_status(observation: Observation) -> str:
@@ -30,19 +49,10 @@ def prepare_row_data(
     is_admin: bool,
     user_municipality_ids: Set[str]
 ) -> List[str]:
-    """
-    Prepare a single row of data for the CSV export with error handling.
-    """
     try:
-        allowed_fields = PUBLIC_FIELDS 
-        
         row_data: List[str] = []
         for field in PUBLIC_FIELDS:
             try:
-                if field not in allowed_fields:
-                    row_data.append("")
-                    continue
-
                 if field == "latitude":
                     row_data.append(str(observation.location.y) if observation.location else "")
                 elif field == "longitude":
@@ -60,18 +70,38 @@ def prepare_row_data(
                     row_data.append(observation.municipality.name if observation.municipality else "")
                 elif field == "nest_status":
                     row_data.append(get_status(observation))
+                elif field == "eradication_date":
+                    date_val = getattr(observation, "eradication_date", None)
+                    row_data.append(date_val.isoformat() if date_val else "")
+                elif field == "eradication_result":
+                    value = getattr(observation, "eradication_result", "")
+                    row_data.append(str(value) if value is not None else "")
+                elif field == "images":
+                    value = getattr(observation, "images", "")
+                    row_data.append(str(value) if value is not None else "")
+                elif field == "notes":
+                    value = getattr(observation, "notes", "")
+                    row_data.append(str(value) if value is not None else "")
+                elif field == "wn_id":
+                    value = getattr(observation, "wn_id", "")
+                    row_data.append(str(value) if value is not None else "")
+                elif field == "wn_validation_status":
+                    value = getattr(observation, "wn_validation_status", "")
+                    row_data.append(str(value) if value is not None else "")
+                elif field == "wn_cluster_id":
+                    value = getattr(observation, "wn_cluster_id", "")
+                    row_data.append(str(value) if value is not None else "")
                 else:
                     value = getattr(observation, field, "")
                     row_data.append(str(value) if value is not None else "")
             except Exception as e:
                 logger.warning(f"Error processing field {field}: {str(e)}")
                 row_data.append("")
-                
         return row_data
     except Exception as e:
         logger.error(f"Error preparing row data: {str(e)}")
         return [""] * len(PUBLIC_FIELDS)
-
+    
 def generate_rows(
     queryset: QuerySet[Model],
     writer: WriterProtocol,

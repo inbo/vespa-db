@@ -60,6 +60,7 @@ def prepare_row_data(
                 elif field in ["created_datetime", "modified_datetime", "observation_datetime"]:
                     datetime_val = getattr(observation, field, None)
                     if datetime_val:
+                        # Remove microseconds and tzinfo for export consistency
                         datetime_val = datetime_val.replace(microsecond=0, tzinfo=None)
                         row_data.append(datetime_val.strftime("%Y-%m-%dT%H:%M:%SZ"))
                     else:
@@ -77,8 +78,32 @@ def prepare_row_data(
                     value = getattr(observation, "eradication_result", "")
                     row_data.append(str(value) if value is not None else "")
                 elif field == "images":
-                    value = getattr(observation, "images", "")
-                    row_data.append(str(value) if value is not None else "")
+                    value = getattr(observation, "images", [])
+                    if isinstance(value, list):
+                        if not value:
+                            row_data.append("")
+                        elif len(value) == 1:
+                            # One image → export URL without quotes
+                            row_data.append(value[0])
+                        else:
+                            # Multiple images → join with commas (no spaces) and enclose in double quotes
+                            joined = ",".join(value)
+                            row_data.append(f'"{joined}"')
+                    else:
+                        # In case the field is stored as a string that looks like a list
+                        s = str(value)
+                        if s.startswith("[") and s.endswith("]"):
+                            s = s[1:-1].strip()
+                            parts = [part.strip().strip("'").strip('"') for part in s.split(",") if part.strip()]
+                            if not parts:
+                                row_data.append("")
+                            elif len(parts) == 1:
+                                row_data.append(parts[0])
+                            else:
+                                joined = ",".join(parts)
+                                row_data.append(f'"{joined}"')
+                        else:
+                            row_data.append(s)
                 elif field == "notes":
                     value = getattr(observation, "notes", "")
                     row_data.append(str(value) if value is not None else "")

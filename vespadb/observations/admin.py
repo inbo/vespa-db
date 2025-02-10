@@ -10,6 +10,7 @@ from django.contrib.admin import SimpleListFilter
 from django.contrib.gis import admin as gis_admin
 from django.core.mail import send_mail
 from django.db.models import Q
+from django.contrib.gis.geos import GEOSGeometry, Point
 from django.db.models.query import QuerySet
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
@@ -182,13 +183,14 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
 
         # Auto-edit based on location
         if obj.location:
+            if not isinstance(obj.location, Point):
+                obj.location = GEOSGeometry(obj.location, srid=4326)
             point = obj.location.transform(4326, clone=True)
             long, lat = point.x, point.y
             obj.anb = check_if_point_in_anb_area(long, lat)
             municipality = get_municipality_from_coordinates(long, lat)
             obj.municipality = municipality
             obj.province = municipality.province if municipality else None
-
         if not obj.source:
             obj.source = "Waarnemingen.be"
 
@@ -273,8 +275,9 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         # Initialize the viewset with the new request
         viewset = ObservationsViewSet.as_view({"post": "bulk_import"})
         response = viewset(api_request)
-        if response.status_code == 201:  # noqa: PLR2004
-            self.message_user(request, "Observations imported successfully.")
+        if response.status_code == 201:
+            imported_ids = response.data.get("observation_ids", [])
+            self.message_user(request, f"Observations imported successfully. IDs: {imported_ids}")
         else:
             self.message_user(request, f"Failed to import observations: {response.data}", level="error")
         return redirect("admin:observations_observation_changelist")

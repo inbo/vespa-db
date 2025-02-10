@@ -583,11 +583,11 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         errors = []
         current_time = now()
         
-        for data_item in data:
+        for idx, data_item in enumerate(data, start=1):
             try:
-                logger.info(f"Processing data item: {data_item}")
+                logger.info(f"Processing record #{idx}: {data_item}")
                 
-                # Issue #294 - Only allow specific fields in import
+                # Only allow specific fields in import
                 allowed_fields = {
                     'id', 'source_id', 'observation_datetime', 'eradication_problems',
                     'source', 'eradication_notes', 'images', 'created_datetime',
@@ -598,27 +598,23 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                     'nest_height', 'eradication_result', 'notes', 'admin_notes'
                 }
                 
-                # Filter out non-allowed fields
                 data_item = {k: v for k, v in data_item.items() if k in allowed_fields}
                 
-                # Issue #297 - Handle record updates vs inserts
-                observation_id = data_item.pop('id', None)  # Remove id from data_item if it exists
+                # Handle record updates vs inserts
+                observation_id = data_item.pop('id', None)
                 
                 if observation_id is not None:  # Update existing record
                     try:
                         existing_obj = Observation.objects.get(id=observation_id)
-                        logger.info(f"Updating existing observation with id {observation_id}")
+                        logger.info(f"Updating observation #{observation_id}")
                         
-                        # Don't modify created_by and created_datetime for existing records
+                        # Remove created_by/created_datetime for updates
                         data_item.pop('created_by', None)
                         data_item.pop('created_datetime', None)
                         
-                        # Set modified_by to import user and modified_datetime to current time
                         data_item['modified_by'] = self.request.user
                         data_item['modified_datetime'] = current_time
 
-                        # Issue #290 - Auto-determine province, municipality and anb
-                        # Handle coordinates for updates
                         if 'longitude' in data_item and 'latitude' in data_item:
                             try:
                                 long = float(data_item.pop('longitude'))
@@ -626,28 +622,24 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                                 data_item['location'] = Point(long, lat, srid=4326)
                                 logger.info(f"Created point from coordinates: {long}, {lat}")
                                 
-                                # Determine municipality, province and anb status
                                 municipality = get_municipality_from_coordinates(long, lat)
                                 if municipality:
                                     data_item['municipality'] = municipality.id
                                     if municipality.province:
                                         data_item['province'] = municipality.province.id
                                 data_item['anb'] = check_if_point_in_anb_area(long, lat)
-                                
-                                logger.info(f"Municipality ID: {data_item.get('municipality')}, Province ID: {data_item.get('province')}, ANB: {data_item['anb']}")
                             except (ValueError, TypeError) as e:
-                                logger.error(f"Invalid coordinates: {e}")
-                                errors.append({"error": f"Invalid coordinates: {str(e)}"})
+                                logger.error(f"Record #{idx}: Invalid coordinates: {e}")
+                                errors.append({"record": idx, "error": f"Invalid coordinates: {str(e)}"})
                                 continue
 
-                        # Issue #292 - Fix timezone handling for eradication_date
                         if 'eradication_date' in data_item:
                             date_str = data_item['eradication_date']
                             if isinstance(date_str, str):
                                 try:
                                     data_item['eradication_date'] = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
                                 except ValueError:
-                                    errors.append({"error": f"Invalid date format for eradication_date: {date_str}"})
+                                    errors.append({"record": idx, "error": f"Invalid date format for eradication_date: {date_str}"})
                                     continue
 
                         for key, value in data_item.items():
@@ -656,22 +648,16 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                         valid_observations.append(existing_obj)
                         continue
                     except Observation.DoesNotExist:
-                        logger.error(f"Observation with id {observation_id} not found")
-                        errors.append({"error": f"Observation with id {observation_id} not found"})
+                        logger.error(f"Record #{idx}: Observation with id {observation_id} not found")
+                        errors.append({"record": idx, "error": f"Observation with id {observation_id} not found"})
                         continue
                 else:  # New record
-                    # Set created_by to import user
                     data_item['created_by'] = self.request.user
-                    
-                    # Set created_datetime to provided value or current time
                     if 'created_datetime' not in data_item:
                         data_item['created_datetime'] = current_time
-                        
-                    # Always set modified_by and modified_datetime for new records
                     data_item['modified_by'] = self.request.user
                     data_item['modified_datetime'] = current_time
 
-                    # Handle coordinates for new records
                     if 'longitude' in data_item and 'latitude' in data_item:
                         try:
                             long = float(data_item.pop('longitude'))
@@ -679,28 +665,24 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                             data_item['location'] = Point(long, lat, srid=4326)
                             logger.info(f"Created point from coordinates: {long}, {lat}")
                             
-                            # Determine municipality, province and anb status
                             municipality = get_municipality_from_coordinates(long, lat)
                             if municipality:
                                 data_item['municipality'] = municipality.id
                                 if municipality.province:
                                     data_item['province'] = municipality.province.id
                             data_item['anb'] = check_if_point_in_anb_area(long, lat)
-                            
-                            logger.info(f"Municipality ID: {data_item.get('municipality')}, Province ID: {data_item.get('province')}, ANB: {data_item['anb']}")
                         except (ValueError, TypeError) as e:
-                            logger.error(f"Invalid coordinates: {e}")
-                            errors.append({"error": f"Invalid coordinates: {str(e)}"})
+                            logger.error(f"Record #{idx}: Invalid coordinates: {e}")
+                            errors.append({"record": idx, "error": f"Invalid coordinates: {str(e)}"})
                             continue
 
-                    # Issue #292 - Fix timezone handling for eradication_date
                     if 'eradication_date' in data_item:
                         date_str = data_item['eradication_date']
                         if isinstance(date_str, str):
                             try:
                                 data_item['eradication_date'] = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
                             except ValueError:
-                                errors.append({"error": f"Invalid date format for eradication_date: {date_str}"})
+                                errors.append({"record": idx, "error": f"Invalid date format for eradication_date: {date_str}"})
                                 continue
 
                     cleaned_item = self.clean_data(data_item)
@@ -708,13 +690,12 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                     if serializer.is_valid():
                         valid_observations.append(serializer.validated_data)
                     else:
-                        errors.append(serializer.errors)
+                        errors.append({"record": idx, "error": serializer.errors})
             except Exception as e:
                 logger.exception(f"Error processing data item: {data_item} - {e}")
                 errors.append({"error": str(e)})
                 
         return valid_observations, errors
-    
     def clean_data(self, data_dict: dict[str, Any]) -> dict[str, Any]:
         """Clean the incoming data and remove empty or None values."""
         logger.info("Original data item: %s", data_dict)
@@ -757,20 +738,19 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         """Save the valid observations to the database."""
         try:
             logger.info(f"Saving {len(valid_data)} valid observations")
+            created_ids = []
             with transaction.atomic():
-                created_count = 0
                 for data in valid_data:
                     if isinstance(data, Observation):
-                        # If it's already an Observation instance, just save it
                         data.save()
+                        created_ids.append(data.id)
                     else:
-                        # If it's a dictionary, create a new Observation instance
                         obs = Observation.objects.create(**data)
-                    created_count += 1
-            
+                        created_ids.append(obs.id)
             invalidate_geojson_cache()
             return Response(
-                {"message": f"Successfully imported {created_count} observations."},
+                {"message": f"Successfully imported {len(created_ids)} observations.",
+                "observation_ids": created_ids},
                 status=status.HTTP_201_CREATED
             )
         except IntegrityError as e:
@@ -779,7 +759,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 {"error": f"An error occurred during bulk import: {e!s}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-    
+        
     @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
     @action(detail=False, methods=["get"], permission_classes=[AllowAny])
     def export(self, request: HttpRequest) -> JsonResponse:

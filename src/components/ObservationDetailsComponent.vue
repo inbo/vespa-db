@@ -578,8 +578,8 @@ export default {
                 const daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
                 const hoursDiff = Math.floor((timeDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
 
-                if (daysDiff < 5) {
-                    let remainingDays = 5 - daysDiff;
+                if (daysDiff < 10) {
+                    let remainingDays = 10 - daysDiff;
                     let remainingHours = 0;
 
                     if (hoursDiff > 0) {
@@ -603,7 +603,6 @@ export default {
                 return null;
             }
         });
-
         const closeDetails = () => {
             emit('closeDetails');
             vespaStore.isDetailsPaneOpen = false;

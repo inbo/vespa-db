@@ -11,6 +11,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
+from django.middleware.csrf import get_token
 
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
@@ -87,40 +88,68 @@ class LoginView(APIView):
 
     @swagger_auto_schema(
         operation_summary="User Login",
-        operation_description="Authenticate a user by username and password, log them in and return a bearer token.",
+        operation_description="Authenticate a user with a username and password, log them in, and return a CSRF token.",
         request_body=LoginSerializer,
         responses={
             200: openapi.Response(
                 description="Login successful",
-                examples={
-                    "application/json": {
-                        "detail": "Login successful.",
-                        "token": "0123456789abcdef0123456789abcdef01234567"
-                    }
-                },
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "detail": openapi.Schema(
+                            type=openapi.TYPE_STRING,
+                            example="Login successful."
+                        ),
+                        "csrftoken": openapi.Schema(
+                            type=openapi.TYPE_STRING,
+                            example="abc123csrf"
+                        )
+                    },
+                ),
             ),
-            400: "Bad Request",
+            400: openapi.Response(
+                description="Bad Request",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "error": openapi.Schema(
+                            type=openapi.TYPE_STRING,
+                            example="Invalid username or password."
+                        )
+                    },
+                ),
+            ),
         },
     )
     def post(self, request: Request) -> Response:
-            """
-            Authenticate a user based on username and password, log them in and return a bearer token.
-            """
-            serializer = LoginSerializer(data=request.data)
-            if serializer.is_valid():
-                user = serializer.validated_data
-                login(request, user)
-                # Create or retrieve the token for the user
-                token, _ = Token.objects.get_or_create(user=user)
-                return Response(
-                    {
-                        "detail": "Login successful.",
-                        "token": token.key,
-                    },
-                    status=status.HTTP_200_OK,
-                )
+        """
+        Authenticate a user based on username and password, log them in, and return a CSRF token.
+        """
+        serializer = LoginSerializer(data=request.data)
+
+        if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
+
+        user = serializer.validated_data
+        login(request, user)
+
+        # Generate CSRF token
+        csrf_token = get_token(request)
+
+        # Prepare response
+        response_data = {
+            "detail": "Login successful.",
+            "csrftoken": csrf_token
+        }
+
+        # Create the response and set CSRF token in both header and cookie
+        response = Response(response_data, status=status.HTTP_200_OK)
+        response.set_cookie(
+            "csrftoken", csrf_token, httponly=False, secure=True, samesite="Lax"
+        )
+        response["X-CSRFToken"] = csrf_token  # Set CSRF token in response headers
+
+        return response
 
 class LogoutView(APIView):
     """API view for user logout."""

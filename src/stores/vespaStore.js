@@ -419,7 +419,7 @@ export const useVespaStore = defineStore('vespaStore', {
         async authCheck() {
             this.loadingAuth = true;
             try {
-                const response = await ApiService.get("/auth-check");
+                const response = await ApiService.get("/auth-check/");
                 const data = response.data;
                 if (data.isAuthenticated && data.user) {
                     this.user = data.user;

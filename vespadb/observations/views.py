@@ -652,10 +652,10 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                         errors.append({"record": idx, "error": f"Observation with id {observation_id} not found"})
                         continue
                 else:  # New record
-                    data_item['created_by'] = self.request.user
+                    data_item['created_by'] = self.request.user.pk if self.request.user else None
                     if 'created_datetime' not in data_item:
                         data_item['created_datetime'] = current_time
-                    data_item['modified_by'] = self.request.user
+                    data_item['modified_by'] = self.request.user.pk if self.request.user else None
                     data_item['modified_datetime'] = current_time
 
                     if 'longitude' in data_item and 'latitude' in data_item:
@@ -719,7 +719,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                     except (ValueError, TypeError):
                         logger.exception(f"Invalid datetime format for {field}: {data_dict[field]}")
                         data_dict.pop(field, None)
-                elif isinstance(data_dict[field], datetime):
+                elif isinstance(data_dict[field], datetime.datetime):
                     data_dict[field] = data_dict[field].isoformat()
                 else:
                     data_dict.pop(field, None)

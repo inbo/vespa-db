@@ -252,7 +252,7 @@ class Observation(models.Model):
     observer_email = models.EmailField(blank=True, null=True, help_text="Email of the observer")
     observer_received_email = models.BooleanField(default=False, help_text="Flag indicating if observer received email")
     observer_name = models.CharField(max_length=255, blank=True, null=True, help_text="Name of the observer")
-    observation_datetime = models.DateTimeField(help_text="Datetime when the observation was made")
+    observation_datetime = models.DateTimeField(null=True, blank=True, help_text="Datetime when the observation was made")
 
     wn_cluster_id = models.IntegerField(blank=True, null=True, help_text="Cluster ID of the observation")
     admin_notes = models.TextField(blank=True, null=True, help_text="Admin notes for the observation")

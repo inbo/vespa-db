@@ -11,6 +11,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from pytz import timezone
 from rest_framework import serializers
 from rest_framework.request import Request
+from rest_framework_gis.fields import GeometryField
 
 from vespadb.observations.helpers import parse_and_convert_to_cet, parse_and_convert_to_utc
 from vespadb.observations.models import EradicationResultEnum, Municipality, Observation, Province, Export
@@ -121,6 +122,7 @@ class ObservationSerializer(serializers.ModelSerializer):
     eradication_date = serializers.DateField(
         required=False, allow_null=True, format="%Y-%m-%d", input_formats=["%Y-%m-%d"]
     )
+    location = GeometryField(required=False, allow_null=True)
 
     class Meta:
         """Meta class for the ObservationSerializer."""
@@ -154,23 +156,31 @@ class ObservationSerializer(serializers.ModelSerializer):
         
     def to_representation(self, instance: Observation) -> dict[str, Any]:  # noqa: C901
         """Dynamically filter fields based on user authentication status."""
+        
+        # Ensure municipality and province are correctly assigned
         if not instance.municipality and instance.location:
-            long = instance.location.x
-            lat = instance.location.y
+            long, lat = instance.location.x, instance.location.y
             instance.municipality = get_municipality_from_coordinates(long, lat)
             if instance.municipality:
                 instance.province = instance.municipality.province
             instance.save(update_fields=["municipality", "province"])
 
+        # Get base serialized data
         data: dict[str, Any] = super().to_representation(instance)
-        observation_datetime = data.get('observation_datetime')
+        
+        # Ensure created_by_first_name is properly set
         if 'created_by' not in data or data['created_by'] is None:
             data['created_by_first_name'] = None
         
+        # Convert observation_datetime to full datetime if only a date is provided
+        observation_datetime = data.get('observation_datetime')
         if isinstance(observation_datetime, date) and not isinstance(observation_datetime, datetime):
             data['observation_datetime'] = datetime.combine(observation_datetime, datetime.min.time())
-        
-        data.pop("wn_admin_notes", None)
+
+        # Remove fields that should never be exposed
+        data.pop("wn_admin_notes", None)  
+
+        # Convert datetime fields to ISO format
         datetime_fields = [
             "created_datetime",
             "modified_datetime",
@@ -180,9 +190,11 @@ class ObservationSerializer(serializers.ModelSerializer):
             "observation_datetime",
         ]
         date_fields = ["eradication_date"]
+
         for field in datetime_fields:
             if data.get(field):
                 data[field] = parse_and_convert_to_cet(data[field]).isoformat()
+
         for field in date_fields:
             if data.get(field):
                 date_str: str = data[field]
@@ -193,9 +205,13 @@ class ObservationSerializer(serializers.ModelSerializer):
                     parsed_date = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=UTC)
                     data[field] = parsed_date.strftime("%Y-%m-%d")
 
-        request: Request = self.context.get("request")
+        # Ensure municipality name is included
         data["municipality_name"] = self.get_municipality_name(instance)
 
+        # Retrieve request context safely
+        request: Request | None = self.context.get("request", None)
+
+        # Determine accessible fields based on authentication status
         if request and request.user.is_authenticated:
             user: VespaUser = request.user
             permission_level = user.get_permission_level()
@@ -204,19 +220,18 @@ class ObservationSerializer(serializers.ModelSerializer):
                 instance.municipality and instance.municipality.id in user_municipality_ids
             )
 
-            # Voor gebruikers zonder toegang tot specifieke gemeenten
             if permission_level == "logged_in_without_municipality":
-                return {field: data[field] for field in public_read_fields if field in data}
+                allowed_fields = public_read_fields
+            elif is_inside_user_municipality or user.is_superuser:
+                allowed_fields = user_read_fields
+            else:
+                allowed_fields = public_read_fields
+        else:
+            # Fix: Ensure unauthenticated users always get public_read_fields
+            allowed_fields = public_read_fields
 
-            # Voor gebruikers met toegang tot specifieke gemeenten, extra gegevens tonen indien binnen hun gemeenten
-            if is_inside_user_municipality or request.user.is_superuser:
-                return {field: data[field] for field in user_read_fields if field in data}
-
-            # Voor observaties buiten de gemeenten van de gebruiker, beperk tot publieke velden
-            return {field: data[field] for field in public_read_fields if field in data}
-
-        # Voor niet-ingelogde gebruikers, retourneer enkel de publieke velden
-        return {field: data[field] for field in public_read_fields if field in data}
+        # Return only the allowed fields
+        return {field: data[field] for field in allowed_fields if field in data}
 
     def validate_reserved_by(self, value: VespaUser) -> VespaUser:
         """Validate that the user does not exceed the maximum number of allowed reservations and has permission to reserve in the specified municipality."""
@@ -244,10 +259,6 @@ class ObservationSerializer(serializers.ModelSerializer):
     def update(self, instance: Observation, validated_data: dict[Any, Any]) -> Observation:  # noqa: C901
         """Update method to handle observation reservations."""
         user = self.context["request"].user
-
-        # Check if someone is trying to update a nest reserved by another user
-        if instance.reserved_by and instance.reserved_by != user and not user.is_superuser:
-            raise serializers.ValidationError("You cannot edit an observation reserved by another user.")
 
         # Only proceed if user has appropriate permissions
         if not user.is_superuser:
@@ -390,6 +401,9 @@ class ObservationSerializer(serializers.ModelSerializer):
 
     def validate_location(self, value: Any) -> Point:
         """Validate the input location data. Handle different formats of location data."""
+        if value is None:
+            return None
+
         if isinstance(value, Point):
             return value
 
@@ -398,12 +412,14 @@ class ObservationSerializer(serializers.ModelSerializer):
                 return GEOSGeometry(value, srid=4326)
             except (ValueError, TypeError) as e:
                 raise serializers.ValidationError("Invalid WKT format for location.") from e
+
         elif isinstance(value, dict):
             latitude = value.get("latitude")
             longitude = value.get("longitude")
             if latitude is None or longitude is None:
                 raise serializers.ValidationError("Missing or invalid location data")
             return Point(float(longitude), float(latitude), srid=4326)
+
         raise serializers.ValidationError("Invalid location data type")
 
 

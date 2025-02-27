@@ -563,139 +563,150 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         try:
             if isinstance(location, str):
                 if location.startswith("SRID"):
-                    # Extract the actual point from the SRID string
                     point_str = location.split(";")[1].strip()
                     geom = GEOSGeometry(point_str, srid=4326)
                 else:
                     geom = GEOSGeometry(location, srid=4326)
                 logger.info(f"Validated GEOSGeometry: {geom}")
-                return geom.wkt
+                return geom
             raise ValidationError("Invalid location data type")
         except (ValueError, TypeError) as e:
             logger.exception(f"Invalid location data: {location} - {e}")
             raise ValidationError("Invalid WKT format for location.") from e
-
-    def process_data(self, data: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-        """Process and validate the incoming data."""
+        
+    def process_data(self, data: list[dict[str, Any]]) -> tuple[list[Observation], list[dict[str, Any]]]:
+        """Process and validate the incoming data, splitting between updates and new records."""
         logger.info("Starting to process import data")
             
-        valid_observations = []
+        valid_observations: list[Observation] = []
         errors = []
         current_time = now()
         
+        # Define the allowed fields for import
+        allowed_fields = {
+            'id', 'source_id', 'observation_datetime', 'eradication_problems',
+            'source', 'eradication_notes', 'images', 'created_datetime',
+            'longitude', 'latitude', 'eradication_persons', 'nest_size',
+            'visible', 'nest_location', 'eradication_date', 'eradication_product',
+            'nest_type', 'eradicator_name', 'eradication_method',
+            'eradication_aftercare', 'public_domain', 'eradication_duration',
+            'nest_height', 'eradication_result', 'notes', 'admin_notes'
+        }
+        
         for idx, data_item in enumerate(data, start=1):
-            try:
-                logger.info(f"Processing record #{idx}: {data_item}")
+            # Only allow specific fields
+            data_item = {k: v for k, v in data_item.items() if k in allowed_fields}
+            
+            # If an id is provided, treat as update; otherwise as create.
+            if "id" in data_item and data_item["id"]:
+                result = self.process_update_item(data_item, idx, current_time)
+            else:
+                result = self.process_create_item(data_item, idx, current_time)
                 
-                # Only allow specific fields in import
-                allowed_fields = {
-                    'id', 'source_id', 'observation_datetime', 'eradication_problems',
-                    'source', 'eradication_notes', 'images', 'created_datetime',
-                    'longitude', 'latitude', 'eradication_persons', 'nest_size',
-                    'visible', 'nest_location', 'eradication_date', 'eradication_product',
-                    'nest_type', 'eradicator_name', 'eradication_method',
-                    'eradication_aftercare', 'public_domain', 'eradication_duration',
-                    'nest_height', 'eradication_result', 'notes', 'admin_notes'
-                }
-                
-                data_item = {k: v for k, v in data_item.items() if k in allowed_fields}
-                
-                # Handle record updates vs inserts
-                observation_id = data_item.pop('id', None)
-                
-                if observation_id is not None:  # Update existing record
-                    try:
-                        existing_obj = Observation.objects.get(id=observation_id)
-                        logger.info(f"Updating observation #{observation_id}")
-                        
-                        # Remove created_by/created_datetime for updates
-                        data_item.pop('created_by', None)
-                        data_item.pop('created_datetime', None)
-                        
-                        data_item['modified_by'] = self.request.user
-                        data_item['modified_datetime'] = current_time
-
-                        if 'longitude' in data_item and 'latitude' in data_item:
-                            try:
-                                long = float(data_item.pop('longitude'))
-                                lat = float(data_item.pop('latitude'))
-                                data_item['location'] = Point(long, lat, srid=4326)
-                                logger.info(f"Created point from coordinates: {long}, {lat}")
-                                
-                                municipality = get_municipality_from_coordinates(long, lat)
-                                if municipality:
-                                    data_item['municipality'] = municipality.id
-                                    if municipality.province:
-                                        data_item['province'] = municipality.province.id
-                                data_item['anb'] = check_if_point_in_anb_area(long, lat)
-                            except (ValueError, TypeError) as e:
-                                logger.error(f"Record #{idx}: Invalid coordinates: {e}")
-                                errors.append({"record": idx, "error": f"Invalid coordinates: {str(e)}"})
-                                continue
-
-                        if 'eradication_date' in data_item:
-                            date_str = data_item['eradication_date']
-                            if isinstance(date_str, str):
-                                try:
-                                    data_item['eradication_date'] = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
-                                except ValueError:
-                                    errors.append({"record": idx, "error": f"Invalid date format for eradication_date: {date_str}"})
-                                    continue
-
-                        for key, value in data_item.items():
-                            setattr(existing_obj, key, value)
-                        existing_obj.save()
-                        valid_observations.append(existing_obj)
-                        continue
-                    except Observation.DoesNotExist:
-                        logger.error(f"Record #{idx}: Observation with id {observation_id} not found")
-                        errors.append({"record": idx, "error": f"Observation with id {observation_id} not found"})
-                        continue
-                else:  # New record
-                    data_item['created_by'] = self.request.user.pk if self.request.user else None
-                    if 'created_datetime' not in data_item:
-                        data_item['created_datetime'] = current_time
-                    data_item['modified_by'] = self.request.user.pk if self.request.user else None
-                    data_item['modified_datetime'] = current_time
-
-                    if 'longitude' in data_item and 'latitude' in data_item:
-                        try:
-                            long = float(data_item.pop('longitude'))
-                            lat = float(data_item.pop('latitude'))
-                            data_item['location'] = Point(long, lat, srid=4326)
-                            logger.info(f"Created point from coordinates: {long}, {lat}")
-                            
-                            municipality = get_municipality_from_coordinates(long, lat)
-                            if municipality:
-                                data_item['municipality'] = municipality.id
-                                if municipality.province:
-                                    data_item['province'] = municipality.province.id
-                            data_item['anb'] = check_if_point_in_anb_area(long, lat)
-                        except (ValueError, TypeError) as e:
-                            logger.error(f"Record #{idx}: Invalid coordinates: {e}")
-                            errors.append({"record": idx, "error": f"Invalid coordinates: {str(e)}"})
-                            continue
-
-                    if 'eradication_date' in data_item:
-                        date_str = data_item['eradication_date']
-                        if isinstance(date_str, str):
-                            try:
-                                data_item['eradication_date'] = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
-                            except ValueError:
-                                errors.append({"record": idx, "error": f"Invalid date format for eradication_date: {date_str}"})
-                                continue
-
-                    cleaned_item = self.clean_data(data_item)
-                    serializer = ObservationSerializer(data=cleaned_item)
-                    if serializer.is_valid():
-                        valid_observations.append(serializer.validated_data)
-                    else:
-                        errors.append({"record": idx, "error": serializer.errors})
-            except Exception as e:
-                logger.exception(f"Error processing data item: {data_item} - {e}")
-                errors.append({"error": str(e)})
+            if isinstance(result, dict) and result.get("error"):
+                errors.append({"record": idx, "error": result["error"]})
+            else:
+                valid_observations.append(result)
                 
         return valid_observations, errors
+
+    def process_update_item(self, data_item: dict[str, Any], idx: int, current_time: datetime.datetime) -> Any:
+        """
+        Process a single record as an update.
+        
+        In update mode, we only require an "id" plus any fields that should be updated.
+        For example, if only eradication_result is provided, observation_datetime is not mandatory.
+        """
+        observation_id = data_item.pop("id")
+        try:
+            existing_obj = Observation.objects.get(id=observation_id)
+            logger.info(f"Updating observation #{observation_id}")
+        except Observation.DoesNotExist:
+            return {"error": f"Observation with id {observation_id} not found"}
+        
+        # Set the update audit fields
+        data_item['modified_by'] = self.request.user
+        data_item['modified_datetime'] = current_time
+
+        # If coordinates are provided, update the location, municipality, province, and ANB flag.
+        if 'longitude' in data_item and 'latitude' in data_item:
+            try:
+                long_val = float(data_item.pop('longitude'))
+                lat_val = float(data_item.pop('latitude'))
+                data_item['location'] = Point(long_val, lat_val, srid=4326)
+                municipality = get_municipality_from_coordinates(long_val, lat_val)
+                if municipality:
+                    data_item['municipality'] = municipality.id
+                    if municipality.province:
+                        data_item['province'] = municipality.province.id
+                data_item['anb'] = check_if_point_in_anb_area(long_val, lat_val)
+            except (ValueError, TypeError) as e:
+                return {"error": f"Invalid coordinates: {str(e)}"}
+                
+        # Convert eradication_date if provided
+        if 'eradication_date' in data_item:
+            date_str = data_item['eradication_date']
+            if isinstance(date_str, str):
+                try:
+                    data_item['eradication_date'] = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
+                except ValueError:
+                    return {"error": f"Invalid date format for eradication_date: {date_str}"}
+        
+        # Update the existing observation with any provided field
+        for key, value in data_item.items():
+            setattr(existing_obj, key, value)
+        existing_obj.save()
+        return existing_obj
+
+    def process_create_item(self, data_item: dict[str, Any], idx: int, current_time: datetime.datetime) -> Any:
+        """
+        Process a single record as a new observation.
+        
+        In create mode, observation_datetime, latitude and longitude are required.
+        """
+        # Ensure required fields for a new record are present
+        required_fields = ["observation_datetime", "longitude", "latitude"]
+        missing_fields = [field for field in required_fields if not data_item.get(field)]
+        if missing_fields:
+            return {"error": f"Missing required fields for new record: {', '.join(missing_fields)}"}
+            
+        data_item['created_by'] = self.request.user.pk if self.request.user else None
+        data_item['created_datetime'] = current_time
+        data_item['modified_by'] = self.request.user.pk if self.request.user else None
+        data_item['modified_datetime'] = current_time
+
+        try:
+            long_val = float(data_item.pop('longitude'))
+            lat_val = float(data_item.pop('latitude'))
+            data_item['location'] = Point(long_val, lat_val, srid=4326)
+            logger.info(f"Created point from coordinates: {long_val}, {lat_val}")
+            
+            municipality = get_municipality_from_coordinates(long_val, lat_val)
+            if municipality:
+                data_item['municipality'] = municipality.id
+                if municipality.province:
+                    data_item['province'] = municipality.province.id
+            data_item['anb'] = check_if_point_in_anb_area(long_val, lat_val)
+        except (ValueError, TypeError) as e:
+            return {"error": f"Invalid coordinates: {str(e)}"}
+        
+        if 'eradication_date' in data_item:
+            date_str = data_item['eradication_date']
+            if isinstance(date_str, str):
+                try:
+                    data_item['eradication_date'] = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
+                except ValueError:
+                    return {"error": f"Invalid date format for eradication_date: {date_str}"}
+        
+        # Clean the data (remove empty values, etc.)
+        cleaned_item = self.clean_data(data_item)
+        serializer = ObservationSerializer(data=cleaned_item)
+        if serializer.is_valid():
+            # Save and return the new observation
+            return serializer.save()
+        else:
+            return {"error": serializer.errors}
+
     def clean_data(self, data_dict: dict[str, Any]) -> dict[str, Any]:
         """Clean the incoming data and remove empty or None values."""
         logger.info("Original data item: %s", data_dict)

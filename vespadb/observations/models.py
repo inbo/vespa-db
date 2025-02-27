@@ -340,6 +340,12 @@ class Observation(models.Model):
         help_text="Problems encountered during the eradication",
     )
     eradication_notes = models.TextField(blank=True, null=True, help_text="Notes about the eradication")
+    
+    queen_present = models.BooleanField(
+        null=True,
+        blank=True,
+        help_text="Shows if the queen was present during the eradication",
+    )
 
     municipality = models.ForeignKey(
         Municipality,

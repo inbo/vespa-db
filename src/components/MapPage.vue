@@ -175,7 +175,7 @@ export default {
           const selectedMarker = vespaStore.markerClusterGroup.getLayers().find(marker => marker.feature.properties.id === selectedObservation.value.id);
           if (selectedMarker) {
             selectedMarker.setStyle({
-              fillColor: fillColor,
+              fillColor: selectedMarker.options.fillColor,
               color: '#ea792a',
               weight: 4
             });
@@ -278,17 +278,29 @@ export default {
       if (observationId) {
         await vespaStore.fetchObservationDetails(observationId);
         const location = selectedObservation.value.location;
-        const [longitude, latitude] = location
-          .slice(location.indexOf('(') + 1, location.indexOf(')'))
-          .split(' ')
-          .map(parseFloat);
-
+        const loc = selectedObservation.value.location;
+        let longitude, latitude;
+        if (typeof loc === 'string') {
+          // If location is in WKT format, e.g. "POINT(5.6899 50.8084)"
+          const coords = loc.slice(loc.indexOf('(') + 1, loc.indexOf(')')).split(' ');
+          [longitude, latitude] = coords.map(parseFloat);
+        } else if (loc && loc.coordinates) {
+          // If location is a GeoJSON object { type: "Point", coordinates: [lng, lat] }
+          [longitude, latitude] = loc.coordinates;
+        } else {
+          // Fallback center
+          longitude = 4.3517;
+          latitude = 50.8503;
+        }
         map.value = L.map('map', {
           center: [latitude, longitude],
           zoom: 16,
           maxZoom: 19,
           layers: [
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', tileLayerOptions),
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+              attribution: 'Map data © OpenStreetMap contributors',
+              maxZoom: 19,
+            }),
           ],
         });
         vespaStore.isDetailsPaneOpen = true;

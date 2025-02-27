@@ -38,7 +38,7 @@ export default defineConfig(({ mode }) => {
               src: './src/assets/materialdesignicons-webfont.woff2',
             },
           ],
-          preload: true,
+          preload: false,
         }
       }),
     ],

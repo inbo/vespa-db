@@ -293,7 +293,15 @@ export const useVespaStore = defineStore('vespaStore', {
         },
         async updateObservation(observation) {
             try {
-                const response = await ApiService.patch(`/observations/${observation.id}/`, observation);
+                // Make a copy to ensure we don't modify the original
+                const observationToSend = { ...observation };
+                
+                // Convert boolean queen_present to explicit true/false
+                if ('queen_present' in observationToSend) {
+                    observationToSend.queen_present = observationToSend.queen_present === true;
+                }
+                
+                const response = await ApiService.patch(`/observations/${observation.id}/`, observationToSend);
                 if (response.status === 200) {
                     this.selectedObservation = response.data;
                     const colorByResult = this.getColorByStatus(response.data.eradication_result);

@@ -209,7 +209,8 @@
                                 <label class="col-4 col-form-label">Type</label>
                                 <div class="col-8">
                                     <p class="form-control-plaintext">
-                                        {{ selectedObservation.nest_type ? nestTypeEnum[selectedObservation.nest_type] : 'Geen' }}
+                                        {{ selectedObservation.nest_type ? nestTypeEnum[selectedObservation.nest_type] :
+                                            'Geen' }}
                                     </p>
                                 </div>
                             </div>
@@ -217,7 +218,9 @@
                                 <label class="col-4 col-form-label">Locatie</label>
                                 <div class="col-8">
                                     <p class="form-control-plaintext">
-                                        {{ selectedObservation.nest_location ? nestLocationEnum[selectedObservation.nest_location] : 'Geen' }}
+                                        {{ selectedObservation.nest_location ?
+                                            nestLocationEnum[selectedObservation.nest_location] :
+                                            'Geen' }}
                                     </p>
                                 </div>
                             </div>
@@ -225,7 +228,8 @@
                                 <label class="col-4 col-form-label">Grootte</label>
                                 <div class="col-8">
                                     <p class="form-control-plaintext">
-                                        {{ selectedObservation.nest_size ? nestSizeEnum[selectedObservation.nest_size] : 'Geen' }}
+                                        {{ selectedObservation.nest_size ? nestSizeEnum[selectedObservation.nest_size] :
+                                            'Geen' }}
                                     </p>
                                 </div>
                             </div>
@@ -233,7 +237,9 @@
                                 <label class="col-4 col-form-label">Hoogte</label>
                                 <div class="col-8">
                                     <p class="form-control-plaintext">
-                                        {{ selectedObservation.nest_height ? nestHeightEnum[selectedObservation.nest_height] : 'Geen' }}
+                                        {{ selectedObservation.nest_height ?
+                                            nestHeightEnum[selectedObservation.nest_height] :
+                                            'Geen' }}
                                     </p>
                                 </div>
                             </div>
@@ -248,12 +254,49 @@
                                     </p>
                                 </div>
                             </div>
+                            <div v-if="canViewRestrictedFields" class="row mb-2">
+                                <label class="col-4 col-form-label">Nest extra</label>
+                                <div class="col-8">
+                                    <multiselect
+                                        v-model="selectedExtras"
+                                        :options="availableExtrasOptions"
+                                        :multiple="true"
+                                        track-by="value"
+                                        label="label"
+                                        placeholder="Selecteer opties"
+                                        :close-on-select="false"
+                                        :searchable="false"
+                                        :disabled="!canEdit"
+                                        :select-label="''"
+                                        :deselect-label="''"
+                                        :selected-label="''"
+                                    >
+                                        <template #option="{ option }">
+                                            <div class="multiselect-option" :class="{ 'is-selected': selectedExtras.some(extra => extra.value === option.value) }">
+                                                <span class="option-label">{{ option.label }}</span>
+                                            </div>
+                                        </template>
+                                        <template #tag="{ option, remove }">
+                                            <span class="multiselect-tag">
+                                                {{ option.label }}
+                                                <button 
+                                                    type="button" 
+                                                    class="remove-tag" 
+                                                    @click="remove(option)"
+                                                    aria-label="Remove option"
+                                                >×</button>
+                                            </span>
+                                        </template>
+                                    </multiselect>
+                                </div>
+                            </div>
                             <div>
                                 <div class="row mb-2">
                                     <label class="col-4 col-form-label">Validatie</label>
                                     <div class="col-8">
                                         <p class="form-control-plaintext">
-                                            {{ validationStatusEnum[selectedObservation.wn_validation_status] || "Geen" }}
+                                            {{ validationStatusEnum[selectedObservation.wn_validation_status] || "Geen"
+                                            }}
                                         </p>
                                     </div>
                                 </div>
@@ -270,7 +313,8 @@
                                         <input v-if="selectedObservation.public_domain !== undefined"
                                             v-model="editableObservation.public_domain" class="form-check-input"
                                             type="checkbox" id="public-domain" :disabled="!canViewRestrictedFields" />
-                                        <label class="form-check-label" for="public-domain">Nest op publiek terrein</label>
+                                        <label class="form-check-label" for="public-domain">Nest op publiek
+                                            terrein</label>
                                     </div>
                                 </div>
                             </div>
@@ -338,15 +382,14 @@
                                 </div>
                             </div>
                             <div class="row mb-2">
-                                <div class="col-8 offset-4">
-                                    <div class="form-check form-switch">
-                                        <input v-if="selectedObservation.observer_received_email !== undefined"
-                                            v-model="editableObservation.observer_received_email"
-                                            class="form-check-input" type="checkbox" id="observer-got-email"
-                                            :disabled="!canEdit" />
-                                        <label class="form-check-label" for="observer-got-email">Melder kreeg
-                                            e-mail</label>
-                                    </div>
+                                <label class="col-4 col-form-label">Melder kreeg e-mail</label>
+                                <div class="col-8">
+                                    <select v-if="selectedObservation.observer_received_email !== undefined"
+                                        v-model="editableObservation.observer_received_email" class="form-select"
+                                        disabled>
+                                        <option :value="true">Melder kreeg e-mail</option>
+                                        <option :value="false">Melder kreeg geen e-mail</option>
+                                    </select>
                                 </div>
                             </div>
                             <div class="row mb-2">
@@ -360,6 +403,7 @@
                         </div>
                     </div>
                 </section>
+
             </div>
 
             <p v-if="canViewRestrictedFields" class="mb-3 text-muted small" id="metadata">
@@ -378,9 +422,14 @@
 <script>
 import { useVespaStore } from '@/stores/vespaStore';
 import { computed, ref, watch } from 'vue';
+import Multiselect from 'vue-multiselect';
+import 'vue-multiselect/dist/vue-multiselect.min.css';
 
 export default {
     emits: ['closeDetails', 'updateMarkerColor'],
+    components: {
+        Multiselect
+    },
     setup(props, { emit }) {
         const vespaStore = useVespaStore();
         const selectedObservation = computed(() => vespaStore.selectedObservation);
@@ -392,10 +441,11 @@ export default {
         const errorMessage = ref('');
         const eradicationResultError = ref('');
         const editableObservation = ref({});
+        const selectedExtras = ref([]);
         const sourceUrl = computed(() => {
             if (!selectedObservation.value) return '';
             const { source, source_id, wn_id } = selectedObservation.value;
-            if ((source === 'Vespa-Watch' || source === 'iNaturalist') && source_id) {
+            if (source && source.toLowerCase().includes('inaturalist') && source_id) {
                 return `https://www.inaturalist.org/observations/${source_id}`;
             }
             if (source === 'Waarnemingen.be' && wn_id) {
@@ -403,7 +453,6 @@ export default {
             }
             return '';
         });
-
         const isAuthorizedToReserve = computed(() => {
             if (vespaStore.isAdmin) return true;
             const observationMunicipality = selectedObservation.value?.municipality_name;
@@ -608,6 +657,7 @@ export default {
             vespaStore.isDetailsPaneOpen = false;
             errorMessage.value = '';
             eradicationResultError.value = '';
+            emit('updateMarkerColor', null);
         };
 
         const startEdit = () => {
@@ -615,32 +665,39 @@ export default {
             if (selectedObservation.value) {
                 editableObservation.value = { ...selectedObservation.value };
                 editableObservation.value.observation_datetime = formatToDatetimeLocal(selectedObservation.value.observation_datetime);
-                editableObservation.value.eradication_date = formatToDate(newVal.eradication_date);
+                editableObservation.value.eradication_date = formatToDate(selectedObservation.value.eradication_date);
             }
         };
 
         const isUpdating = ref(false);
+        let isUpdatingObservation = false;
+
         const confirmUpdate = async () => {
             if (isUpdating.value) return;
-
             try {
                 isUpdating.value = true;
-                // Check if any eradication fields are filled
-                const eradicationFields = [
-                    'eradication_date', 'eradicator_name', 'eradication_duration',
-                    'eradication_persons', 'eradication_method', 'eradication_aftercare',
-                    'eradication_problems', 'eradication_notes', 'eradication_product'
-                ];
+                isUpdatingObservation = true;
+
+                // Explicitly set queen_present based on selectedExtras
+                const hasQueenPresent = selectedExtras.value.some(extra => extra.value === 'queen_present');
+                editableObservation.value.queen_present = hasQueenPresent;
+                
+                // Log to verify the value is set correctly
+                console.log('Queen present value before save:', editableObservation.value.queen_present);
+                
+                // Remove nest_extra if it exists (the backend doesn't need it)
+                if ('nest_extra' in editableObservation.value) {
+                    delete editableObservation.value.nest_extra;
+                }
+
+                const eradicationFields = ['eradication_date', 'eradicator_name', 'eradication_duration', 'eradication_persons', 'eradication_method', 'eradication_aftercare', 'eradication_problems', 'eradication_notes', 'eradication_product'];
                 const hasEradicationData = eradicationFields.some(field => editableObservation.value[field]);
 
-                if (
-                    editableObservation.value.eradication_result &&
-                    !editableObservation.value.eradication_date
-                ) {
+                if (editableObservation.value.eradication_result && !editableObservation.value.eradication_date) {
                     const today = new Date();
                     editableObservation.value.eradication_date = today.toISOString().split('T')[0];
                 }
-                // Format eradication_date if provided, and check for valid eradication result
+
                 if (editableObservation.value.eradication_date) {
                     const date = new Date(editableObservation.value.eradication_date);
                     if (!isNaN(date.getTime())) {
@@ -659,8 +716,15 @@ export default {
                 errorMessage.value = '';
                 eradicationResultError.value = '';
 
-                // Send updated observation to the store
-                await vespaStore.updateObservation(editableObservation.value);
+                // Create a copy of editableObservation to explicitly set queen_present to true/false (not null)
+                const observationToSend = { ...editableObservation.value };
+                observationToSend.queen_present = hasQueenPresent;
+
+                // Log the object being sent
+                console.log('Sending to backend:', observationToSend);
+
+                // Send explicit object to the store
+                await vespaStore.updateObservation(observationToSend);
             } catch (error) {
                 if (error.message === "Invalid eradication date format") {
                     errorMessage.value = 'De ingevoerde datum is ongeldig.';
@@ -668,10 +732,12 @@ export default {
                     errorMessage.value = 'Er is een fout opgetreden bij het opslaan van de wijzigingen.';
                 }
                 console.error('Error updating observation:', error);
+                isUpdatingObservation = false;
             } finally {
                 isUpdating.value = false;
             }
         };
+        
         const cancelEdit = () => {
             isEditing.value = false;
             if (selectedObservation.value) {
@@ -686,6 +752,14 @@ export default {
             const userMunicipalities = vespaStore.userMunicipalities;
             const observationMunicipality = selectedObservation.value?.municipality_name;
             return userMunicipalities.includes(observationMunicipality);
+        });
+
+        const extrasOptions = [
+            { value: "queen_present", label: "Koningin aanwezig" }
+        ];
+        
+        const availableExtrasOptions = computed(() => {
+            return extrasOptions.filter(option => !selectedExtras.value.some(selected => selected.value === option.value));
         });
 
         const reserveObservation = async () => {
@@ -706,19 +780,45 @@ export default {
         const clearSuccessMessage = () => {
             successMessage.value = '';
         };
-
-        watch(() => vespaStore.selectedObservation, (newVal, oldVal) => {
-            if (!newVal || newVal.id === oldVal?.id) {
-                return;
-            }
+        
+        // Modified watch for selectedObservation that initializes the multi-select when loading data
+        watch(() => vespaStore.selectedObservation, (newVal) => {
+            if (!newVal) return;
+            
             editableObservation.value = { ...newVal };
             editableObservation.value.observation_datetime = formatToDatetimeLocal(newVal.observation_datetime);
-            editableObservation.value.eradication_date = newVal.eradication_date
-                ? formatToDate(newVal.eradication_date)
-                : null;
+            editableObservation.value.eradication_date = newVal.eradication_date ? formatToDate(newVal.eradication_date) : null;
+            
+            // Initialize selectedExtras based on the queen_present value
+            selectedExtras.value = [];
+            if (newVal.queen_present === true) {
+                const queenOption = extrasOptions.find(option => option.value === 'queen_present');
+                if (queenOption) {
+                    selectedExtras.value = [queenOption];
+                }
+            }
+            
+            emit('updateMarkerColor', newVal.id);
         }, { immediate: true });
+        
+        // Modified watch for selectedExtras that correctly updates queen_present in editableObservation
+        watch(selectedExtras, (newVal) => {
+            if (!editableObservation.value) return;
+            
+            // Set queen_present directly based on whether the queen_present option is selected
+            editableObservation.value.queen_present = newVal.some(extra => extra.value === 'queen_present');
+            
+            // No need to store nest_extra in the model since backend doesn't have this field
+            // This is just for the UI component
+            
+            emit('updateMarkerColor', selectedObservation.value.id);
+        }, { deep: true });
 
         watch(selectedObservation, { immediate: true });
+
+        const removeExtra = (option) => {
+            selectedExtras.value = selectedExtras.value.filter(extra => extra.value !== option.value);
+        };
 
         return {
             selectedObservation,
@@ -745,6 +845,9 @@ export default {
             reserveObservation,
             cancelReservation,
             formatDate,
+            selectedExtras,
+            extrasOptions,
+            availableExtrasOptions,
             getEnumLabel,
             eradicationProductEnum,
             canViewContactInfo,
@@ -760,7 +863,8 @@ export default {
             eradicationResultError,
             canViewRestrictedFields,
             validationStatusEnum,
-            sourceUrl
+            sourceUrl,
+            removeExtra,
         };
     }
 };

@@ -277,7 +277,7 @@ class Observation(models.Model):
     wn_created_datetime = models.DateTimeField(
         blank=True, null=True, help_text="Datetime when the observation was created in the source system"
     )
-    visible = models.BooleanField(default=True, help_text="Flag indicating if the observation is visible")
+    visible = models.BooleanField(null=True, default=True, help_text="Flag indicating if the observation is visible")
     images = models.JSONField(
         default=list, blank=True, null=True, help_text="List of images associated with the observation"
     )
@@ -346,6 +346,11 @@ class Observation(models.Model):
         blank=True,
         help_text="Shows if the queen was present during the eradication",
     )
+    moth_present = models.BooleanField(
+        null=True,
+        blank=True,
+        help_text="Shows if moths were present during the eradication",
+    )
 
     municipality = models.ForeignKey(
         Municipality,
@@ -381,17 +386,12 @@ class Observation(models.Model):
         """
         logger.info(f"Save method called for observation {self.id if self.id else 'new'}")
         
-        # Issue #290 - Automatically determine municipality, province and anb
-        if self.location and not (self.municipality and self.province and self.anb is not None):
+        if self.location:
             if not isinstance(self.location, Point):
                 self.location = Point(self.location)
+            long, lat = self.location.x, self.location.y
 
-            long = self.location.x
-            lat = self.location.y
-
-            if self.anb is None:
-                self.anb = check_if_point_in_anb_area(long, lat)
-                
+            self.anb = check_if_point_in_anb_area(long, lat)
             if not self.municipality:
                 municipality = get_municipality_from_coordinates(long, lat)
                 self.municipality = municipality

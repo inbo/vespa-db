@@ -78,7 +78,8 @@ class ObservationSerializer(serializers.ModelSerializer):
 
         for field in datetime_fields:
             if data.get(field):
-                data[field] = parse_and_convert_to_cet(data[field]).isoformat()
+                dt = parse_and_convert_to_utc(data[field])
+                data[field] = dt.strftime("%Y-%m-%dT%H:%M:%S")
         for field in date_fields:
             if data.get(field):
                 date_str: str = data[field]
@@ -109,6 +110,7 @@ class ObservationSerializer(serializers.ModelSerializer):
             "eradication_date",
             "municipality",
             "queen_present",
+            "moth_present",
             "province",
             "images",
             "municipality_name",
@@ -200,6 +202,7 @@ class ObservationSerializer(serializers.ModelSerializer):
             "eradication_problems",
             "eradication_notes",
             "queen_present",
+            "moth_present",
             "public_domain",
         ]
         allowed_update_fields_admin = allowed_update_fields_non_admin + admin_update_fields

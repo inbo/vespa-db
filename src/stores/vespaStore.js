@@ -300,6 +300,9 @@ export const useVespaStore = defineStore('vespaStore', {
                 if ('queen_present' in observationToSend) {
                     observationToSend.queen_present = observationToSend.queen_present === true;
                 }
+                if ('moth_present' in observationToSend) {
+                    observationToSend.moth_present = observationToSend.moth_present === true;
+                }
                 
                 const response = await ApiService.patch(`/observations/${observation.id}/`, observationToSend);
                 if (response.status === 200) {

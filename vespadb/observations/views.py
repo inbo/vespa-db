@@ -945,7 +945,6 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             # Create the streaming response
             pseudo_buffer = Echo()
             writer = csv.writer(pseudo_buffer)
-            
             response = StreamingHttpResponse(
                 streaming_content=generate_rows(
                     queryset=queryset,
@@ -956,17 +955,14 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 ),
                 content_type='text/csv'
             )
-            
             # Set filename with timestamp
             timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
             response['Content-Disposition'] = f'attachment; filename="observations_export_{timestamp}.csv"'
-            
             # Add CORS headers
             response["Access-Control-Allow-Origin"] = request.META.get('HTTP_ORIGIN', '*')
             response["Access-Control-Allow-Credentials"] = "true"
             response["Access-Control-Allow-Methods"] = "GET, OPTIONS"
             response["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-            
             return response
 
         except Exception as e:

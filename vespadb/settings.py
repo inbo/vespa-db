@@ -17,7 +17,6 @@ from celery.schedules import crontab
 from dotenv import load_dotenv
 
 load_dotenv()
-
 secrets = {
     "DJANGO_SECRET_KEY": os.getenv("SECRET_KEY"),
     "CORS_ALLOWED_ORIGINS": os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000").split(",") + ["https://nesten.vespawatch.be", "https://uat-nesten.vespawatch.be","https://db.vespawatch.be","https://uat-db.vespawatch.be",],
@@ -223,7 +222,6 @@ TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
 TIME_ZONE = "UTC"
-USE_TZ = True
 
 # templates
 TEMPLATES = [

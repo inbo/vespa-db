@@ -247,15 +247,17 @@
                                 <label class="col-4 col-form-label">Bron</label>
                                 <div class="col-8">
                                     <p class="form-control-plaintext">
-                                        <a v-if="selectedObservation.wn_id"
-                                            :href="'https://waarnemingen.be/observation/' + selectedObservation.wn_id"
-                                            target="_blank">Waarnemingen.be</a>
-                                        <span v-else>{{ selectedObservation.source }}</span>
+                                    <template v-if="sourceUrl">
+                                        <a :href="sourceUrl" target="_blank">{{ selectedObservation.source }}</a>
+                                    </template>
+                                    <template v-else>
+                                        {{ selectedObservation.source }}
+                                    </template>
                                     </p>
                                 </div>
                             </div>
                             <div v-if="canViewRestrictedFields" class="row mb-2">
-                                <label class="col-4 col-form-label">Nest extra</label>
+                                <label class="col-4 col-form-label">Extra info</label>
                                 <div class="col-8">
                                     <multiselect
                                         v-model="selectedExtras"
@@ -295,9 +297,14 @@
                                     <label class="col-4 col-form-label">Validatie</label>
                                     <div class="col-8">
                                         <p class="form-control-plaintext">
-                                            {{ validationStatusEnum[selectedObservation.wn_validation_status] || "Geen"
-                                            }}
+                                            {{ validationStatusEnum[selectedObservation.wn_validation_status] || "Geen" }}
                                         </p>
+                                    </div>
+                                </div>
+                                <div class="row mb-2">
+                                    <label class="col-4 col-form-label">Cluster ID</label>
+                                    <div class="col-8">
+                                        <p class="form-control-plaintext">{{ selectedObservation.wn_cluster_id }}</p>
                                     </div>
                                 </div>
                                 <div class="row mb-2">
@@ -377,8 +384,7 @@
                             <div class="row mb-2">
                                 <label class="col-4 col-form-label">Cluster ID</label>
                                 <div class="col-8">
-                                    <input v-model="editableObservation.wn_cluster_id" type="text" class="form-control"
-                                        readonly />
+                                    <input v-model="editableObservation.wn_cluster_id" type="text" class="form-control" readonly />
                                 </div>
                             </div>
                             <div class="row mb-2">
@@ -680,11 +686,11 @@ export default {
 
                 // Explicitly set queen_present based on selectedExtras
                 const hasQueenPresent = selectedExtras.value.some(extra => extra.value === 'queen_present');
+                const hasMothPresent = selectedExtras.value.some(extra => extra.value === 'moth_present');
                 editableObservation.value.queen_present = hasQueenPresent;
+                editableObservation.value.moth_present = hasMothPresent;
                 
-                // Log to verify the value is set correctly
-                console.log('Queen present value before save:', editableObservation.value.queen_present);
-                
+
                 // Remove nest_extra if it exists (the backend doesn't need it)
                 if ('nest_extra' in editableObservation.value) {
                     delete editableObservation.value.nest_extra;
@@ -719,6 +725,7 @@ export default {
                 // Create a copy of editableObservation to explicitly set queen_present to true/false (not null)
                 const observationToSend = { ...editableObservation.value };
                 observationToSend.queen_present = hasQueenPresent;
+                observationToSend.moth_present = hasMothPresent;
 
                 // Log the object being sent
                 console.log('Sending to backend:', observationToSend);
@@ -755,7 +762,8 @@ export default {
         });
 
         const extrasOptions = [
-            { value: "queen_present", label: "Koningin aanwezig" }
+            { value: "queen_present", label: "Koningin aanwezig" },
+            { value: "moth_present", label: "Mot aanwezig" }
         ];
         
         const availableExtrasOptions = computed(() => {
@@ -793,9 +801,11 @@ export default {
             selectedExtras.value = [];
             if (newVal.queen_present === true) {
                 const queenOption = extrasOptions.find(option => option.value === 'queen_present');
-                if (queenOption) {
-                    selectedExtras.value = [queenOption];
-                }
+                if (queenOption) selectedExtras.value.push(queenOption);
+            }
+            if (newVal.moth_present === true) {
+                const mothOption = extrasOptions.find(option => option.value === 'moth_present');
+                if (mothOption) selectedExtras.value.push(mothOption);
             }
             
             emit('updateMarkerColor', newVal.id);
@@ -807,6 +817,7 @@ export default {
             
             // Set queen_present directly based on whether the queen_present option is selected
             editableObservation.value.queen_present = newVal.some(extra => extra.value === 'queen_present');
+            editableObservation.value.moth_present = newVal.some(extra => extra.value === 'moth_present');
             
             // No need to store nest_extra in the model since backend doesn't have this field
             // This is just for the UI component

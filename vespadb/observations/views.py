@@ -54,7 +54,7 @@ from rest_framework_gis.filters import DistanceToPointFilter
 
 from vespadb.observations.cache import invalidate_geojson_cache, invalidate_observation_cache
 from vespadb.observations.filters import ObservationFilter
-from vespadb.observations.helpers import parse_and_convert_to_utc
+from vespadb.observations.helpers import parse_and_convert_to_cet
 from vespadb.observations.models import Municipality, Observation, Province, Export
 from vespadb.observations.models import Export
 from vespadb.observations.tasks.export_utils import generate_rows
@@ -209,7 +209,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                     data[field] = None
                 else:
                     try:
-                        data[field] = parse_and_convert_to_utc(value).isoformat()
+                        data[field] = parse_and_convert_to_cet(value).isoformat()
                     except (ValueError, TypeError):
                         return Response(
                             {field: [f"Invalid datetime format for {field}."]},
@@ -549,7 +549,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 for field in datetime_fields:
                     if row.get(field):
                         try:
-                            row[field] = parse_and_convert_to_utc(row[field])
+                            row[field] = parse_and_convert_to_cet(row[field])
                         except (ValueError, TypeError) as e:
                             logger.exception(f"Invalid datetime format for {field}: {row[field]} - {e}")
                             row[field] = None
@@ -573,12 +573,24 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         except (ValueError, TypeError) as e:
             logger.exception(f"Invalid location data: {location} - {e}")
             raise ValidationError("Invalid WKT format for location.") from e
-        
+    
+    def parse_boolean(self, value):
+        """Convert string boolean values to Python boolean."""
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            value = value.lower().strip()
+            if value == 'true':
+                return True
+            elif value == 'false':
+                return False
+        return None
+
     def process_data(self, data: list[dict[str, Any]]) -> tuple[list[Observation], list[dict[str, Any]]]:
         """Process and validate the incoming data, splitting between updates and new records."""
         logger.info("Starting to process import data")
-            
-        valid_observations: list[Observation] = []
+        
+        valid_observations: list[Union[dict[str, Any], Observation]] = []
         errors = []
         current_time = now()
         
@@ -590,12 +602,21 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             'visible', 'nest_location', 'eradication_date', 'eradication_product',
             'nest_type', 'eradicator_name', 'eradication_method',
             'eradication_aftercare', 'public_domain', 'eradication_duration',
-            'nest_height', 'eradication_result', 'notes', 'admin_notes'
+            'nest_height', 'eradication_result', 'notes', 'admin_notes',
+            'queen_present', 'moth_present'
         }
+        
+        # Fields that need boolean conversion
+        boolean_fields = {'visible', 'public_domain', 'queen_present', 'moth_present'}
         
         for idx, data_item in enumerate(data, start=1):
             # Only allow specific fields
             data_item = {k: v for k, v in data_item.items() if k in allowed_fields}
+            
+            # Process boolean fields
+            for field in boolean_fields:
+                if field in data_item:
+                    data_item[field] = self.parse_boolean(data_item[field])
             
             # If an id is provided, treat as update; otherwise as create.
             if "id" in data_item and data_item["id"]:
@@ -605,11 +626,13 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 
             if isinstance(result, dict) and result.get("error"):
                 errors.append({"record": idx, "error": result["error"]})
-            else:
+            elif result is not None:  # Only add if not None
                 valid_observations.append(result)
-                
+            else:
+                logger.warning(f"Unexpected None result for record {idx}")
+                errors.append({"record": idx, "error": "Unexpected None result"})                
         return valid_observations, errors
-
+        
     def process_update_item(self, data_item: dict[str, Any], idx: int, current_time: datetime.datetime) -> Any:
         """
         Process a single record as an update.
@@ -619,14 +642,37 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         """
         observation_id = data_item.pop("id")
         try:
+            # First attempt to find by exact ID
             existing_obj = Observation.objects.get(id=observation_id)
             logger.info(f"Updating observation #{observation_id}")
         except Observation.DoesNotExist:
-            return {"error": f"Observation with id {observation_id} not found"}
+            logger.warning(f"Observation with id {observation_id} not found directly, trying to create...")
+            # If observation doesn't exist, we'll create it instead of failing
+            return self.process_create_item({**data_item, "id": observation_id}, idx, current_time)
         
         # Set the update audit fields
         data_item['modified_by'] = self.request.user
         data_item['modified_datetime'] = current_time
+
+        # Process datetime fields - properly handle timezone conversion
+        datetime_fields = [
+            "created_datetime", 
+            "modified_datetime",
+            "observation_datetime",
+            "wn_modified_datetime",
+            "wn_created_datetime",
+            "reserved_datetime"
+        ]
+        
+        for field in datetime_fields:
+            if field in data_item and data_item[field]:
+                try:
+                    # Parse the datetime value and ensure it's in CET
+                    dt_value = parse_and_convert_to_cet(data_item[field])
+                    data_item[field] = dt_value
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"Invalid datetime format for {field}: {data_item[field]} - {e}")
+                    data_item[field] = None
 
         # If coordinates are provided, update the location, municipality, province, and ANB flag.
         if 'longitude' in data_item and 'latitude' in data_item:
@@ -636,27 +682,18 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 data_item['location'] = Point(long_val, lat_val, srid=4326)
                 municipality = get_municipality_from_coordinates(long_val, lat_val)
                 if municipality:
-                    data_item['municipality'] = municipality.id
+                    data_item['municipality'] = municipality
                     if municipality.province:
-                        data_item['province'] = municipality.province.id
-                data_item['anb'] = check_if_point_in_anb_area(long_val, lat_val)
-            except (ValueError, TypeError) as e:
-                return {"error": f"Invalid coordinates: {str(e)}"}
+                        data_item['province'] = municipality.province
                 
-        # Convert eradication_date if provided
-        if 'eradication_date' in data_item:
-            date_str = data_item['eradication_date']
-            if isinstance(date_str, str):
-                try:
-                    data_item['eradication_date'] = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
-                except ValueError:
-                    return {"error": f"Invalid date format for eradication_date: {date_str}"}
+                # Always explicitly update ANB status when coordinates change
+                data_item['anb'] = check_if_point_in_anb_area(long_val, lat_val)
+                logger.info(f"Setting ANB status for coordinates ({long_val}, {lat_val}): {data_item['anb']}")
+            except (ValueError, TypeError) as e:
+                logger.error(f"Invalid coordinates: {str(e)}")
+                return {"error": f"Invalid coordinates: {str(e)}"}
         
-        # Update the existing observation with any provided field
-        for key, value in data_item.items():
-            setattr(existing_obj, key, value)
-        existing_obj.save()
-        return existing_obj
+        return data_item 
 
     def process_create_item(self, data_item: dict[str, Any], idx: int, current_time: datetime.datetime) -> Any:
         """
@@ -664,16 +701,41 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         
         In create mode, observation_datetime, latitude and longitude are required.
         """
+        # Check if ID is specified for explicitly creating with a specific ID
+        observation_id = data_item.get("id")
+        
         # Ensure required fields for a new record are present
         required_fields = ["observation_datetime", "longitude", "latitude"]
         missing_fields = [field for field in required_fields if not data_item.get(field)]
         if missing_fields:
             return {"error": f"Missing required fields for new record: {', '.join(missing_fields)}"}
-            
-        data_item['created_by'] = self.request.user.pk if self.request.user else None
+        
+        # Set user fields   
+        data_item['created_by'] = self.request.user
         data_item['created_datetime'] = current_time
-        data_item['modified_by'] = self.request.user.pk if self.request.user else None
+        data_item['modified_by'] = self.request.user
         data_item['modified_datetime'] = current_time
+
+        # Process datetime fields
+        datetime_fields = [
+            "created_datetime", 
+            "modified_datetime",
+            "observation_datetime",
+            "wn_modified_datetime",
+            "wn_created_datetime",
+            "reserved_datetime"
+        ]
+        
+        for field in datetime_fields:
+            if field in data_item and data_item[field]:
+                try:
+                    dt_value = parse_and_convert_to_cet(data_item[field])
+                    data_item[field] = dt_value
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"Invalid datetime format for {field}: {data_item[field]} - {e}")
+                    if field == "observation_datetime":  # This is required
+                        return {"error": f"Invalid datetime format for required field {field}: {data_item[field]}"}
+                    data_item[field] = None
 
         try:
             long_val = float(data_item.pop('longitude'))
@@ -683,29 +745,21 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             
             municipality = get_municipality_from_coordinates(long_val, lat_val)
             if municipality:
-                data_item['municipality'] = municipality.id
+                data_item['municipality'] = municipality
                 if municipality.province:
-                    data_item['province'] = municipality.province.id
+                    data_item['province'] = municipality.province
+            
+            # Always explicitly set ANB status
             data_item['anb'] = check_if_point_in_anb_area(long_val, lat_val)
+            logger.info(f"Setting ANB status for coordinates ({long_val}, {lat_val}): {data_item['anb']}")
+            
+            return data_item  # Return the processed dictionary
         except (ValueError, TypeError) as e:
+            logger.error(f"Error processing coordinates: {str(e)}")
             return {"error": f"Invalid coordinates: {str(e)}"}
-        
-        if 'eradication_date' in data_item:
-            date_str = data_item['eradication_date']
-            if isinstance(date_str, str):
-                try:
-                    data_item['eradication_date'] = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
-                except ValueError:
-                    return {"error": f"Invalid date format for eradication_date: {date_str}"}
-        
-        # Clean the data (remove empty values, etc.)
-        cleaned_item = self.clean_data(data_item)
-        serializer = ObservationSerializer(data=cleaned_item)
-        if serializer.is_valid():
-            # Save and return the new observation
-            return serializer.save()
-        else:
-            return {"error": serializer.errors}
+        except Exception as e:
+            logger.error(f"Unexpected error in process_create_item: {str(e)}")
+            return {"error": f"Unexpected error: {str(e)}"}
 
     def clean_data(self, data_dict: dict[str, Any]) -> dict[str, Any]:
         """Clean the incoming data and remove empty or None values."""

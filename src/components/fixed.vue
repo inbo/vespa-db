@@ -780,6 +780,7 @@ export default {
         };
 
         const startEdit = () => {
+            console.log("Starting edit mode");
             isEditing.value = true;
             if (selectedObservation.value) {
                 editableObservation.value = { ...selectedObservation.value };
@@ -797,7 +798,9 @@ export default {
             if (!isEditing.value) {
                 startEdit();
                 return;
-            }            
+            }
+            console.log("Saving changes");
+            
             if (isUpdating.value) return;
             try {
                 isUpdating.value = true;
@@ -841,12 +844,23 @@ export default {
                 observationToSend.queen_present = hasQueenPresent;
                 observationToSend.moth_present = hasMothPresent;
 
+                // Log the payload before sending
+                console.log('confirmUpdate: Sending to backend:', observationToSend);
+
+                // Log the update attempt
+                console.log('confirmUpdate: Attempting to update observation with ID:', observationToSend.id);
                 const updatedObservation = await vespaStore.updateObservation(observationToSend);
+                
+                // Log the response
+                console.log('confirmUpdate: Update response:', updatedObservation);
+
                 successMessage.value = 'Wijzigingen succesvol opgeslagen!';
                 setTimeout(() => successMessage.value = '', 3000);
                 
+                // Exit edit mode after successful save
                 isEditing.value = false;
             } catch (error) {
+                console.error('confirmUpdate: Error during update:', error);
                 if (error.message === "Invalid eradication date format") {
                     errorMessage.value = 'De ingevoerde datum is ongeldig.';
                 } else if (error.message === 'Validation failed') {
@@ -863,6 +877,7 @@ export default {
         };
         
         const cancelEdit = () => {
+            console.log("Canceling edit mode");
             isEditing.value = false;
             if (selectedObservation.value) {
                 editableObservation.value = { ...selectedObservation.value };

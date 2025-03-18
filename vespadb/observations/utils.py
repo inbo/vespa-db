@@ -2,10 +2,12 @@
 
 from django.contrib.gis.geos import Point
 import time
+import logging
 from functools import wraps
 from django.db import connection, OperationalError
 from typing import Callable, TypeVar, Any, cast, Generator, List
 
+logger = logging.getLogger(__name__)
 F = TypeVar("F", bound=Callable[..., Any])
 
 def get_municipality_from_coordinates(longitude: float, latitude: float):  # type: ignore[no-untyped-def]
@@ -22,13 +24,20 @@ def get_municipality_from_coordinates(longitude: float, latitude: float):  # typ
 
 def check_if_point_in_anb_area(longitude: float, latitude: float) -> bool:
     """Check if a given point is in an ANB area."""
-    from vespadb.observations.models import ANB  # noqa: PLC0415
-
-    point_to_check = Point(longitude, latitude, srid=4326)
-    point_to_check.transform(31370)
-
-    anb_areas_containing_point = ANB.objects.filter(polygon__contains=point_to_check)
-    return bool(anb_areas_containing_point)
+    from django.contrib.gis.geos import Point
+    from .models import ANB  # Import here to avoid circular imports
+    
+    point = Point(longitude, latitude, srid=4326)
+    
+    # Transform to the same SRID as ANB polygons (31370)
+    transformed_point = point.transform(31370, clone=True)
+    
+    # Check if the point is within any ANB area
+    is_within_anb = ANB.objects.filter(polygon__contains=transformed_point).exists()
+    
+    logger.info(f"Checking if point ({longitude}, {latitude}) is in ANB area: {is_within_anb}")
+    
+    return is_within_anb
 
 def db_retry(retries: int = 3, delay: int = 5) -> Callable[[F], F]:
     """

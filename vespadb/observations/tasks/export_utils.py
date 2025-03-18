@@ -62,10 +62,13 @@ def prepare_row_data(
                 elif field in ["created_datetime", "modified_datetime", "observation_datetime"]:
                     datetime_val = getattr(observation, field, None)
                     if datetime_val:
+                        cet_tz = pytz.timezone("Europe/Brussels")
                         if datetime_val.tzinfo is None:
-                            datetime_val = pytz.UTC.localize(datetime_val)
+                            datetime_val = cet_tz.localize(datetime_val)
+                        else:
+                            datetime_val = datetime_val.astimezone(cet_tz)
                         datetime_val = datetime_val.replace(microsecond=0)
-                        # Format as UTC without 'Z'
+                        # Format as CET without timezone indicator
                         row_data.append(datetime_val.strftime("%Y-%m-%dT%H:%M:%S"))
                     else:
                         row_data.append("")

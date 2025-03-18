@@ -14,7 +14,7 @@ from rest_framework import serializers
 from rest_framework.request import Request
 from rest_framework_gis.fields import GeometryField
 
-from vespadb.observations.helpers import parse_and_convert_to_cet, parse_and_convert_to_utc
+from vespadb.observations.helpers import parse_and_convert_to_cet, parse_and_convert_to_cet
 from vespadb.observations.models import EradicationResultEnum, Municipality, Observation, Province, Export
 from vespadb.observations.utils import get_municipality_from_coordinates
 from vespadb.users.models import VespaUser
@@ -78,7 +78,7 @@ class ObservationSerializer(serializers.ModelSerializer):
 
         for field in datetime_fields:
             if data.get(field):
-                dt = parse_and_convert_to_utc(data[field])
+                dt = parse_and_convert_to_cet(data[field])
                 data[field] = dt.strftime("%Y-%m-%dT%H:%M:%S")
         for field in date_fields:
             if data.get(field):
@@ -231,7 +231,7 @@ class ObservationSerializer(serializers.ModelSerializer):
             if data.get(field):
                 if isinstance(data[field], str):
                     try:
-                        converted_datetime = parse_and_convert_to_utc(data[field])
+                        converted_datetime = parse_and_convert_to_cet(data[field])
                         if field in date_fields:
                             data[field] = converted_datetime.date()
                         else:

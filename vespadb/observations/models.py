@@ -385,13 +385,13 @@ class Observation(models.Model):
         :param kwargs: Arbitrary keyword arguments.
         """
         logger.info(f"Save method called for observation {self.id if self.id else 'new'}")
-        
         if self.location:
             if not isinstance(self.location, Point):
                 self.location = Point(self.location)
             long, lat = self.location.x, self.location.y
 
             self.anb = check_if_point_in_anb_area(long, lat)
+            
             if not self.municipality:
                 municipality = get_municipality_from_coordinates(long, lat)
                 self.municipality = municipality

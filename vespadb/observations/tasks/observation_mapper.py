@@ -196,16 +196,19 @@ def parse_datetime_with_timezone(
     # Combine date and time strings
     datetime_str = f"{date_str}T{time_str}"
 
-    # If timezone_str is provided, use it; otherwise assume UTC
-    if timezone_str:
+    # If timezone_str is provided, use it; otherwise assume CET
+    if timezone_str and timezone_str != "Europe/Brussels":
         timezone = pytz.timezone(timezone_str)
         datetime_obj = datetime.strptime(datetime_str, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone)
+        # Convert to CET
+        datetime_obj = datetime_obj.astimezone(pytz.timezone("Europe/Brussels"))
     else:
-        # Assume UTC if no timezone is provided
-        datetime_obj = datetime.strptime(datetime_str, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=pytz.UTC)
+        # Assume CET if no timezone is provided or it's already CET
+        datetime_obj = datetime.strptime(datetime_str, "%Y-%m-%dT%H:%M:%S")
+        datetime_obj = pytz.timezone("Europe/Brussels").localize(datetime_obj)
 
-    # Always return UTC
-    return datetime_obj.astimezone(pytz.UTC)
+    # Always return CET
+    return datetime_obj
 
 
 def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dict[str, Any] | None:  # noqa: C901
@@ -225,12 +228,15 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
 
     try:
         observation_time = external_data.get("time", "00:00:00") or "00:00:00"
-        # Parse observation_datetime assuming UTC unless specified otherwise
-        observation_datetime_utc = parse_datetime_with_timezone(external_data["date"], observation_time)
+        # Parse observation_datetime assuming ETC unless specified otherwise
+        observation_datetime_cet = parse_datetime_with_timezone(external_data["date"], observation_time)
 
         # Parse created and modified datetimes from ISO format, assuming UTC
-        created_datetime = datetime.fromisoformat(external_data["created"].replace("Z", "")).replace(tzinfo=pytz.UTC)
-        modified_datetime = datetime.fromisoformat(external_data["modified"].replace("Z", "")).replace(tzinfo=pytz.UTC)
+        cet_tz = pytz.timezone("Europe/Brussels")
+        created_datetime = datetime.fromisoformat(external_data["created"].replace("Z", ""))
+        created_datetime = created_datetime.replace(tzinfo=pytz.UTC).astimezone(cet_tz)
+        modified_datetime = datetime.fromisoformat(external_data["modified"].replace("Z", ""))
+        modified_datetime = modified_datetime.replace(tzinfo=pytz.UTC).astimezone(cet_tz)
     except ValueError as e:
         logger.exception(f"Invalid date/time or ISO format: {e} for external ID {external_data.get('id', 'Unknown')}")
         return None
@@ -249,7 +255,7 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
     mapped_data = {
         "wn_id": external_data["id"],
         "location": location,
-        "observation_datetime": observation_datetime_utc,
+        "observation_datetime": observation_datetime_cet,
         "wn_created_datetime": created_datetime,
         "wn_modified_datetime": modified_datetime,
         "anb": anb,
@@ -285,10 +291,10 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
             break
 
     if eradication_flagged:
-        mapped_data["eradication_date"] = observation_datetime_utc.date()
+        mapped_data["eradication_date"] = observation_datetime_cet.date()
         mapped_data["eradicator_name"] = "Gemeld als bestreden"
         if "eradication_result" not in mapped_data or not mapped_data["eradication_result"]:
-            mapped_data["eradication_result"] = "eradicated"
+            mapped_data["eradication_result"] = "successful" 
 
     return mapped_data
 

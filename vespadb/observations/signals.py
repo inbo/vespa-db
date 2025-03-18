@@ -1,40 +1,36 @@
 """Signal handlers for the observations app."""
 
 from typing import Any
-
+import logging
 from django.db.models import F, Model
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.utils import timezone
 
 from vespadb.observations.models import Observation
+logger = logging.getLogger(__name__)
 
 
 @receiver(pre_save, sender=Observation)
-def handle_reservation_change(sender: type[Model], instance: Observation, **kwargs: Any) -> None:
+def handle_reservation_change(sender, instance, **kwargs):
     """
-    Signal to handle changes in reservation ownership before an Observation is saved.
-
-    If the reserved_by user changes, adjust the reservation count for the previously
-    reserved user and the newly reserved user. Decrease the count for the old user
-    and increase it for the new user.
-
-    Parameters
-    ----------
-        sender (Type[Model]): The model class that sent the signal.
-        instance (Observation): The observation instance being saved.
-        **kwargs: Extra keyword arguments.
+    Handle changes to the reservation status of an Observation.
     """
-    if instance.pk:
+    if instance.pk is None:
+        # This is a new instance being created; no old instance exists
+        logger.debug(f"New observation being created: {instance}")
+        return
+    
+    try:
         old_instance: Observation = sender.objects.get(pk=instance.pk)
+        # Compare old_instance.reserved_by with instance.reserved_by or other fields
         if old_instance.reserved_by != instance.reserved_by:
-            if old_instance.reserved_by:
-                old_instance.reserved_by.reservation_count -= 1
-                old_instance.reserved_by.save()
-            if instance.reserved_by:
-                instance.reserved_by.reservation_count += 1
-                instance.reserved_by.save()
-
+            logger.info(f"Reservation changed for observation {instance.pk}: "
+                       f"from {old_instance.reserved_by} to {instance.reserved_by}")
+            # Add your logic here (e.g., update reservation count)
+    except Observation.DoesNotExist:
+        # This shouldn't happen with pk check above, but log it just in case
+        logger.error(f"Observation with pk {instance.pk} not found in pre_save signal")
 
 @receiver(post_save, sender=Observation)
 def update_reserved_datetime(sender: type[Model], instance: Observation, created: bool, **kwargs: Any) -> None:

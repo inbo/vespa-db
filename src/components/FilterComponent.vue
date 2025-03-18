@@ -109,8 +109,6 @@ export default {
       const minDateCET = minDate.value ? DateTime.fromJSDate(minDate.value).setZone('Europe/Paris').toFormat('yyyy-MM-dd\'T\'HH:mm:ss') : null;
       const maxDateCET = maxDate.value ? DateTime.fromJSDate(maxDate.value).setZone('Europe/Paris').toFormat('yyyy-MM-dd\'T\'HH:mm:ss') : null;
 
-
-
       vespaStore.applyFilters({
         municipalities: selectedMunicipalities.value.length > 0 ? selectedMunicipalities.value : [],
         provinces: selectedProvinces.value.length > 0 ? selectedProvinces.value : [],

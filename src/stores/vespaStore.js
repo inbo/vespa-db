@@ -154,10 +154,9 @@ export const useVespaStore = defineStore('vespaStore', {
         },
         formatDateWithoutTime(date) {
             const d = new Date(date);
-            const cetString = new Date(d.toLocaleString('en-US', { timeZone: 'Europe/Brussels' }));
-            let month = '' + (cetString.getMonth() + 1);
-            let day = '' + cetString.getDate();
-            const year = cetString.getFullYear();
+            let month = '' + (d.getMonth() + 1);
+            let day = '' + d.getDate();
+            const year = d.getFullYear();
 
             if (month.length < 2) month = '0' + month;
             if (day.length < 2) day = '0' + day;
@@ -165,13 +164,10 @@ export const useVespaStore = defineStore('vespaStore', {
             return [year, month, day].join('-');
         },
         formatDateWithEndOfDayTime(date) {
-            // Format to CET
             const d = new Date(date);
-            // Ensure the date is interpreted in CET
-            const cetString = new Date(d.toLocaleString('en-US', { timeZone: 'Europe/Brussels' }));
-            let month = '' + (cetString.getMonth() + 1);
-            let day = '' + cetString.getDate();
-            const year = cetString.getFullYear();
+            let month = '' + (d.getMonth() + 1);
+            let day = '' + d.getDate();
+            const year = d.getFullYear();
 
             if (month.length < 2) month = '0' + month;
             if (day.length < 2) day = '0' + day;

@@ -208,6 +208,9 @@ class ObservationSerializer(serializers.ModelSerializer):
         if "wn_cluster_id" in validated_data and validated_data["wn_cluster_id"] != instance.wn_cluster_id:
             raise serializers.ValidationError("wn_cluster_id cannot be updated.")
 
+        # Automatically set modified_by to current user without needing to check permissions for this field
+        validated_data['modified_by'] = user
+
         # For non-admins, disallow any admin-only fields from being updated.
         admin_update_fields = [
             "admin_notes",
@@ -215,10 +218,9 @@ class ObservationSerializer(serializers.ModelSerializer):
             "wn_admin_notes",
             "visible",
             "created_by",
-            "modified_by",
             "created_by_first_name",
             "modified_by_first_name",
-        ]
+        ]  # removed "modified_by" from this list
         if not user.is_superuser:
             for field in admin_update_fields:
                 if field in validated_data:
@@ -246,6 +248,7 @@ class ObservationSerializer(serializers.ModelSerializer):
             "queen_present",
             "moth_present",
             "public_domain",
+            "modified_by",  # explicitly allow modified_by for all users
         ]
         
         # Define eradication-related fields
@@ -276,7 +279,7 @@ class ObservationSerializer(serializers.ModelSerializer):
         # Conditionally set `reserved_by` and `reserved_datetime`
         if "reserved_by" in validated_data:
             if validated_data["reserved_by"] is not None:
-                validated_data["reserved_datetime"] = datetime.now(timezone("EST"))
+                validated_data["reserved_datetime"] = datetime.now(timezone("Europe/Brussels"))
             else:
                 validated_data["reserved_datetime"] = None
 

@@ -38,9 +38,11 @@ def cleanup_expired_reservations() -> None:
 
     This task is intended to be run as a cron job to regularly clean up outdated reservation data.
     """
-    five_days_ago = (timezone.now() - timedelta(days=settings.RESERVATION_DURATION_DAYS)).replace(
-        hour=0, minute=0, second=0, microsecond=0
-    )
+    from vespadb.observations.helpers import parse_and_convert_to_cet
+    five_days_ago = (timezone.now() - timedelta(days=settings.RESERVATION_DURATION_DAYS))
+    five_days_ago = parse_and_convert_to_cet(five_days_ago)
+    five_days_ago = five_days_ago.replace(hour=0, minute=0, second=0, microsecond=0)
+    
     observations_to_update = Observation.objects.filter(
         Q(reserved_datetime__lte=five_days_ago, reserved_by__isnull=False)
         | Q(reserved_datetime__isnull=False, reserved_by__isnull=True)

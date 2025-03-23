@@ -163,10 +163,56 @@
                                         :readonly="!canEdit" :class="{ 'form-control-plaintext': !canEdit }"></textarea>
                                 </div>
                             </div>
+                            <div v-if="canViewRestrictedFields" class="row mb-2">
+                                <label class="col-4 col-form-label">Extra info</label>
+                                <div class="col-8">
+                                    <multiselect
+                                        v-model="selectedExtras"
+                                        :options="availableExtrasOptions"
+                                        :multiple="true"
+                                        track-by="value"
+                                        label="label"
+                                        placeholder="Selecteer opties"
+                                        :close-on-select="false"
+                                        :searchable="false"
+                                        :disabled="!canEdit"
+                                        :select-label="''"
+                                        :deselect-label="''"
+                                        :selected-label="''"
+                                    >
+                                        <template #option="{ option }">
+                                            <div class="multiselect-option" :class="{ 'is-selected': selectedExtras.some(extra => extra.value === option.value) }">
+                                                <span class="option-label">{{ option.label }}</span>
+                                            </div>
+                                        </template>
+                                        <template #tag="{ option, remove }">
+                                            <span class="multiselect-tag">
+                                                {{ option.label }}
+                                                <button 
+                                                    type="button" 
+                                                    class="remove-tag" 
+                                                    @click="remove(option)"
+                                                    aria-label="Remove option"
+                                                >×</button>
+                                            </span>
+                                        </template>
+                                    </multiselect>
+                                </div>
+                            </div>
+                            <div v-if="canViewRestrictedFields" class="row mb-2">
+                                <div class="col-8 offset-4">
+                                    <div class="form-check form-switch">
+                                        <input v-if="selectedObservation.public_domain !== undefined"
+                                            v-model="editableObservation.public_domain" class="form-check-input"
+                                            type="checkbox" id="public-domain" :disabled="!canViewRestrictedFields" />
+                                        <label class="form-check-label" for="public-domain">Nest op publiek
+                                            terrein</label>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </section>
-
                 <section class="accordion-item">
                     <h4 class="accordion-header" id="nest-header">
                         <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#nest"
@@ -256,42 +302,6 @@
                                     </p>
                                 </div>
                             </div>
-                            <div v-if="canViewRestrictedFields" class="row mb-2">
-                                <label class="col-4 col-form-label">Extra info</label>
-                                <div class="col-8">
-                                    <multiselect
-                                        v-model="selectedExtras"
-                                        :options="availableExtrasOptions"
-                                        :multiple="true"
-                                        track-by="value"
-                                        label="label"
-                                        placeholder="Selecteer opties"
-                                        :close-on-select="false"
-                                        :searchable="false"
-                                        :disabled="!canEdit"
-                                        :select-label="''"
-                                        :deselect-label="''"
-                                        :selected-label="''"
-                                    >
-                                        <template #option="{ option }">
-                                            <div class="multiselect-option" :class="{ 'is-selected': selectedExtras.some(extra => extra.value === option.value) }">
-                                                <span class="option-label">{{ option.label }}</span>
-                                            </div>
-                                        </template>
-                                        <template #tag="{ option, remove }">
-                                            <span class="multiselect-tag">
-                                                {{ option.label }}
-                                                <button 
-                                                    type="button" 
-                                                    class="remove-tag" 
-                                                    @click="remove(option)"
-                                                    aria-label="Remove option"
-                                                >×</button>
-                                            </span>
-                                        </template>
-                                    </multiselect>
-                                </div>
-                            </div>
                             <div>
                                 <div class="row mb-2">
                                     <label class="col-4 col-form-label">Validatie</label>
@@ -311,17 +321,6 @@
                                     <label class="col-4 col-form-label">Opmerking</label>
                                     <div class="col-8">
                                         <p class="form-control-plaintext">{{ selectedObservation.notes }}</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div v-if="canViewRestrictedFields" class="row mb-2">
-                                <div class="col-8 offset-4">
-                                    <div class="form-check form-switch">
-                                        <input v-if="selectedObservation.public_domain !== undefined"
-                                            v-model="editableObservation.public_domain" class="form-check-input"
-                                            type="checkbox" id="public-domain" :disabled="!canViewRestrictedFields" />
-                                        <label class="form-check-label" for="public-domain">Nest op publiek
-                                            terrein</label>
                                     </div>
                                 </div>
                             </div>
@@ -577,7 +576,6 @@ export default {
             return vespaStore.isAdmin ||
                 (isLoggedIn.value && vespaStore.userMunicipalities.includes(selectedObservation.value?.municipality_name));
         });
-
         const eradicationStatusClass = computed(() => {
             const result = selectedObservation.value?.eradication_result;
             if (result && result !== null) {
@@ -687,51 +685,107 @@ export default {
                 // Explicitly set queen_present based on selectedExtras
                 const hasQueenPresent = selectedExtras.value.some(extra => extra.value === 'queen_present');
                 const hasMothPresent = selectedExtras.value.some(extra => extra.value === 'moth_present');
-                editableObservation.value.queen_present = hasQueenPresent;
-                editableObservation.value.moth_present = hasMothPresent;
-                
-
-                // Remove nest_extra if it exists (the backend doesn't need it)
-                if ('nest_extra' in editableObservation.value) {
-                    delete editableObservation.value.nest_extra;
-                }
-
-                const eradicationFields = ['eradication_date', 'eradicator_name', 'eradication_duration', 'eradication_persons', 'eradication_method', 'eradication_aftercare', 'eradication_problems', 'eradication_notes', 'eradication_product'];
-                const hasEradicationData = eradicationFields.some(field => editableObservation.value[field]);
-
-                if (editableObservation.value.eradication_result && !editableObservation.value.eradication_date) {
-                    const today = new Date();
-                    editableObservation.value.eradication_date = today.toISOString().split('T')[0];
-                }
-
-                if (editableObservation.value.eradication_date) {
-                    const date = new Date(editableObservation.value.eradication_date);
-                    if (!isNaN(date.getTime())) {
-                        editableObservation.value.eradication_date = date.toISOString().split('T')[0];
-                    } else {
-                        throw new Error("Invalid eradication date format");
-                    }
-                }
-
-                if (hasEradicationData && !editableObservation.value.eradication_result) {
-                    eradicationResultError.value = 'Resultaat is verplicht wanneer andere bestrijdingsgegevens zijn ingevuld.';
-                    throw new Error('Validation failed');
-                }
 
                 // Reset error messages
                 errorMessage.value = '';
                 eradicationResultError.value = '';
 
-                // Create a copy of editableObservation to explicitly set queen_present to true/false (not null)
-                const observationToSend = { ...editableObservation.value };
-                observationToSend.queen_present = hasQueenPresent;
-                observationToSend.moth_present = hasMothPresent;
+                // Create a clean object with only the fields that are allowed to be updated
+                const observationToSend = {
+                    id: editableObservation.value.id
+                };
 
-                // Log the object being sent
-                console.log('Sending to backend:', observationToSend);
+                // Fields that regular users can update
+                const regularUserAllowedFields = [
+                    "reserved_by",
+                    "eradication_date",
+                    "eradication_result",
+                    "queen_present",
+                    "moth_present",
+                    "public_domain"
+                ];
 
-                // Send explicit object to the store
+                // Additional fields that require special privilege (municipality access)
+                const restrictedUserFields = [
+                    "eradicator_name",
+                    "eradication_duration",
+                    "eradication_persons",
+                    "eradication_method",
+                    "eradication_product",
+                    "eradication_aftercare",
+                    "eradication_problems",
+                    "eradication_notes"
+                ];
+
+                // Admin-only fields
+                const adminOnlyFields = [
+                    "visible",
+                    "admin_notes"
+                ];
+
+                // Add regular user fields
+                regularUserAllowedFields.forEach(field => {
+                    if (field === 'queen_present') {
+                        observationToSend[field] = hasQueenPresent;
+                    } else if (field === 'moth_present') {
+                        observationToSend[field] = hasMothPresent;
+                    } else if (field in editableObservation.value) {
+                        observationToSend[field] = editableObservation.value[field];
+                    }
+                });
+
+                // Add restricted fields if user has municipality access
+                if (canViewRestrictedFields.value) {
+                    restrictedUserFields.forEach(field => {
+                        if (field in editableObservation.value) {
+                            observationToSend[field] = editableObservation.value[field];
+                        }
+                    });
+                }
+
+                // Add admin-only fields if user is admin
+                if (canEditAdminFields.value) {
+                    adminOnlyFields.forEach(field => {
+                        if (field in editableObservation.value) {
+                            observationToSend[field] = editableObservation.value[field];
+                        }
+                    });
+                }
+
+                // Handle eradication date format
+                if (observationToSend.eradication_date) {
+                    const date = new Date(observationToSend.eradication_date);
+                    if (!isNaN(date.getTime())) {
+                        observationToSend.eradication_date = date.toISOString().split('T')[0];
+                    } else {
+                        throw new Error("Invalid eradication date format");
+                    }
+                }
+
+                // Validate that eradication result is provided if other eradication fields are filled
+                const eradicationFields = restrictedUserFields.filter(field => field.startsWith('eradication_'));
+                const hasEradicationData = eradicationFields.some(field => 
+                    field in observationToSend && observationToSend[field] !== null
+                );
+
+                if (hasEradicationData && !observationToSend.eradication_result) {
+                    eradicationResultError.value = 'Resultaat is verplicht wanneer andere bestrijdingsgegevens zijn ingevuld.';
+                    throw new Error('Validation failed');
+                }
+
+                // If eradication result is set but no date, use today's date
+                if (observationToSend.eradication_result && !observationToSend.eradication_date) {
+                    const today = new Date();
+                    observationToSend.eradication_date = today.toISOString().split('T')[0];
+                }
+
+                // Send the filtered data to the store
                 await vespaStore.updateObservation(observationToSend);
+                successMessage.value = 'Wijzigingen succesvol opgeslagen!';
+                setTimeout(() => {
+                    successMessage.value = '';
+                }, 3000);
+
             } catch (error) {
                 if (error.message === "Invalid eradication date format") {
                     errorMessage.value = 'De ingevoerde datum is ongeldig.';
@@ -790,24 +844,22 @@ export default {
         };
         
         // Modified watch for selectedObservation that initializes the multi-select when loading data
-        watch(() => vespaStore.selectedObservation, (newVal) => {
+        watch(() => vespaStore.selectedObservation, async (newVal) => {
             if (!newVal) return;
             
             editableObservation.value = { ...newVal };
             editableObservation.value.observation_datetime = formatToDatetimeLocal(newVal.observation_datetime);
             editableObservation.value.eradication_date = newVal.eradication_date ? formatToDate(newVal.eradication_date) : null;
             
-            // Initialize selectedExtras based on the queen_present value
             selectedExtras.value = [];
             if (newVal.queen_present === true) {
-                const queenOption = extrasOptions.find(option => option.value === 'queen_present');
-                if (queenOption) selectedExtras.value.push(queenOption);
+                selectedExtras.value.push(extrasOptions.find(option => option.value === 'queen_present'));
             }
             if (newVal.moth_present === true) {
-                const mothOption = extrasOptions.find(option => option.value === 'moth_present');
-                if (mothOption) selectedExtras.value.push(mothOption);
+                selectedExtras.value.push(extrasOptions.find(option => option.value === 'moth_present'));
             }
-            
+            editableObservation.value.queen_present = newVal.queen_present === true;
+            editableObservation.value.moth_present = newVal.moth_present === true;
             emit('updateMarkerColor', newVal.id);
         }, { immediate: true });
         

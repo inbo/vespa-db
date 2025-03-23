@@ -280,13 +280,13 @@ def map_external_data_to_observation_model(external_data: dict[str, Any]) -> dic
     if (
         "notes" in external_data
         and external_data["notes"]
-        and any(keyword in external_data["notes"].upper() for keyword in settings.ERADICATION_KEYWORD_LIST)
+        and any(keyword in external_data["notes"] for keyword in settings.ERADICATION_KEYWORD_LIST)
         and not check_existing_eradication_date(external_data["id"])
     ):
         eradication_flagged = True
 
     for attribute in external_data.get("attributes", []):
-        if attribute.get("attribute") == 369 and "BESTREDEN" in attribute.get("value", "").upper():
+        if attribute.get("attribute") == 369 and "BESTREDEN" in attribute.get("value", ""):
             eradication_flagged = True
             break
 

@@ -124,11 +124,19 @@ CELERY_TIMEZONE = "Europe/Brussels"
 CELERY_BEAT_SCHEDULE = {
     "fetch_and_update_observations": {
         "task": "vespadb.observations.tasks.observation_sync.fetch_and_update_observations",
-        "schedule": crontab(hour=4, minute=0),  # Runs every day at X AM UTC.
+        "schedule": crontab(hour=4, minute=0),
     },
     "remove_expired_reservations": {
         "task": "vespadb.observations.tasks.reservation_cleanup.free_expired_reservations_and_audit_reservation_count",
-        "schedule": crontab(hour=5, minute=30),  # Runs every day at X AM UTC
+        "schedule": crontab(hour=5, minute=30),
+    },
+    'prewarm-geojson-cache': {
+        'task': "vespadb.observations.tasks.generate_geojson_task",
+        'schedule': crontab(minute='*/10', hour='9-17'),
+        'args': ({
+            'visible': 'true',
+            'min_observation_datetime': '2024-04-01'
+        }, 'vespadb:geojson:visible=true&min_observation_datetime=2024-04-01'),
     },
 }
 

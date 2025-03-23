@@ -92,21 +92,28 @@ DATE_REGEX = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 class ObservationSerializer(serializers.ModelSerializer):
     """Serializer for the full details of an Observation model instance."""
 
-    municipality_name = serializers.SerializerMethodField()
-    nest_status = serializers.SerializerMethodField()  # Renamed from status to nest_status
-    reserved_by_first_name = serializers.SerializerMethodField()
-    modified_by_first_name = serializers.SerializerMethodField()
-    created_by_first_name = serializers.SerializerMethodField()
-    eradication_date = serializers.DateField(
-        required=False, allow_null=True, format="%Y-%m-%d", input_formats=["%Y-%m-%d"]
-    )
+    municipality_name = serializers.CharField(source='municipality.name', read_only=True)
+    nest_status = serializers.SerializerMethodField()
     location = GeometryField(required=False, allow_null=True)
 
     class Meta:
         """Meta class for the ObservationSerializer."""
 
         model = Observation
-        fields = "__all__"
+        fields = [
+            'id', 'created_datetime', 'modified_datetime', 'location', 'source', 'source_id',
+            'nest_height', 'nest_size', 'nest_location', 'nest_type', 'observation_datetime',
+            'eradication_date', 'municipality', 'queen_present', 'moth_present', 'province',
+            'images', 'municipality_name', 'notes', 'eradication_result', 'wn_id',
+            'wn_validation_status', 'anb', 'visible', 'wn_cluster_id', 'nest_status',
+            'reserved_by', 'reserved_datetime', 'eradicator_name', 'eradication_duration',
+            'eradication_persons', 'eradication_product', 'eradication_method',
+            'eradication_aftercare', 'eradication_problems', 'eradication_notes',
+            'observer_phone_number', 'observer_email', 'observer_name', 'public_domain',
+            'created_by', 'modified_by', 'wn_modified_datetime', 'wn_created_datetime',
+            'admin_notes', 'observer_received_email', 'wn_admin_notes'
+        ]
+
         
     def get_municipality_name(self, obj: Observation) -> str | None:
         """Retrieve the name of the municipality associated with the observation, if any."""
@@ -134,65 +141,43 @@ class ObservationSerializer(serializers.ModelSerializer):
         
     def to_representation(self, instance: Observation) -> dict[str, Any]:
         """Dynamically filter fields based on user authentication status."""
-        
-        # Get base serialized data
-        data: dict[str, Any] = super().to_representation(instance)
-        
-        # Rename "status" to "nest_status" for the output
-        if "status" in data:
-            data["nest_status"] = data.pop("status")
-        
-        # Convert datetime fields to formatted strings
+        data = super().to_representation(instance)
+
+        # Format datetime and date fields as required by frontend
         datetime_fields = [
-            "created_datetime",
-            "modified_datetime",
-            "wn_modified_datetime",
-            "wn_created_datetime",
-            "reserved_datetime",
-            "observation_datetime",
+            "created_datetime", "modified_datetime", "wn_modified_datetime",
+            "wn_created_datetime", "reserved_datetime", "observation_datetime"
         ]
         date_fields = ["eradication_date"]
 
         for field in datetime_fields:
             if data.get(field):
-                dt = parse_and_convert_to_cet(data[field])
-                data[field] = dt.strftime("%Y-%m-%dT%H:%M:%S")
-                
+                try:
+                    dt = parse_and_convert_to_cet(data[field])
+                    data[field] = dt.strftime("%Y-%m-%dT%H:%M:%S")
+                except (ValueError, TypeError):
+                    data[field] = None  # Fallback to None if parsing fails
+
         for field in date_fields:
             if data.get(field):
-                date_str: str = data[field]
                 try:
-                    parsed_date = datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S%z").replace(tzinfo=UTC)
-                    data[field] = parsed_date.strftime("%Y-%m-%d")
-                except ValueError:
-                    try:
-                        parsed_date = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=UTC)
-                        data[field] = parsed_date.strftime("%Y-%m-%d")
-                    except Exception:
-                        pass
+                    dt = datetime.strptime(data[field], "%Y-%m-%d")
+                    data[field] = dt.strftime("%Y-%m-%d")
+                except (ValueError, TypeError):
+                    data[field] = None  # Fallback to None if parsing fails
 
-        # Retrieve request context safely
+        # Filter fields based on user permissions
         request = self.context.get("request")
-        
-        # Determine accessible fields based on authentication status
         if request and request.user.is_authenticated:
-            user = request.user
-            if user.is_superuser:
-                allowed = admin_fields
+            if request.user.is_superuser:
+                allowed = set(admin_fields)
             else:
-                # Check if the observation's municipality is one of the user's assigned ones
-                user_muni_ids = set(user.municipalities.values_list("id", flat=True))
-                if instance.municipality and instance.municipality.id in user_muni_ids:
-                    allowed = logged_in_fields
-                else:
-                    allowed = public_fields
+                user_muni_ids = set(request.user.municipalities.values_list("id", flat=True))
+                allowed = set(logged_in_fields if instance.municipality and instance.municipality.id in user_muni_ids else public_fields)
         else:
-            allowed = public_fields
+            allowed = set(public_fields)
 
-        # Return only the allowed fields
-        return {field: data[field] for field in allowed if field in data}
-
-    
+        return {k: v for k, v in data.items() if k in allowed}
 
     def update(self, instance: Observation, validated_data: dict[Any, Any]) -> Observation:
         """Update method to handle observation updates."""

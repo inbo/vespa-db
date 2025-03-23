@@ -149,9 +149,8 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         Admin users can see all observations. Authenticated users see their reservations and unreserved observations.
         Unauthenticated users see only unreserved observations.
         """
-        base_queryset = super().get_queryset()
+        base_queryset = super().get_queryset().select_related('municipality', 'province')
         order_params = self.request.query_params.get("ordering", "")
-
         if "municipality_name" in order_params:
             base_queryset = base_queryset.annotate(
                 municipality_name=Coalesce(
@@ -326,16 +325,30 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         -------
         - Response: The paginated response containing the observations data or full list if pagination is not applied.
         """
-        queryset = self.filter_queryset(self.get_queryset())
+        # Generate a unique cache key based on query parameters
+        query_params = request.GET.copy()
+        page = query_params.get('page', '1')
+        page_size = query_params.get('page_size', '25')
+        cache_key = f"observations_list:{hash(str(query_params))}:page_{page}:size_{page_size}"
+        
+        # Check cache
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            return Response(cached_data)
 
+        queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+            response_data = self.get_paginated_response(serializer.data).data
+            cache.set(cache_key, response_data, timeout=3600)  # Cache for 1 hour
+            return Response(response_data)
 
         serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
-
+        response_data = {"results": serializer.data}
+        cache.set(cache_key, response_data, timeout=3600)
+        return Response(response_data)
+    
     @swagger_auto_schema(
         operation_description="Retrieve GeoJSON data for observations within a bounding box (bbox).",
         manual_parameters=[
@@ -368,64 +381,50 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         try:
             query_params = request.GET.copy()
             bbox_str = query_params.pop("bbox", None)
-
             sorted_params = "&".join(sorted(f"{key}={value}" for key, value in query_params.items()))
-            cache_key = f"vespadb::{request.path}::{sorted_params}"
-            logger.info(f"Checking cache for {cache_key}")
-
+            cache_key = f"vespadb:geojson:{sorted_params}"
+            
             cached_data = cache.get(cache_key)
             if cached_data:
-                logger.info("Cache hit - Returning cached response")
                 return JsonResponse(cached_data, safe=False)
 
-            bbox_str = request.GET.get("bbox")
+            bbox = None
             if bbox_str:
-                try:
-                    bbox_coords = list(map(float, bbox_str.split(",")))
-                    if len(bbox_coords) == BBOX_LENGTH:
-                        xmin, ymin, xmax, ymax = bbox_coords
-                        bbox_wkt = (
-                            f"POLYGON(({xmin} {ymin}, {xmin} {ymax}, {xmax} {ymax}, {xmax} {ymin}, {xmin} {ymin}))"
-                        )
-                        bbox = GEOSGeometry(bbox_wkt, srid=4326)
-                    else:
-                        return HttpResponse("Invalid bbox format", status=status.HTTP_400_BAD_REQUEST)
-                except ValueError:
-                    return HttpResponse("Invalid bbox values", status=status.HTTP_400_BAD_REQUEST)
-            else:
-                bbox = None
+                bbox_coords = list(map(float, bbox_str.split(",")))
+                if len(bbox_coords) == BBOX_LENGTH:
+                    xmin, ymin, xmax, ymax = bbox_coords
+                    bbox_wkt = f"POLYGON(({xmin} {ymin}, {xmin} {ymax}, {xmax} {ymax}, {xmax} {ymin}, {xmin} {ymin}))"
+                    bbox = GEOSGeometry(bbox_wkt, srid=4326)
+                else:
+                    return HttpResponse("Invalid bbox format", status=400)
 
-            queryset = self.filter_queryset(self.get_queryset())
+            # Adjusted queryset - removed prefetch_related('images') unless confirmed as ManyToMany
+            queryset = self.filter_queryset(
+                self.get_queryset().select_related('municipality')
+            ).annotate(point=Transform("location", 4326))
 
             if bbox:
                 queryset = queryset.filter(location__within=bbox)
 
-            queryset = queryset.annotate(point=Transform("location", 4326))
+            def generate_features(qs):
+                for obs in qs.iterator(chunk_size=1000):
+                    yield {
+                        "type": "Feature",
+                        "properties": {
+                            "id": obs.id,
+                            "status": "eradicated" if obs.eradication_result else "reserved" if obs.reserved_by else "default",
+                        },
+                        "geometry": json.loads(obs.point.geojson) if obs.point else None,
+                    }
 
-            features = [
-                {
-                    "type": "Feature",
-                    "properties": {
-                        "id": obs.id,
-                        "status": "eradicated"
-                        if obs.eradication_result is not None
-                        else "reserved"
-                        if obs.reserved_by
-                        else "default",
-                    },
-                    "geometry": json.loads(obs.location.geojson) if obs.location else None,
-                }
-                for obs in queryset
-            ]
+            features = list(generate_features(queryset))
             geojson_response = {"type": "FeatureCollection", "features": features}
             cache.set(cache_key, geojson_response, GEOJSON_REDIS_CACHE_EXPIRATION)
-            return JsonResponse(geojson_response)
-        except Exception:
-            logger.exception("An error occurred while generating GeoJSON data")
-            return HttpResponse(
-                "An error occurred while generating GeoJSON data", status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
+            return JsonResponse(geojson_response, safe=False)
+        except Exception as e:
+            logger.exception("GeoJSON generation failed")
+            return HttpResponse("Error generating GeoJSON", status=500)
+        
     @swagger_auto_schema(
         operation_description="Bulk import observations from either JSON or CSV file.",
         request_body=openapi.Schema(

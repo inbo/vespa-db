@@ -106,8 +106,8 @@ export default {
     const menu2 = ref(false);
 
     const emitFilterUpdate = debounce(() => {
-      const minDateCET = minDate.value ? DateTime.fromJSDate(minDate.value).setZone('Europe/Paris').toFormat('yyyy-MM-dd\'T\'HH:mm:ss') : null;
-      const maxDateCET = maxDate.value ? DateTime.fromJSDate(maxDate.value).setZone('Europe/Paris').toFormat('yyyy-MM-dd\'T\'HH:mm:ss') : null;
+      const minDateCET = minDate.value ? DateTime.fromJSDate(minDate.value).setZone('Europe/Brussels').toFormat('yyyy-MM-dd\'T\'HH:mm:ss') : null;
+      const maxDateCET = maxDate.value ? DateTime.fromJSDate(maxDate.value).setZone('Europe/Brussels').toFormat('yyyy-MM-dd\'T\'HH:mm:ss') : null;
 
       vespaStore.applyFilters({
         municipalities: selectedMunicipalities.value.length > 0 ? selectedMunicipalities.value : [],

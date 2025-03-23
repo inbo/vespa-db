@@ -44,6 +44,8 @@ export const useVespaStore = defineStore('vespaStore', {
         userMunicipalities: [],
         isAdmin: false,
         loginError: null,
+        termsAcceptanceLoading: false,
+        termsAcceptanceError: null,
     }),
     getters: {
         canEditObservation: (state) => (observation) => {
@@ -261,13 +263,43 @@ export const useVespaStore = defineStore('vespaStore', {
                 }
             });
         },
+        async acceptTermsOfService() {
+            this.termsAcceptanceLoading = true;
+            this.termsAcceptanceError = null;
+            
+            try {
+                const response = await ApiService.post("/accept-terms/", {
+                    user_id: this.user.id,
+                    accepted: true
+                });
+                
+                if (response.status === 200) {
+                    this.user = { ...this.user, hasAcceptedTerms: true };
+                    return true;
+                } else {
+                    throw new Error('Failed to record terms acceptance');
+                }
+            } catch (error) {
+                console.error('Error accepting terms of service:', error);
+                
+                if (error.response && error.response.data) {
+                    this.termsAcceptanceError = error.response.data.error || 'Failed to accept terms of service';
+                } else {
+                    this.termsAcceptanceError = error.message || 'Failed to accept terms of service';
+                }
+                
+                return false;
+            } finally {
+                this.termsAcceptanceLoading = false;
+            }
+        },
         async cancelReservation(observation) {
             try {
-                const updatedObservation = {
-                    ...observation,
+                // Only send the reserved_by field, not the entire observation
+                const response = await ApiService.patch(`/observations/${observation.id}/`, {
                     reserved_by: null
-                };
-                const response = await ApiService.patch(`/observations/${observation.id}/`, updatedObservation);
+                });
+                
                 if (response.status === 200) {
                     this.selectedObservation = { ...this.selectedObservation, ...response.data };
                     this.updateMarkerColor(observation.id, '#212529', '#212529', 1);

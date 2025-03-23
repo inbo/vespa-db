@@ -30,20 +30,13 @@
             </div>
 
             <div v-if="canViewRestrictedFields" class="mb-3" id="edit">
-                <button class="btn btn-sm" :class="isEditing ? 'btn-outline-success' : 'btn-outline-primary'" @click="toggleEditMode">
-                    {{ isEditing ? 'Wijzigingen opslaan' : 'Bewerken' }}
-                </button>
-                <button v-if="isEditing" class="btn btn-sm btn-outline-secondary ms-2" @click="cancelEdit">
-                    Annuleren
-                </button>
+                <button class="btn btn-sm btn-outline-success" @click="confirmUpdate">Wijzigingen opslaan</button>
             </div>
             <div v-if="successMessage" class="alert alert-success alert-dismissible fade show" role="alert">
                 {{ successMessage }}
-                <button type="button" class="btn-close" @click="clearSuccessMessage" aria-label="Close"></button>
             </div>
             <div v-if="errorMessage" class="alert alert-danger alert-dismissible fade show" role="alert">
                 {{ errorMessage }}
-                <button type="button" class="btn-close" @click="errorMessage = ''" aria-label="Close"></button>
             </div>
 
             <div class="accordion accordion-flush mb-3" id="sections">
@@ -61,173 +54,165 @@
                             <div class="row mb-2">
                                 <label class="col-4 col-form-label">Resultaat</label>
                                 <div class="col-8">
-                                    <template v-if="isEditing && canEdit">
-                                        <select v-model="editableObservation.eradication_result" class="form-select"
-                                            :class="{ 'is-invalid': eradicationResultError }">
-                                            <option :value="null">Geen</option>
-                                            <option v-for="(label, value) in eradicationResultEnum" :key="value" :value="value">
-                                                {{ label }}
-                                            </option>
-                                        </select>
-                                        <div v-if="eradicationResultError" class="invalid-feedback">
-                                            {{ eradicationResultError }}
-                                        </div>
-                                    </template>
-                                    <template v-else>
-                                        <p class="form-control-plaintext">
-                                            {{ selectedObservation.eradication_result ? 
-                                               eradicationResultEnum[selectedObservation.eradication_result] : 'Geen' }}
-                                        </p>
-                                    </template>
+                                    <select v-if="selectedObservation.eradication_result !== undefined"
+                                        v-model="editableObservation.eradication_result" class="form-select"
+                                        :class="{ 'is-invalid': eradicationResultError }" :disabled="!canEdit">
+                                        <option :value="null">Geen</option>
+                                        <option v-for="(label, value) in eradicationResultEnum" :key="value"
+                                            :value="value">
+                                            {{ label }}
+                                        </option>
+                                    </select>
+                                    <div v-if="eradicationResultError" class="invalid-feedback">
+                                        {{ eradicationResultError }}
+                                    </div>
                                 </div>
                             </div>
                             <div class="row mb-2">
                                 <label class="col-4 col-form-label">Datum</label>
                                 <div class="col-8">
-                                    <template v-if="isEditing && canEdit">
-                                        <input v-model="editableObservation.eradication_date" type="date" class="form-control" />
-                                    </template>
-                                    <template v-else>
-                                        <p class="form-control-plaintext">
-                                            {{ selectedObservation.eradication_date ? 
-                                               formatDate(selectedObservation.eradication_date) : '-' }}
-                                        </p>
-                                    </template>
+                                    <input v-if="selectedObservation.eradication_date !== undefined"
+                                        v-model="editableObservation.eradication_date" type="date" class="form-control"
+                                        :readonly="!canEdit" :class="{ 'form-control-plaintext': !canEdit }" />
                                 </div>
                             </div>
                             <div v-if="canViewRestrictedFields" class="row mb-2">
                                 <label class="col-4 col-form-label">Uitvoerder</label>
                                 <div class="col-8">
-                                    <template v-if="isEditing && canEdit">
-                                        <input v-model="editableObservation.eradicator_name" type="text"
-                                            placeholder="bv. Rato VZW" class="form-control" />
-                                    </template>
-                                    <template v-else>
-                                        <p class="form-control-plaintext">
-                                            {{ selectedObservation.eradicator_name || '-' }}
-                                        </p>
-                                    </template>
+                                    <input v-if="selectedObservation.eradicator_name !== undefined"
+                                        v-model="editableObservation.eradicator_name" type="text"
+                                        placeholder="bv. Rato VZW" class="form-control" :readonly="!canEdit"
+                                        :class="{ 'form-control-plaintext': !canEdit }" />
                                 </div>
                             </div>
                             <div v-if="canViewRestrictedFields" class="row mb-2">
                                 <label class="col-4 col-form-label">Duur</label>
                                 <div class="col-8">
-                                    <template v-if="isEditing && canEdit">
-                                        <input v-model="editableObservation.eradication_duration" type="text"
-                                            placeholder="bv. 30 (min)" class="form-control" />
-                                    </template>
-                                    <template v-else>
-                                        <p class="form-control-plaintext">
-                                            {{ selectedObservation.eradication_duration || '-' }}
-                                        </p>
-                                    </template>
+                                    <input v-if="selectedObservation.eradication_duration !== undefined"
+                                        v-model="editableObservation.eradication_duration" type="text"
+                                        class="form-control" :readonly="!canEdit" placeholder="bv. 30 (min)"
+                                        :class="{ 'form-control-plaintext': !canEdit }" />
                                 </div>
                             </div>
                             <div v-if="canViewRestrictedFields" class="row mb-2">
                                 <label class="col-4 col-form-label">Personeel</label>
                                 <div class="col-8">
-                                    <template v-if="isEditing && canEdit">
-                                        <input v-model="editableObservation.eradication_persons" type="number"
-                                            placeholder="bv. 2 (personen)" class="form-control" />
-                                    </template>
-                                    <template v-else>
-                                        <p class="form-control-plaintext">
-                                            {{ selectedObservation.eradication_persons || '-' }}
-                                        </p>
-                                    </template>
+                                    <input v-if="selectedObservation.eradication_persons !== undefined"
+                                        v-model="editableObservation.eradication_persons" type="number"
+                                        class="form-control" :readonly="!canEdit" placeholder="bv. 2 (personen)"
+                                        :class="{ 'form-control-plaintext': !canEdit }" />
                                 </div>
                             </div>
                             <div v-if="canViewRestrictedFields" class="row mb-2">
                                 <label class="col-4 col-form-label">Methode</label>
                                 <div class="col-8">
-                                    <template v-if="isEditing && canEdit">
-                                        <select v-model="editableObservation.eradication_method" class="form-select">
-                                            <option :value="null">Geen</option>
-                                            <option v-for="(label, value) in eradicationMethodEnum" :key="value" :value="value">
-                                                {{ label }}
-                                            </option>
-                                        </select>
-                                    </template>
-                                    <template v-else>
-                                        <p class="form-control-plaintext">
-                                            {{ selectedObservation.eradication_method ? 
-                                               eradicationMethodEnum[selectedObservation.eradication_method] : '-' }}
-                                        </p>
-                                    </template>
+                                    <select v-if="selectedObservation.eradication_method !== undefined"
+                                        v-model="editableObservation.eradication_method" class="form-select"
+                                        :disabled="!canEdit">
+                                        <option :value="null">Geen</option>
+                                        <option v-for="(label, value) in eradicationMethodEnum" :key="value"
+                                            :value="value">{{ label
+                                            }}</option>
+                                    </select>
                                 </div>
                             </div>
                             <div v-if="canViewRestrictedFields" class="row mb-2">
                                 <label class="col-4 col-form-label">Product</label>
                                 <div class="col-8">
-                                    <template v-if="isEditing && canEdit">
-                                        <select v-model="editableObservation.eradication_product" class="form-select">
-                                            <option :value="null">Geen</option>
-                                            <option v-for="(label, value) in eradicationProductEnum" :key="value" :value="value">
-                                                {{ label }}
-                                            </option>
-                                        </select>
-                                    </template>
-                                    <template v-else>
-                                        <p class="form-control-plaintext">
-                                            {{ selectedObservation.eradication_product ? 
-                                               eradicationProductEnum[selectedObservation.eradication_product] : '-' }}
-                                        </p>
-                                    </template>
+                                    <select v-if="selectedObservation.eradication_product !== undefined"
+                                        v-model="editableObservation.eradication_product" class="form-select"
+                                        :disabled="!canEdit">
+                                        <option :value="null">Geen</option>
+                                        <option v-for="(label, value) in eradicationProductEnum" :key="value"
+                                            :value="value">{{
+                                                label }}</option>
+                                    </select>
                                 </div>
                             </div>
                             <div v-if="canViewRestrictedFields" class="row mb-2">
                                 <label class="col-4 col-form-label">Nazorg</label>
                                 <div class="col-8">
-                                    <template v-if="isEditing && canEdit">
-                                        <select v-model="editableObservation.eradication_aftercare" class="form-select">
-                                            <option :value="null">Geen</option>
-                                            <option v-for="(label, value) in eradicationAfterCareEnum" :key="value" :value="value">
-                                                {{ label }}
-                                            </option>
-                                        </select>
-                                    </template>
-                                    <template v-else>
-                                        <p class="form-control-plaintext">
-                                            {{ selectedObservation.eradication_aftercare ? 
-                                               eradicationAfterCareEnum[selectedObservation.eradication_aftercare] : '-' }}
-                                        </p>
-                                    </template>
+                                    <select v-if="selectedObservation.eradication_aftercare !== undefined"
+                                        v-model="editableObservation.eradication_aftercare" class="form-select"
+                                        :disabled="!canEdit">
+                                        <option :value="null">Geen</option>
+                                        <option v-for="(label, value) in eradicationAfterCareEnum" :key="value"
+                                            :value="value">{{
+                                                label }}</option>
+                                    </select>
                                 </div>
                             </div>
                             <div v-if="canViewRestrictedFields" class="row mb-2">
                                 <label class="col-4 col-form-label">Problemen</label>
                                 <div class="col-8">
-                                    <template v-if="isEditing && canEdit">
-                                        <select v-model="editableObservation.eradication_problems" class="form-select">
-                                            <option :value="null">Geen</option>
-                                            <option v-for="(label, value) in eradicationProblemsEnum" :key="value" :value="value">
-                                                {{ label }}
-                                            </option>
-                                        </select>
-                                    </template>
-                                    <template v-else>
-                                        <p class="form-control-plaintext">
-                                            {{ selectedObservation.eradication_problems ? 
-                                               eradicationProblemsEnum[selectedObservation.eradication_problems] : '-' }}
-                                        </p>
-                                    </template>
+                                    <select v-if="selectedObservation.eradication_problems !== undefined"
+                                        v-model="editableObservation.eradication_problems" class="form-select"
+                                        :disabled="!canEdit">
+                                        <option :value="null">Geen</option>
+                                        <option v-for="(label, value) in eradicationProblemsEnum" :key="value"
+                                            :value="value">{{
+                                                label }}</option>
+                                    </select>
                                 </div>
                             </div>
                             <div v-if="canViewRestrictedFields" class="row mb-2">
                                 <label class="col-4 col-form-label">Opmerkingen</label>
                                 <div class="col-8">
-                                    <template v-if="isEditing && canEdit">
-                                        <textarea v-model="editableObservation.eradication_notes" rows="2" class="form-control"></textarea>
-                                    </template>
-                                    <template v-else>
-                                        <p class="form-control-plaintext">{{ selectedObservation.eradication_notes || '-' }}</p>
-                                    </template>
+                                    <textarea v-if="selectedObservation.eradication_notes !== undefined"
+                                        v-model="editableObservation.eradication_notes" rows="2" class="form-control"
+                                        :readonly="!canEdit" :class="{ 'form-control-plaintext': !canEdit }"></textarea>
+                                </div>
+                            </div>
+                            <div v-if="canViewRestrictedFields" class="row mb-2">
+                                <label class="col-4 col-form-label">Extra info</label>
+                                <div class="col-8">
+                                    <multiselect
+                                        v-model="selectedExtras"
+                                        :options="availableExtrasOptions"
+                                        :multiple="true"
+                                        track-by="value"
+                                        label="label"
+                                        placeholder="Selecteer opties"
+                                        :close-on-select="false"
+                                        :searchable="false"
+                                        :disabled="!canEdit"
+                                        :select-label="''"
+                                        :deselect-label="''"
+                                        :selected-label="''"
+                                    >
+                                        <template #option="{ option }">
+                                            <div class="multiselect-option" :class="{ 'is-selected': selectedExtras.some(extra => extra.value === option.value) }">
+                                                <span class="option-label">{{ option.label }}</span>
+                                            </div>
+                                        </template>
+                                        <template #tag="{ option, remove }">
+                                            <span class="multiselect-tag">
+                                                {{ option.label }}
+                                                <button 
+                                                    type="button" 
+                                                    class="remove-tag" 
+                                                    @click="remove(option)"
+                                                    aria-label="Remove option"
+                                                >×</button>
+                                            </span>
+                                        </template>
+                                    </multiselect>
+                                </div>
+                            </div>
+                            <div v-if="canViewRestrictedFields" class="row mb-2">
+                                <div class="col-8 offset-4">
+                                    <div class="form-check form-switch">
+                                        <input v-if="selectedObservation.public_domain !== undefined"
+                                            v-model="editableObservation.public_domain" class="form-check-input"
+                                            type="checkbox" id="public-domain" :disabled="!canViewRestrictedFields" />
+                                        <label class="form-check-label" for="public-domain">Nest op publiek
+                                            terrein</label>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </section>
-
                 <section class="accordion-item">
                     <h4 class="accordion-header" id="nest-header">
                         <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#nest"
@@ -317,49 +302,6 @@
                                     </p>
                                 </div>
                             </div>
-                            <div v-if="canViewRestrictedFields" class="row mb-2">
-                                <label class="col-4 col-form-label">Extra info</label>
-                                <div class="col-8">
-                                    <template v-if="isEditing && canEdit">
-                                        <multiselect
-                                            v-model="selectedExtras"
-                                            :options="extrasOptions"
-                                            :multiple="true"
-                                            track-by="value"
-                                            label="label"
-                                            placeholder="Selecteer opties"
-                                            :close-on-select="false"
-                                            :searchable="false"
-                                            :select-label="''"
-                                            :deselect-label="''"
-                                            :selected-label="''">
-                                            <template #option="{ option }">
-                                                <div class="multiselect-option" :class="{ 'is-selected': selectedExtras.some(extra => extra.value === option.value) }">
-                                                    <span class="option-label">{{ option.label }}</span>
-                                                </div>
-                                            </template>
-                                            <template #tag="{ option, remove }">
-                                                <span class="multiselect-tag">
-                                                    {{ option.label }}
-                                                    <button 
-                                                        type="button" 
-                                                        class="remove-tag" 
-                                                        @click="remove(option)"
-                                                        aria-label="Remove option">×</button>
-                                                </span>
-                                            </template>
-                                        </multiselect>
-                                    </template>
-                                    <template v-else>
-                                        <p class="form-control-plaintext">
-                                            <span v-if="selectedObservation.queen_present">Koningin aanwezig</span>
-                                            <span v-if="selectedObservation.queen_present && selectedObservation.moth_present">, </span>
-                                            <span v-if="selectedObservation.moth_present">Mot aanwezig</span>
-                                            <span v-if="!selectedObservation.queen_present && !selectedObservation.moth_present">-</span>
-                                        </p>
-                                    </template>
-                                </div>
-                            </div>
                             <div>
                                 <div class="row mb-2">
                                     <label class="col-4 col-form-label">Validatie</label>
@@ -379,23 +321,6 @@
                                     <label class="col-4 col-form-label">Opmerking</label>
                                     <div class="col-8">
                                         <p class="form-control-plaintext">{{ selectedObservation.notes }}</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div v-if="canViewRestrictedFields" class="row mb-2">
-                                <div class="col-8 offset-4">
-                                    <div class="form-check form-switch">
-                                        <template v-if="isEditing && canEdit">
-                                            <input v-model="editableObservation.public_domain" class="form-check-input"
-                                                type="checkbox" id="public-domain" />
-                                            <label class="form-check-label" for="public-domain">Nest op publiek terrein</label>
-                                        </template>
-                                        <template v-else>
-                                            <p class="form-control-plaintext">
-                                                <span v-if="selectedObservation.public_domain">Nest op publiek terrein</span>
-                                                <span v-else>Niet op publiek terrein</span>
-                                            </p>
-                                        </template>
                                     </div>
                                 </div>
                             </div>
@@ -428,7 +353,8 @@
                             <div class="row mb-2">
                                 <label class="col-4 col-form-label">Telefoon</label>
                                 <div class="col-8">
-                                    <p class="form-control-plaintext">{{ selectedObservation.observer_phone_number }}</p>
+                                    <p class="form-control-plaintext">{{ selectedObservation.observer_phone_number }}
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -447,62 +373,42 @@
                             <div class="row mb-2">
                                 <div class="col-8 offset-4">
                                     <div class="form-check form-switch">
-                                        <template v-if="isEditing && canEdit">
-                                            <input v-model="editableObservation.visible" class="form-check-input"
-                                                type="checkbox" id="visible" />
-                                            <label class="form-check-label" for="visible">Nest tonen</label>
-                                        </template>
-                                        <template v-else>
-                                            <p class="form-control-plaintext">
-                                                <span v-if="selectedObservation.visible">Nest wordt getoond</span>
-                                                <span v-else>Nest wordt niet getoond</span>
-                                            </p>
-                                        </template>
+                                        <input v-if="selectedObservation.visible !== undefined"
+                                            v-model="editableObservation.visible" class="form-check-input"
+                                            type="checkbox" id="visible" :disabled="!canEdit" />
+                                        <label class="form-check-label" for="visible">Nest tonen</label>
                                     </div>
                                 </div>
                             </div>
                             <div class="row mb-2">
                                 <label class="col-4 col-form-label">Cluster ID</label>
                                 <div class="col-8">
-                                    <template v-if="isEditing && canEdit">
-                                        <input v-model="editableObservation.wn_cluster_id" type="text" class="form-control" />
-                                    </template>
-                                    <template v-else>
-                                        <p class="form-control-plaintext">{{ selectedObservation.wn_cluster_id || '-' }}</p>
-                                    </template>
+                                    <input v-model="editableObservation.wn_cluster_id" type="text" class="form-control" readonly />
                                 </div>
                             </div>
                             <div class="row mb-2">
                                 <label class="col-4 col-form-label">Melder kreeg e-mail</label>
                                 <div class="col-8">
-                                    <template v-if="isEditing && canEdit">
-                                        <select v-model="editableObservation.observer_received_email" class="form-select">
-                                            <option :value="true">Melder kreeg e-mail</option>
-                                            <option :value="false">Melder kreeg geen e-mail</option>
-                                        </select>
-                                    </template>
-                                    <template v-else>
-                                        <p class="form-control-plaintext">
-                                            {{ selectedObservation.observer_received_email ? 
-                                              'Melder kreeg e-mail' : 'Melder kreeg geen e-mail' }}
-                                        </p>
-                                    </template>
+                                    <select v-if="selectedObservation.observer_received_email !== undefined"
+                                        v-model="editableObservation.observer_received_email" class="form-select"
+                                        disabled>
+                                        <option :value="true">Melder kreeg e-mail</option>
+                                        <option :value="false">Melder kreeg geen e-mail</option>
+                                    </select>
                                 </div>
                             </div>
                             <div class="row mb-2">
                                 <label class="col-4 col-form-label">Opmerkingen</label>
                                 <div class="col-8">
-                                    <template v-if="isEditing && canEdit">
-                                        <textarea v-model="editableObservation.admin_notes" rows="2" class="form-control"></textarea>
-                                    </template>
-                                    <template v-else>
-                                        <p class="form-control-plaintext">{{ selectedObservation.admin_notes || '-' }}</p>
-                                    </template>
+                                    <textarea v-if="selectedObservation.admin_notes !== undefined"
+                                        v-model="editableObservation.admin_notes" rows="2" class="form-control"
+                                        :readonly="!canEdit" :class="{ 'form-control-plaintext': !canEdit }"></textarea>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </section>
+
             </div>
 
             <p v-if="canViewRestrictedFields" class="mb-3 text-muted small" id="metadata">
@@ -534,17 +440,7 @@ export default {
         const selectedObservation = computed(() => vespaStore.selectedObservation);
         const isEditing = ref(false);
         const isLoggedIn = computed(() => vespaStore.isLoggedIn);
-        const canEdit = computed(() => {
-            const result = isLoggedIn.value && vespaStore.canEditObservation(selectedObservation.value);
-            console.log('canEdit computed:', {
-                isLoggedIn: isLoggedIn.value,
-                canEditObservation: vespaStore.canEditObservation(selectedObservation.value),
-                userMunicipalities: vespaStore.userMunicipalities,
-                isAdmin: vespaStore.isAdmin,
-                observationMunicipality: selectedObservation.value?.municipality_name
-            });
-            return result;
-        });
+        const canEdit = computed(() => isLoggedIn.value && vespaStore.canEditObservation(selectedObservation.value));
         const canEditAdminFields = computed(() => isLoggedIn.value && vespaStore.isAdmin);
         const successMessage = ref('');
         const errorMessage = ref('');
@@ -680,7 +576,6 @@ export default {
             return vespaStore.isAdmin ||
                 (isLoggedIn.value && vespaStore.userMunicipalities.includes(selectedObservation.value?.municipality_name));
         });
-
         const eradicationStatusClass = computed(() => {
             const result = selectedObservation.value?.eradication_result;
             if (result && result !== null) {
@@ -769,23 +664,12 @@ export default {
             emit('updateMarkerColor', null);
         };
 
-        // Add toggle edit mode function to switch between edit mode and view mode
-        const toggleEditMode = () => {
-            console.log("Toggle edit mode, current state:", isEditing.value);
-            if (!isEditing.value) {
-                startEdit(); // Enter edit mode
-            } else {
-                confirmUpdate(); // Save changes
-            }
-        };
-
         const startEdit = () => {
             isEditing.value = true;
             if (selectedObservation.value) {
                 editableObservation.value = { ...selectedObservation.value };
                 editableObservation.value.observation_datetime = formatToDatetimeLocal(selectedObservation.value.observation_datetime);
-                editableObservation.value.eradication_date = selectedObservation.value.eradication_date ? 
-                    formatToDate(selectedObservation.value.eradication_date) : null;
+                editableObservation.value.eradication_date = formatToDate(selectedObservation.value.eradication_date);
             }
         };
 
@@ -793,72 +677,125 @@ export default {
         let isUpdatingObservation = false;
 
         const confirmUpdate = async () => {
-            // If not in edit mode, enter edit mode and exit
-            if (!isEditing.value) {
-                startEdit();
-                return;
-            }            
             if (isUpdating.value) return;
             try {
                 isUpdating.value = true;
                 isUpdatingObservation = true;
 
+                // Explicitly set queen_present based on selectedExtras
                 const hasQueenPresent = selectedExtras.value.some(extra => extra.value === 'queen_present');
                 const hasMothPresent = selectedExtras.value.some(extra => extra.value === 'moth_present');
-                editableObservation.value.queen_present = hasQueenPresent;
-                editableObservation.value.moth_present = hasMothPresent;
 
-                if ('nest_extra' in editableObservation.value) {
-                    delete editableObservation.value.nest_extra;
+                // Reset error messages
+                errorMessage.value = '';
+                eradicationResultError.value = '';
+
+                // Create a clean object with only the fields that are allowed to be updated
+                const observationToSend = {
+                    id: editableObservation.value.id
+                };
+
+                // Fields that regular users can update
+                const regularUserAllowedFields = [
+                    "reserved_by",
+                    "eradication_date",
+                    "eradication_result",
+                    "queen_present",
+                    "moth_present",
+                    "public_domain"
+                ];
+
+                // Additional fields that require special privilege (municipality access)
+                const restrictedUserFields = [
+                    "eradicator_name",
+                    "eradication_duration",
+                    "eradication_persons",
+                    "eradication_method",
+                    "eradication_product",
+                    "eradication_aftercare",
+                    "eradication_problems",
+                    "eradication_notes"
+                ];
+
+                // Admin-only fields
+                const adminOnlyFields = [
+                    "visible",
+                    "admin_notes"
+                ];
+
+                // Add regular user fields
+                regularUserAllowedFields.forEach(field => {
+                    if (field === 'queen_present') {
+                        observationToSend[field] = hasQueenPresent;
+                    } else if (field === 'moth_present') {
+                        observationToSend[field] = hasMothPresent;
+                    } else if (field in editableObservation.value) {
+                        observationToSend[field] = editableObservation.value[field];
+                    }
+                });
+
+                // Add restricted fields if user has municipality access
+                if (canViewRestrictedFields.value) {
+                    restrictedUserFields.forEach(field => {
+                        if (field in editableObservation.value) {
+                            observationToSend[field] = editableObservation.value[field];
+                        }
+                    });
                 }
 
-                const eradicationFields = ['eradication_date', 'eradicator_name', 'eradication_duration', 'eradication_persons', 'eradication_method', 'eradication_aftercare', 'eradication_problems', 'eradication_notes', 'eradication_product'];
-                const hasEradicationData = eradicationFields.some(field => editableObservation.value[field]);
-
-                if (editableObservation.value.eradication_result && !editableObservation.value.eradication_date) {
-                    const today = new Date();
-                    editableObservation.value.eradication_date = today.toISOString().split('T')[0];
+                // Add admin-only fields if user is admin
+                if (canEditAdminFields.value) {
+                    adminOnlyFields.forEach(field => {
+                        if (field in editableObservation.value) {
+                            observationToSend[field] = editableObservation.value[field];
+                        }
+                    });
                 }
 
-                if (editableObservation.value.eradication_date) {
-                    const date = new Date(editableObservation.value.eradication_date);
+                // Handle eradication date format
+                if (observationToSend.eradication_date) {
+                    const date = new Date(observationToSend.eradication_date);
                     if (!isNaN(date.getTime())) {
-                        editableObservation.value.eradication_date = date.toISOString().split('T')[0];
+                        observationToSend.eradication_date = date.toISOString().split('T')[0];
                     } else {
                         throw new Error("Invalid eradication date format");
                     }
                 }
 
-                if (hasEradicationData && !editableObservation.value.eradication_result) {
+                // Validate that eradication result is provided if other eradication fields are filled
+                const eradicationFields = restrictedUserFields.filter(field => field.startsWith('eradication_'));
+                const hasEradicationData = eradicationFields.some(field => 
+                    field in observationToSend && observationToSend[field] !== null
+                );
+
+                if (hasEradicationData && !observationToSend.eradication_result) {
                     eradicationResultError.value = 'Resultaat is verplicht wanneer andere bestrijdingsgegevens zijn ingevuld.';
                     throw new Error('Validation failed');
                 }
 
-                errorMessage.value = '';
-                eradicationResultError.value = '';
+                // If eradication result is set but no date, use today's date
+                if (observationToSend.eradication_result && !observationToSend.eradication_date) {
+                    const today = new Date();
+                    observationToSend.eradication_date = today.toISOString().split('T')[0];
+                }
 
-                const observationToSend = { ...editableObservation.value };
-                observationToSend.queen_present = hasQueenPresent;
-                observationToSend.moth_present = hasMothPresent;
-
-                const updatedObservation = await vespaStore.updateObservation(observationToSend);
+                // Send the filtered data to the store
+                await vespaStore.updateObservation(observationToSend);
                 successMessage.value = 'Wijzigingen succesvol opgeslagen!';
-                setTimeout(() => successMessage.value = '', 3000);
-                
-                isEditing.value = false;
+                setTimeout(() => {
+                    successMessage.value = '';
+                }, 3000);
+
             } catch (error) {
                 if (error.message === "Invalid eradication date format") {
                     errorMessage.value = 'De ingevoerde datum is ongeldig.';
-                } else if (error.message === 'Validation failed') {
-                    // Error already set in eradicationResultError
-                } else if (error.message && error.message.includes('Network response was not ok')) {
-                    errorMessage.value = 'Serverfout bij het opslaan van wijzigingen.';
-                } else {
-                    errorMessage.value = error.message || 'Er is een fout opgetreden bij het opslaan van de wijzigingen.';
+                } else if (error.message !== 'Validation failed') {
+                    errorMessage.value = 'Er is een fout opgetreden bij het opslaan van de wijzigingen.';
                 }
+                console.error('Error updating observation:', error);
+                isUpdatingObservation = false;
             } finally {
                 isUpdating.value = false;
-                isUpdatingObservation = false;
             }
         };
         
@@ -867,11 +804,8 @@ export default {
             if (selectedObservation.value) {
                 editableObservation.value = { ...selectedObservation.value };
                 editableObservation.value.observation_datetime = formatToDatetimeLocal(selectedObservation.value.observation_datetime);
-                editableObservation.value.eradication_date = selectedObservation.value.eradication_date ? 
-                    formatToDate(selectedObservation.value.eradication_date) : null;
+                editableObservation.value.eradication_date = formatToDate(selectedObservation.value.eradication_date);
             }
-            errorMessage.value = '';
-            eradicationResultError.value = '';
         };
 
         const canViewContactInfo = computed(() => {
@@ -910,36 +844,37 @@ export default {
         };
         
         // Modified watch for selectedObservation that initializes the multi-select when loading data
-        watch(() => vespaStore.selectedObservation, (newVal) => {
-            console.log('watch: selectedObservation changed:', newVal);
+        watch(() => vespaStore.selectedObservation, async (newVal) => {
             if (!newVal) return;
             
             editableObservation.value = { ...newVal };
             editableObservation.value.observation_datetime = formatToDatetimeLocal(newVal.observation_datetime);
             editableObservation.value.eradication_date = newVal.eradication_date ? formatToDate(newVal.eradication_date) : null;
             
-            // Reset edit mode when a new observation is selected
-            isEditing.value = false;
-            
             selectedExtras.value = [];
             if (newVal.queen_present === true) {
-                const queenOption = extrasOptions.find(option => option.value === 'queen_present');
-                if (queenOption) selectedExtras.value.push(queenOption);
+                selectedExtras.value.push(extrasOptions.find(option => option.value === 'queen_present'));
             }
             if (newVal.moth_present === true) {
-                const mothOption = extrasOptions.find(option => option.value === 'moth_present');
-                if (mothOption) selectedExtras.value.push(mothOption);
+                selectedExtras.value.push(extrasOptions.find(option => option.value === 'moth_present'));
             }
-            
+            editableObservation.value.queen_present = newVal.queen_present === true;
+            editableObservation.value.moth_present = newVal.moth_present === true;
             emit('updateMarkerColor', newVal.id);
         }, { immediate: true });
-
         
+        // Modified watch for selectedExtras that correctly updates queen_present in editableObservation
         watch(selectedExtras, (newVal) => {
             if (!editableObservation.value) return;
+            
+            // Set queen_present directly based on whether the queen_present option is selected
             editableObservation.value.queen_present = newVal.some(extra => extra.value === 'queen_present');
             editableObservation.value.moth_present = newVal.some(extra => extra.value === 'moth_present');
-            emit('updateMarkerColor', selectedObservation.value?.id);
+            
+            // No need to store nest_extra in the model since backend doesn't have this field
+            // This is just for the UI component
+            
+            emit('updateMarkerColor', selectedObservation.value.id);
         }, { deep: true });
 
         watch(selectedObservation, { immediate: true });
@@ -968,7 +903,6 @@ export default {
             reservationStatus,
             closeDetails,
             startEdit,
-            toggleEditMode,
             confirmUpdate,
             cancelEdit,
             reserveObservation,

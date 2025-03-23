@@ -404,6 +404,11 @@ class Observation(models.Model):
     
     class Meta:
         ordering = ['id']
+        indexes = [
+            models.Index(fields=['visible', 'observation_datetime']),
+            gis_models.Index(fields=['location'], name='location_idx'),
+            models.Index(fields=['municipality', 'visible']),
+        ]
 
 class Export(models.Model):
     """Model for tracking observation exports."""

@@ -56,16 +56,16 @@ from vespadb.observations.cache import invalidate_geojson_cache, invalidate_obse
 from vespadb.observations.filters import ObservationFilter
 from vespadb.observations.helpers import parse_and_convert_to_cet
 from vespadb.observations.models import Municipality, Observation, Province, Export
-from vespadb.observations.models import Export
 from vespadb.observations.tasks.export_utils import generate_rows
 from vespadb.observations.tasks.generate_export import generate_export
 from vespadb.observations.serializers import ObservationSerializer, MunicipalitySerializer, ProvinceSerializer
-from vespadb.observations.utils import check_if_point_in_anb_area, get_municipality_from_coordinates
+from vespadb.observations.utils import check_if_point_in_anb_area, get_municipality_from_coordinates, get_geojson_cache_key
 from django.utils.decorators import method_decorator
 from django_ratelimit.decorators import ratelimit
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
 from django.shortcuts import get_object_or_404
+from vespadb.observations.constants import MIN_OBSERVATION_DATETIME
 
 if TYPE_CHECKING:
     from geopy.location import Location
@@ -381,15 +381,19 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         try:
             query_params = request.GET.copy()
             bbox_str = query_params.pop("bbox", None)
-            sorted_params = "&".join(sorted(f"{key}={value}" for key, value in query_params.items()))
-            cache_key = f"vespadb:geojson:{sorted_params}"
-            logger.info("Cache key: %s", cache_key)
+            
+            if 'min_observation_datetime' not in query_params:
+                query_params['min_observation_datetime'] = MIN_OBSERVATION_DATETIME
+            if 'visible' not in query_params:
+                query_params['visible'] = 'true'
+
+            cache_key = get_geojson_cache_key(query_params)
             cached_data = cache.get(cache_key)
             if cached_data:
-                logger.info("Returning cached GeoJSON data")
+                logger.info(f"Returning cached GeoJSON data, found cache: {cache_key}")
                 return JsonResponse(cached_data, safe=False)
             
-            logger.info("Generating GeoJSON data")
+            # Rest of your view logic remains the same
             bbox = None
             if bbox_str:
                 bbox_coords = list(map(float, bbox_str.split(",")))
@@ -400,11 +404,9 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 else:
                     return HttpResponse("Invalid bbox format", status=400)
 
-            # Adjusted queryset - removed prefetch_related('images') unless confirmed as ManyToMany
             queryset = self.filter_queryset(
                 self.get_queryset().select_related('municipality')
             ).annotate(point=Transform("location", 4326))
-
             if bbox:
                 queryset = queryset.filter(location__within=bbox)
 
@@ -421,13 +423,13 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
 
             features = list(generate_features(queryset))
             geojson_response = {"type": "FeatureCollection", "features": features}
-            logger.info("Set cache")
+            logger.info(f"Generating GeoJSON in view with cache_key {cache_key}")
             cache.set(cache_key, geojson_response, GEOJSON_REDIS_CACHE_EXPIRATION)
             return JsonResponse(geojson_response, safe=False)
         except Exception as e:
             logger.exception("GeoJSON generation failed")
             return HttpResponse("Error generating GeoJSON", status=500)
-        
+            
     @swagger_auto_schema(
         operation_description="Bulk import observations from either JSON or CSV file.",
         request_body=openapi.Schema(

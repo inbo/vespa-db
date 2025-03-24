@@ -60,51 +60,26 @@ def parse_and_convert_to_cet(datetime_str: Union[str, datetime]) -> datetime:
         ValueError: If the input cannot be parsed or converted.
     """
     cet_tz = pytz.timezone("Europe/Brussels")
-    
-    # If it's already a datetime object
+
     if isinstance(datetime_str, datetime):
-        # If it's naive, assume it's in UTC
+        # If naive, assume it's in CET (matches app context), not UTC
         if datetime_str.tzinfo is None:
-            datetime_str = pytz.UTC.localize(datetime_str)
-        # Convert to CET
+            return cet_tz.localize(datetime_str)
+        # If timezone-aware, convert to CET
         return datetime_str.astimezone(cet_tz)
-    
-    # Handle string values
+
     if isinstance(datetime_str, str):
-        # Try parsing with dateutil parser first
         try:
+            # Use dateutil.parser for flexible parsing
             dt = parser.parse(datetime_str)
-            # If parsed without timezone, assume UTC
+            # If naive, assume CET (consistent with app timezone)
             if dt.tzinfo is None:
-                dt = pytz.UTC.localize(dt)
-            # Convert to CET
+                return cet_tz.localize(dt)
+            # If timezone-aware, convert to CET
             return dt.astimezone(cet_tz)
         except ValueError:
-            # Try parsing with known formats
-            for fmt in DATETIME_FORMATS:
-                try:
-                    # Try to parse with the format
-                    if 'Z' in fmt:
-                        # For UTC formats
-                        dt = datetime.strptime(datetime_str, fmt)
-                        dt = pytz.UTC.localize(dt)
-                    elif '%z' in fmt:
-                        # Format has timezone info
-                        dt = datetime.strptime(datetime_str, fmt)
-                    else:
-                        # Format without timezone, assume UTC
-                        dt = datetime.strptime(datetime_str, fmt)
-                        dt = pytz.UTC.localize(dt)
-                    
-                    # Convert to CET
-                    return dt.astimezone(cet_tz)
-                except ValueError:
-                    continue
-                    
-            # If we get here, none of the formats worked
             raise ValueError(f"Could not parse datetime from: {datetime_str}")
-    
-    # If we get a non-string, non-datetime value
+
     raise ValueError(f"Expected datetime string or object, got: {type(datetime_str)}")
 
 def retry_with_backoff(func: Callable[..., T], retries: int=3, backoff_in_seconds: int=2) -> Any:

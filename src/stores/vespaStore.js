@@ -46,6 +46,7 @@ export const useVespaStore = defineStore('vespaStore', {
         loginError: null,
         termsAcceptanceLoading: false,
         termsAcceptanceError: null,
+        appInitialized: false,
     }),
     getters: {
         canEditObservation: (state) => (observation) => {
@@ -63,6 +64,21 @@ export const useVespaStore = defineStore('vespaStore', {
         canEditAdminFields: (state) => state.isAdmin,
     },
     actions: {
+        async initializeApp() {
+            if (this.appInitialized) return;
+            
+            try {
+              await Promise.all([
+                this.fetchMunicipalities(),
+                this.fetchProvinces(),
+                this.authCheck(), // Include auth check here if it should run once on app start
+              ]);
+              this.appInitialized = true;
+            } catch (error) {
+              console.error('Failed to initialize app:', error);
+              this.error = 'Failed to initialize application data';
+            }
+        },
         async getObservations(page = 1, page_size = 25, sortBy = null, sortOrder = 'asc') {
             const currentFilters = JSON.stringify(this.filters);
             this.loadingObservations = true;
@@ -216,6 +232,20 @@ export const useVespaStore = defineStore('vespaStore', {
                 console.error('Error fetching municipalities:', error);
             }
         },
+        async updateObservations() {
+            if (this.isFetchingGeoJson) return; // Prevent concurrent fetches
+            this.isFetchingGeoJson = true;
+            try {
+              await this.getObservationsGeoJson();
+              // Only fetch table data if explicitly needed (e.g., for a table view)
+              // Remove this line unless you need table_observations separately:
+              // await this.getObservations(1, 25);
+            } catch (error) {
+              console.error('Error updating observations:', error);
+            } finally {
+              this.isFetchingGeoJson = false;
+            }
+        },      
         createCircleMarker(feature, latlng) {
             let fillColor = this.getColorByStatus(feature.properties.status);
             let markerOptions = {

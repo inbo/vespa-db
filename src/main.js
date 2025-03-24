@@ -27,6 +27,7 @@ app.component('Multiselect', Multiselect);
 registerPlugins(app);
 
 const vespaStore = useVespaStore();
-vespaStore.authCheck();
-
-app.mount('#app');
+(async () => {
+    await vespaStore.initializeApp();
+    app.mount('#app');
+})();

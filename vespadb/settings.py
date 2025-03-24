@@ -132,11 +132,11 @@ CELERY_BEAT_SCHEDULE = {
     },
     'prewarm-geojson-cache': {
         'task': "vespadb.observations.tasks.generate_geojson_task",
-        'schedule': crontab(minute='*/10', hour='9-17'),
+        'schedule': crontab(minute='*/13', hour='9-17'),
         'args': ({
             'visible': 'true',
-            'min_observation_datetime': '2024-04-01'
-        }, 'vespadb:geojson:visible=true&min_observation_datetime=2024-04-01'),
+            'min_observation_datetime': '2024-04-01T00:00:00+02:00'
+        },)
     },
 }
 

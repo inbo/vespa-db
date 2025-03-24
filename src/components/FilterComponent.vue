@@ -178,8 +178,6 @@ export default {
       selectedNestStatus.value = vespaStore.filters.nestStatus || [];
       minDate.value = vespaStore.filters.min_observation_date ? new Date(vespaStore.filters.min_observation_date) : new Date(2024, 3, 1);
       maxDate.value = vespaStore.filters.max_observation_date ? new Date(vespaStore.filters.max_observation_date) : null;
-      if (!vespaStore.municipalitiesFetched) await vespaStore.fetchMunicipalities();
-      if (!vespaStore.provincesFetched) await vespaStore.fetchProvinces();
     });
 
     return {

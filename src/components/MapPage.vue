@@ -150,7 +150,7 @@ export default {
       isFetchingGeoJson.value = true;
 
       try {
-        await vespaStore.getObservationsGeoJson();
+        await vespaStore.updateObservations();
         const geoJsonLayer = L.geoJSON(vespaStore.observations, {
           pointToLayer: (feature, latlng) => {
             const marker = vespaStore.createCircleMarker(feature, latlng);
@@ -240,8 +240,7 @@ export default {
     );
 
     onMounted(async () => {
-      if (!vespaStore.municipalitiesFetched) await vespaStore.fetchMunicipalities();
-      if (!vespaStore.provincesFetched) await vespaStore.fetchProvinces();
+      await vespaStore.initializeApp();
       vespaStore.markerClusterGroup = L.markerClusterGroup({
         spiderfyOnMaxZoom: false,
         showCoverageOnHover: true,

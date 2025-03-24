@@ -383,11 +383,13 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             bbox_str = query_params.pop("bbox", None)
             sorted_params = "&".join(sorted(f"{key}={value}" for key, value in query_params.items()))
             cache_key = f"vespadb:geojson:{sorted_params}"
-            
+            logger.info("Cache key: %s", cache_key)
             cached_data = cache.get(cache_key)
             if cached_data:
+                logger.info("Returning cached GeoJSON data")
                 return JsonResponse(cached_data, safe=False)
-
+            
+            logger.info("Generating GeoJSON data")
             bbox = None
             if bbox_str:
                 bbox_coords = list(map(float, bbox_str.split(",")))
@@ -419,6 +421,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
 
             features = list(generate_features(queryset))
             geojson_response = {"type": "FeatureCollection", "features": features}
+            logger.info("Set cache")
             cache.set(cache_key, geojson_response, GEOJSON_REDIS_CACHE_EXPIRATION)
             return JsonResponse(geojson_response, safe=False)
         except Exception as e:

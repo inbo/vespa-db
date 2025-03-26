@@ -2,7 +2,6 @@
 
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
-from . import views
 from vespadb.users.views import AuthCheck, ChangePasswordView, LoginView, LogoutView, UserViewSet
 
 app_name = "users"
@@ -16,5 +15,4 @@ urlpatterns = [
     path("login/", LoginView.as_view(), name="login"),
     path("logout/", LogoutView.as_view(), name="logout"),
     path("change-password/", ChangePasswordView.as_view(), name="change_password"),
-    path('accept-terms/', views.accept_terms, name='accept_terms'),
 ]

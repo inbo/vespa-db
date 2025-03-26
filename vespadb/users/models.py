@@ -48,23 +48,3 @@ class VespaUser(AbstractUser):
             return "logged_in_with_municipality"
         else:
             return "logged_in_without_municipality"
-
-class TermsOfServiceAcceptance(models.Model):
-    """
-    Model to track when a user has accepted the terms of service
-    """
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, 
-        on_delete=models.CASCADE,
-        related_name='terms_acceptances'
-    )
-    accepted_at = models.DateTimeField(auto_now_add=True)
-    ip_address = models.GenericIPAddressField(null=True, blank=True)
-    
-    class Meta:
-        ordering = ['-accepted_at']
-        verbose_name = 'Terms of Service Acceptance'
-        verbose_name_plural = 'Terms of Service Acceptances'
-        
-    def __str__(self):
-        return f"{self.user.username} - {self.accepted_at.strftime('%Y-%m-%d %H:%M:%S')}"

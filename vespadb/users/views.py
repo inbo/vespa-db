@@ -21,7 +21,6 @@ from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required
 from vespadb.permissions import IsAdminOrSelf
 from vespadb.users.models import VespaUser as User
-from vespadb.users.models import TermsOfServiceAcceptance
 from vespadb.users.serializers import (
     ChangePasswordSerializer,
     LoginSerializer,
@@ -196,59 +195,3 @@ class ChangePasswordView(APIView):
             update_session_auth_hash(request, user)  # Important to keep the session active
             return Response({"detail": "Password changed successfully."}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-@login_required
-@require_POST
-@csrf_exempt
-def accept_terms(request):
-    """
-    Endpoint to record a user's acceptance of the terms of service
-    """
-    try:
-        data = json.loads(request.body)
-        user_id = data.get('user_id')
-        
-        # Security check: users can only accept terms for themselves
-        if request.user.id != user_id:
-            return JsonResponse(
-                {'error': 'You can only accept terms for your own account'}, 
-                status=403
-            )
-            
-        # Record the terms acceptance
-        user = request.user
-        
-        # Check if the user has previously accepted terms
-        terms_acceptance, created = TermsOfServiceAcceptance.objects.get_or_create(
-            user=user,
-            defaults={
-                'accepted_at': timezone.now(),
-                'ip_address': get_client_ip(request)
-            }
-        )
-        
-        # If not created, update the timestamp
-        if not created:
-            terms_acceptance.accepted_at = timezone.now()
-            terms_acceptance.ip_address = get_client_ip(request)
-            terms_acceptance.save()
-            
-        # Update the user model if you're storing the flag there too
-        user.has_accepted_terms = True
-        user.save()
-        
-        return JsonResponse({'success': True, 'message': 'Terms of service accepted'})
-        
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
-
-def get_client_ip(request):
-    """
-    Get the client's IP address from the request
-    """
-    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-    if x_forwarded_for:
-        ip = x_forwarded_for.split(',')[0]
-    else:
-        ip = request.META.get('REMOTE_ADDR')
-    return ip

@@ -47,6 +47,8 @@ export const useVespaStore = defineStore('vespaStore', {
         termsAcceptanceLoading: false,
         termsAcceptanceError: null,
         appInitialized: false,
+        termsAcceptanceLoading: false,
+        termsAcceptanceError: null,
     }),
     getters: {
         canEditObservation: (state) => (observation) => {
@@ -382,6 +384,36 @@ export const useVespaStore = defineStore('vespaStore', {
             } catch (error) {
                 console.error('Error when updating the observation:', error);
                 return null;
+            }
+        },
+        async acceptTermsOfService() {
+            this.termsAcceptanceLoading = true;
+            this.termsAcceptanceError = null;
+            
+            try {
+                const response = await ApiService.post("/accept-terms/", {
+                    user_id: this.user.id,
+                    accepted: true
+                });
+                
+                if (response.status === 200) {
+                    this.user = { ...this.user, hasAcceptedTerms: true };
+                    return true;
+                } else {
+                    throw new Error('Failed to record terms acceptance');
+                }
+            } catch (error) {
+                console.error('Error accepting terms of service:', error);
+                
+                if (error.response && error.response.data) {
+                    this.termsAcceptanceError = error.response.data.error || 'Failed to accept terms of service';
+                } else {
+                    this.termsAcceptanceError = error.message || 'Failed to accept terms of service';
+                }
+                
+                return false;
+            } finally {
+                this.termsAcceptanceLoading = false;
             }
         },
         async exportData(format) {

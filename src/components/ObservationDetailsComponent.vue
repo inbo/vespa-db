@@ -685,7 +685,8 @@ export default {
                 // Explicitly set queen_present based on selectedExtras
                 const hasQueenPresent = selectedExtras.value.some(extra => extra.value === 'queen_present');
                 const hasMothPresent = selectedExtras.value.some(extra => extra.value === 'moth_present');
-
+                const hasDuplicateNest = selectedExtras.value.some(extra => extra.value === 'duplicate_nest');
+                const hasOtherSpeciesNest = selectedExtras.value.some(extra => extra.value === 'other_species_nest');
                 // Reset error messages
                 errorMessage.value = '';
                 eradicationResultError.value = '';
@@ -702,7 +703,9 @@ export default {
                     "eradication_result",
                     "queen_present",
                     "moth_present",
-                    "public_domain"
+                    "public_domain",
+                    "other_species_nest",
+                    "duplicate_nest"
                 ];
 
                 // Additional fields that require special privilege (municipality access)
@@ -729,6 +732,10 @@ export default {
                         observationToSend[field] = hasQueenPresent;
                     } else if (field === 'moth_present') {
                         observationToSend[field] = hasMothPresent;
+                    } else if (field === 'duplicate_nest') {
+                        observationToSend[field] = hasDuplicateNest;
+                    } else if (field === 'other_species_nest') {
+                        observationToSend[field] = hasOtherSpeciesNest;
                     } else if (field in editableObservation.value) {
                         observationToSend[field] = editableObservation.value[field];
                     }
@@ -817,7 +824,9 @@ export default {
 
         const extrasOptions = [
             { value: "queen_present", label: "Koningin aanwezig" },
-            { value: "moth_present", label: "Mot aanwezig" }
+            { value: "moth_present", label: "Mot aanwezig" },
+            { value: "duplicate_nest", label: "Duplicaat" },
+            { value: "other_species_nest", label: "Nest is van andere soort" }
         ];
         
         const availableExtrasOptions = computed(() => {
@@ -858,8 +867,16 @@ export default {
             if (newVal.moth_present === true) {
                 selectedExtras.value.push(extrasOptions.find(option => option.value === 'moth_present'));
             }
+            if (newVal.duplicate_nest === true) {
+                selectedExtras.value.push(extrasOptions.find(option => option.value === 'duplicate_nest'));
+            }
+            if (newVal.other_species_nest === true) {
+                selectedExtras.value.push(extrasOptions.find(option => option.value === 'other_species_nest'));
+            }
             editableObservation.value.queen_present = newVal.queen_present === true;
             editableObservation.value.moth_present = newVal.moth_present === true;
+            editableObservation.value.duplicate_nest = newVal.duplicate_nest === true;
+            editableObservation.value.other_species_nest = newVal.other_species_nest === true;
             emit('updateMarkerColor', newVal.id);
         }, { immediate: true });
         
@@ -870,7 +887,9 @@ export default {
             // Set queen_present directly based on whether the queen_present option is selected
             editableObservation.value.queen_present = newVal.some(extra => extra.value === 'queen_present');
             editableObservation.value.moth_present = newVal.some(extra => extra.value === 'moth_present');
-            
+            editableObservation.value.duplicate_nest = newVal.some(extra => extra.value === 'duplicate_nest');
+            editableObservation.value.other_species_nest = newVal.some(extra => extra.value === 'other_species_nest');
+    
             // No need to store nest_extra in the model since backend doesn't have this field
             // This is just for the UI component
             

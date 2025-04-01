@@ -371,6 +371,12 @@ export const useVespaStore = defineStore('vespaStore', {
                 if ('moth_present' in observationToSend) {
                     observationToSend.moth_present = observationToSend.moth_present === true;
                 }
+                if ('duplicate_nest' in observationToSend) {
+                    observationToSend.duplicate_nest = observationToSend.duplicate_nest === true;
+                }
+                if ('other_species_nest' in observationToSend) {
+                    observationToSend.other_species_nest = observationToSend.other_species_nest === true;
+                }
                 
                 const response = await ApiService.patch(`/observations/${observation.id}/`, observationToSend);
                 if (response.status === 200) {

@@ -52,6 +52,8 @@ public_fields = [
     "visible",
     "wn_cluster_id",
     "nest_status",
+    "duplicate_nest",
+    "other_species_nest",
 ]
 
 # Logged-in users WITH an assigned municipality see additional fields:
@@ -111,7 +113,7 @@ class ObservationSerializer(serializers.ModelSerializer):
             'eradication_aftercare', 'eradication_problems', 'eradication_notes',
             'observer_phone_number', 'observer_email', 'observer_name', 'public_domain',
             'created_by', 'modified_by', 'wn_modified_datetime', 'wn_created_datetime',
-            'admin_notes', 'observer_received_email', 'wn_admin_notes'
+            'admin_notes', 'observer_received_email', 'wn_admin_notes', "duplicate_nest", "other_species_nest"
         ]
 
         
@@ -234,6 +236,8 @@ class ObservationSerializer(serializers.ModelSerializer):
             "moth_present",
             "public_domain",
             "modified_by",  # explicitly allow modified_by for all users
+            "duplicate_nest",
+            "other_species_nest",
         ]
         
         # Define eradication-related fields

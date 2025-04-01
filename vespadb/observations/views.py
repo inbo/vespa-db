@@ -8,7 +8,7 @@ import time
 import logging
 import csv
 import json
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any, Union, List
 from django.http import HttpResponseNotFound
 import os
 from typing import Iterator, Set
@@ -66,6 +66,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
 from django.shortcuts import get_object_or_404
 from vespadb.observations.constants import MIN_OBSERVATION_DATETIME
+from rest_framework.pagination import CursorPagination
 
 if TYPE_CHECKING:
     from geopy.location import Location
@@ -84,6 +85,11 @@ BBOX_LENGTH = 4
 GEOJSON_REDIS_CACHE_EXPIRATION = 900  # 15 minutes
 GET_REDIS_CACHE_EXPIRATION = 86400  # 1 day
 BATCH_SIZE = 150
+
+class ObservationCursorPagination(CursorPagination):
+    page_size = 50
+    ordering = ('observation_datetime', 'id')
+    
 class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
     """ViewSet for the Observation model."""
 
@@ -99,6 +105,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
     filterset_class = ObservationFilter
     distance_filter_field = "location"
     distance_filter_convert_meters = True
+    pagination_class = ObservationCursorPagination
 
     def get_serializer_context(self) -> dict[str, Any]:
         """
@@ -120,7 +127,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         """
         return super().get_serializer_class()
 
-    def get_permissions(self) -> list[BasePermission]:
+    def get_permissions(self) -> List[BasePermission]:
         """Determine the set of permissions that apply to the current action.
 
         - For 'update' and 'partial_update' actions, authenticated users are allowed to make changes.
@@ -282,28 +289,6 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             logger.exception("Error during delete operation")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    def get_paginated_response(self, data: list[dict[str, Any]]) -> Response:
-        """
-        Construct the paginated response for the observations data.
-
-        This method adds pagination links and the total count of observations to the response.
-
-        Parameters
-        ----------
-        - data (List[Dict[str, Any]]): Serialized data for the current page.
-
-        Returns
-        -------
-        - Response: A response object containing the paginated data and navigation links.
-        """
-        assert self.paginator is not None
-        return Response({
-            "total": self.paginator.page.paginator.count,
-            "next": self.paginator.get_next_link(),
-            "previous": self.paginator.get_previous_link(),
-            "results": data,
-        })
-
     @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
     @swagger_auto_schema(
         operation_description="Retrieve a list of observations. Supports filtering and ordering.",
@@ -311,26 +296,12 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
     )
     def retrieve_list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """
-        Handle requests for the list of observations with pagination.
-
-        Override the default list method to apply pagination and return paginated response.
-
-        Parameters
-        ----------
-        - request (Request): The incoming HTTP request.
-        - *args (Any): Additional positional arguments.
-        - **kwargs (Any): Additional keyword arguments.
-
-        Returns
-        -------
-        - Response: The paginated response containing the observations data or full list if pagination is not applied.
+        Handle requests for the list of observations with pagination and caching.
         """
-        # Generate a unique cache key based on query parameters
         query_params = request.GET.copy()
-        page = query_params.get('page', '1')
-        page_size = query_params.get('page_size', '25')
-        cache_key = f"observations_list:{hash(str(query_params))}:page_{page}:size_{page_size}"
-        
+        cursor = query_params.get('cursor', '')
+        cache_key = f"observations_list:{hash(str(query_params))}:cursor_{cursor}"
+
         # Check cache
         cached_data = cache.get(cache_key)
         if cached_data:
@@ -340,10 +311,11 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
-            response_data = self.get_paginated_response(serializer.data).data
-            cache.set(cache_key, response_data, timeout=3600)  # Cache for 1 hour
-            return Response(response_data)
+            response = self.get_paginated_response(serializer.data)
+            cache.set(cache_key, response.data, timeout=3600)  # Cache for 1 hour
+            return response
 
+        # In case pagination is disabled (should not happen)
         serializer = self.get_serializer(queryset, many=True)
         response_data = {"results": serializer.data}
         cache.set(cache_key, response_data, timeout=3600)
@@ -590,11 +562,11 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 return False
         return None
 
-    def process_data(self, data: list[dict[str, Any]]) -> tuple[list[Observation], list[dict[str, Any]]]:
+    def process_data(self, data: List[dict[str, Any]]) -> tuple[List[Observation], List[dict[str, Any]]]:
         """Process and validate the incoming data, splitting between updates and new records."""
         logger.info("Starting to process import data")
         
-        valid_observations: list[Union[dict[str, Any], Observation]] = []
+        valid_observations: List[Union[dict[str, Any], Observation]] = []
         errors = []
         current_time = now()
         
@@ -607,11 +579,11 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             'nest_type', 'eradicator_name', 'eradication_method',
             'eradication_aftercare', 'public_domain', 'eradication_duration',
             'nest_height', 'eradication_result', 'notes', 'admin_notes',
-            'queen_present', 'moth_present'
+            'queen_present', 'moth_present', 'duplicate_nest', 'other_species_nest',
         }
         
         # Fields that need boolean conversion
-        boolean_fields = {'visible', 'public_domain', 'queen_present', 'moth_present'}
+        boolean_fields = {'visible', 'public_domain', 'queen_present', 'moth_present', 'duplicate_nest', 'other_species_nest'}
         
         for idx, data_item in enumerate(data, start=1):
             # Only allow specific fields
@@ -1078,7 +1050,7 @@ class MunicipalityViewSet(ReadOnlyModelViewSet):
     serializer_class = MunicipalitySerializer
     pagination_class = None
 
-    def get_permissions(self) -> list[BasePermission]:
+    def get_permissions(self) -> List[BasePermission]:
         """Determine the set of permissions that apply to the current action."""
         if self.request.method == "GET":
             return [AllowAny()]
@@ -1132,7 +1104,7 @@ class ProvinceViewSet(ReadOnlyModelViewSet):
     serializer_class = ProvinceSerializer
     pagination_class = None
 
-    def get_permissions(self) -> list[BasePermission]:
+    def get_permissions(self) -> List[BasePermission]:
         """Determine the set of permissions that apply to the current action."""
         if self.request.method == "GET":
             return [AllowAny()]

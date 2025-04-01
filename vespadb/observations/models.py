@@ -372,6 +372,17 @@ class Observation(models.Model):
     public_domain = models.BooleanField(
         blank=True, null=True, help_text="Flag indicating if the observation is in the public domain"
     )
+    duplicate_nest = models.BooleanField(
+        null=True,
+        blank=True,
+        help_text="Shows if the nest is a duplicate",
+    )
+    other_species_nest = models.BooleanField(
+        null=True,
+        blank=True,
+        help_text="Shows if the nest belongs to another species",
+    )
+
 
     def __str__(self) -> str:
         """Return the string representation of the model."""

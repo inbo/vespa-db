@@ -157,6 +157,12 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         Unauthenticated users see only unreserved observations.
         """
         base_queryset = super().get_queryset().select_related('municipality', 'province')
+    
+        # Add default filter for visible observations
+        visible_param = self.request.query_params.get("visible", "true")
+        if visible_param.lower() != "all" and (not self.request.user.is_authenticated or not self.request.user.is_superuser):
+            base_queryset = base_queryset.filter(visible=True)
+        
         order_params = self.request.query_params.get("ordering", "")
         if "municipality_name" in order_params:
             base_queryset = base_queryset.annotate(
@@ -354,10 +360,12 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             query_params = request.GET.copy()
             bbox_str = query_params.pop("bbox", None)
             
+            # Set default visible=true if not specified and not an admin
+            if 'visible' not in query_params and (not request.user.is_authenticated or not request.user.is_superuser):
+                query_params['visible'] = 'true'
+                
             if 'min_observation_datetime' not in query_params:
                 query_params['min_observation_datetime'] = MIN_OBSERVATION_DATETIME
-            if 'visible' not in query_params:
-                query_params['visible'] = 'true'
 
             cache_key = get_geojson_cache_key(query_params)
             cached_data = cache.get(cache_key)
@@ -664,7 +672,6 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 
                 # Always explicitly update ANB status when coordinates change
                 data_item['anb'] = check_if_point_in_anb_area(long_val, lat_val)
-                logger.info(f"Setting ANB status for coordinates ({long_val}, {lat_val}): {data_item['anb']}")
             except (ValueError, TypeError) as e:
                 logger.error(f"Invalid coordinates: {str(e)}")
                 return {"error": f"Invalid coordinates: {str(e)}"}
@@ -726,9 +733,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                     data_item['province'] = municipality.province
             
             # Always explicitly set ANB status
-            data_item['anb'] = check_if_point_in_anb_area(long_val, lat_val)
-            logger.info(f"Setting ANB status for coordinates ({long_val}, {lat_val}): {data_item['anb']}")
-            
+            data_item['anb'] = check_if_point_in_anb_area(long_val, lat_val)            
             return data_item  # Return the processed dictionary
         except (ValueError, TypeError) as e:
             logger.error(f"Error processing coordinates: {str(e)}")

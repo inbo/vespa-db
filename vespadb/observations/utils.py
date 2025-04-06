@@ -34,10 +34,7 @@ def check_if_point_in_anb_area(longitude: float, latitude: float) -> bool:
     transformed_point = point.transform(31370, clone=True)
     
     # Check if the point is within any ANB area
-    is_within_anb = ANB.objects.filter(polygon__contains=transformed_point).exists()
-    
-    logger.info(f"Checking if point ({longitude}, {latitude}) is in ANB area: {is_within_anb}")
-    
+    is_within_anb = ANB.objects.filter(polygon__contains=transformed_point).exists()    
     return is_within_anb
 
 def db_retry(retries: int = 3, delay: int = 5) -> Callable[[F], F]:

@@ -78,7 +78,6 @@ export default {
     const selectedNestType = ref([]);
     const selectedNestStatus = ref([]);
     const anbAreasActief = ref(null);
-    const visibleActief = ref(true);
     const nestType = ref([
       { name: 'Actief embryonaal nest', value: 'actief_embryonaal_nest' },
       { name: 'Actief primair nest', value: 'actief_primair_nest' },
@@ -93,10 +92,6 @@ export default {
     const anbAreaOptions = ref([
       { name: 'Niet in ANB gebied', value: false },
       { name: 'Wel in ANB gebied', value: true }
-    ]);
-    const VisibleOptions = ref([
-      { name: 'Zichtbaar', value: true },
-      { name: 'Niet zichtbaar', value: false }
     ]);
     const minDate = ref(new Date(2024, 3, 1));
     const maxDate = ref(null);
@@ -117,7 +112,6 @@ export default {
         nestStatus: selectedNestStatus.value.length > 0 ? selectedNestStatus.value : null,
         min_observation_date: minDateCET,
         max_observation_date: maxDateCET,
-        visible: visibleActief.value
       });
 
     }, 300);
@@ -152,7 +146,7 @@ export default {
 
     watch([minDate, maxDate], emitFilterUpdate, { immediate: true });
 
-    watch([selectedMunicipalities, selectedProvinces, selectedNestType, selectedNestStatus, anbAreasActief, selectedObservationStart, selectedObservationEnd, visibleActief], () => {
+    watch([selectedMunicipalities, selectedProvinces, selectedNestType, selectedNestStatus, anbAreasActief, selectedObservationStart, selectedObservationEnd], () => {
       emitFilterUpdate();
     }, { deep: true });
 
@@ -203,8 +197,6 @@ export default {
       closeMenu1,
       toggleMenu2,
       closeMenu2,
-      VisibleOptions,
-      visibleActief,
     };
   }
 };

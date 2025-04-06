@@ -3,6 +3,7 @@ import logging
 import os
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from django.conf import settings
 
 import requests
 from celery import Task, shared_task
@@ -48,12 +49,13 @@ def get_oauth_token() -> str | None:
     return None
 
 
-def fetch_observations_page(token: str, modified_since: str, offset: int = 0) -> dict[str, Any]:
+def fetch_observations_page(token: str, modified_since: str, created_after: str, offset: int = 0) -> dict[str, Any]:
     """Fetch a page of observations."""
     try:
         headers = {"Authorization": f"Bearer {token}"}
         params: dict[str, str | int | list[str]] = {
             "modified_after": modified_since,
+            "created_after": created_after,
             "limit": 100,
             "offset": offset,
             "validation_status": ["P", "J"],
@@ -223,6 +225,7 @@ def manage_observations_visibility(token: str) -> None:
         observation_dates = {obs.id: obs.observation_datetime for obs in observations}
 
         # Determine observations to hide
+        # TODO: We willen de oudste obs op basis van CREATED_DATE laten staan (#372)
         latest_date = max(observation_dates.values(), default=None)
         if latest_date:
             observation_ids_to_hide = {
@@ -245,6 +248,9 @@ def fetch_and_update_observations(self: Task, since_week: int | None = None, dat
     if not token:
         raise self.retry(exc=Exception("Failed to obtain OAuth2 token"))
 
+    # Get the created_start_date from settings
+    created_start_date = getattr(settings, 'CREATED_START_DATE', '2024-06-13')
+    
     if date:
         try:
             modified_since = (
@@ -268,6 +274,13 @@ def fetch_and_update_observations(self: Task, since_week: int | None = None, dat
             .replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=UTC)
             .isoformat()
         )
+    
+    # Parse created_start_date to ISO format
+    created_after = (
+        datetime.strptime(created_start_date, "%Y-%m-%d")
+        .replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=UTC)
+        .isoformat()
+    )
 
     # Pre-fetch existing observations to minimize query overhead
     existing_wn_ids = cache_wn_ids()
@@ -275,7 +288,7 @@ def fetch_and_update_observations(self: Task, since_week: int | None = None, dat
     offset = 0
 
     while True:
-        data = fetch_observations_page(token, modified_since, offset)
+        data = fetch_observations_page(token, modified_since, created_after, offset)
 
         if data:
             observations_to_update = []

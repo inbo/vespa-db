@@ -283,3 +283,4 @@ SERVER_EMAIL = secrets["DEFAULT_FROM_EMAIL"]
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 EXPORTS_DIR = os.path.join(MEDIA_ROOT, 'exports')
+CREATED_START_DATE = "2024-06-13"

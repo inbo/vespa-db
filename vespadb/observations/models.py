@@ -277,6 +277,7 @@ class Observation(models.Model):
     wn_created_datetime = models.DateTimeField(
         blank=True, null=True, help_text="Datetime when the observation was created in the source system"
     )
+    # TODO: visible True in response & export. Frontend -> visible weg
     visible = models.BooleanField(null=True, default=True, help_text="Flag indicating if the observation is visible")
     images = models.JSONField(
         default=list, blank=True, null=True, help_text="List of images associated with the observation"
@@ -395,7 +396,6 @@ class Observation(models.Model):
         :param args: Variable length argument list.
         :param kwargs: Arbitrary keyword arguments.
         """
-        logger.info(f"Save method called for observation {self.id if self.id else 'new'}")
         if self.location:
             if not isinstance(self.location, Point):
                 self.location = Point(self.location)
@@ -408,9 +408,6 @@ class Observation(models.Model):
                 self.municipality = municipality
                 if municipality and not self.province:
                     self.province = municipality.province
-
-            logger.info(f"Save method for observation {self.id if self.id else 'new'}: Setting municipality={self.municipality}, province={self.province}, anb={self.anb}")
-
         super().save(*args, **kwargs)
     
     class Meta:

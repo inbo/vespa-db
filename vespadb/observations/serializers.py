@@ -285,7 +285,6 @@ class ObservationSerializer(serializers.ModelSerializer):
     
     def to_internal_value(self, data: dict[str, Any]) -> dict[str, Any]:
         """Convert the incoming data to a Python native representation."""
-        logger.info("Raw input data: %s", data)
         # List of fields that should be parsed as datetime (with time)
         datetime_fields = [
             "created_datetime",

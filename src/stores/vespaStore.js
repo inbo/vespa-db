@@ -36,7 +36,6 @@ export const useVespaStore = defineStore('vespaStore', {
             nestStatus: null,
             min_observation_date: null,
             max_observation_date: null,
-            visible: true,
         },
         lastAppliedFilters: null,
         isDetailsPaneOpen: false,
@@ -148,10 +147,6 @@ export const useVespaStore = defineStore('vespaStore', {
 
             if (this.filters.anbAreasActief !== null) {
                 params['anb'] = this.filters.anbAreasActief;
-            }
-
-            if (this.filters.visible !== null) {
-                params['visible'] = this.filters.visible;
             }
 
             if (this.filters.nestType) {

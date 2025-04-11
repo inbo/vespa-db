@@ -3,7 +3,7 @@
 import time
 from collections.abc import Callable
 from datetime import datetime
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Union
 
 import pytz
 from dateutil import parser
@@ -46,21 +46,41 @@ def parse_and_convert_to_utc(datetime_str: str) -> datetime:
             continue
     raise ValueError(f"Invalid datetime format: {datetime_str}")
 
-
-def parse_and_convert_to_cet(datetime_str: str) -> datetime:
+def parse_and_convert_to_cet(datetime_str: Union[str, datetime]) -> datetime:
     """
-    Convert a UTC datetime to CET.
+    Convert a datetime string or object to CET.
 
     Args:
-        dt (datetime): The UTC datetime to convert.
+        datetime_str (Union[str, datetime]): The datetime string or object to convert.
 
-    Returns
-    -------
+    Returns:
         datetime: The converted CET datetime.
+
+    Raises:
+        ValueError: If the input cannot be parsed or converted.
     """
     cet_tz = pytz.timezone("Europe/Brussels")
-    return parser.parse(datetime_str).astimezone(cet_tz)
 
+    if isinstance(datetime_str, datetime):
+        # If naive, assume it's in CET (matches app context), not UTC
+        if datetime_str.tzinfo is None:
+            return cet_tz.localize(datetime_str)
+        # If timezone-aware, convert to CET
+        return datetime_str.astimezone(cet_tz)
+
+    if isinstance(datetime_str, str):
+        try:
+            # Use dateutil.parser for flexible parsing
+            dt = parser.parse(datetime_str)
+            # If naive, assume CET (consistent with app timezone)
+            if dt.tzinfo is None:
+                return cet_tz.localize(dt)
+            # If timezone-aware, convert to CET
+            return dt.astimezone(cet_tz)
+        except ValueError:
+            raise ValueError(f"Could not parse datetime from: {datetime_str}")
+
+    raise ValueError(f"Expected datetime string or object, got: {type(datetime_str)}")
 
 def retry_with_backoff(func: Callable[..., T], retries: int=3, backoff_in_seconds: int=2) -> Any:
     """Retry mechanism for retrying a function with a backoff strategy."""

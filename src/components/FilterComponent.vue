@@ -78,7 +78,6 @@ export default {
     const selectedNestType = ref([]);
     const selectedNestStatus = ref([]);
     const anbAreasActief = ref(null);
-    const visibleActief = ref(true);
     const nestType = ref([
       { name: 'Actief embryonaal nest', value: 'actief_embryonaal_nest' },
       { name: 'Actief primair nest', value: 'actief_primair_nest' },
@@ -94,10 +93,6 @@ export default {
       { name: 'Niet in ANB gebied', value: false },
       { name: 'Wel in ANB gebied', value: true }
     ]);
-    const VisibleOptions = ref([
-      { name: 'Zichtbaar', value: true },
-      { name: 'Niet zichtbaar', value: false }
-    ]);
     const minDate = ref(new Date(2024, 3, 1));
     const maxDate = ref(null);
     const selectedObservationStart = ref(false);
@@ -106,10 +101,8 @@ export default {
     const menu2 = ref(false);
 
     const emitFilterUpdate = debounce(() => {
-      const minDateCET = minDate.value ? DateTime.fromJSDate(minDate.value).setZone('Europe/Paris').toFormat('yyyy-MM-dd\'T\'HH:mm:ss') : null;
-      const maxDateCET = maxDate.value ? DateTime.fromJSDate(maxDate.value).setZone('Europe/Paris').toFormat('yyyy-MM-dd\'T\'HH:mm:ss') : null;
-
-
+      const minDateCET = minDate.value ? DateTime.fromJSDate(minDate.value).setZone('Europe/Brussels').toFormat('yyyy-MM-dd\'T\'HH:mm:ss') : null;
+      const maxDateCET = maxDate.value ? DateTime.fromJSDate(maxDate.value).setZone('Europe/Brussels').toFormat('yyyy-MM-dd\'T\'HH:mm:ss') : null;
 
       vespaStore.applyFilters({
         municipalities: selectedMunicipalities.value.length > 0 ? selectedMunicipalities.value : [],
@@ -119,7 +112,6 @@ export default {
         nestStatus: selectedNestStatus.value.length > 0 ? selectedNestStatus.value : null,
         min_observation_date: minDateCET,
         max_observation_date: maxDateCET,
-        visible: visibleActief.value
       });
 
     }, 300);
@@ -154,7 +146,7 @@ export default {
 
     watch([minDate, maxDate], emitFilterUpdate, { immediate: true });
 
-    watch([selectedMunicipalities, selectedProvinces, selectedNestType, selectedNestStatus, anbAreasActief, selectedObservationStart, selectedObservationEnd, visibleActief], () => {
+    watch([selectedMunicipalities, selectedProvinces, selectedNestType, selectedNestStatus, anbAreasActief, selectedObservationStart, selectedObservationEnd], () => {
       emitFilterUpdate();
     }, { deep: true });
 
@@ -180,8 +172,6 @@ export default {
       selectedNestStatus.value = vespaStore.filters.nestStatus || [];
       minDate.value = vespaStore.filters.min_observation_date ? new Date(vespaStore.filters.min_observation_date) : new Date(2024, 3, 1);
       maxDate.value = vespaStore.filters.max_observation_date ? new Date(vespaStore.filters.max_observation_date) : null;
-      if (!vespaStore.municipalitiesFetched) await vespaStore.fetchMunicipalities();
-      if (!vespaStore.provincesFetched) await vespaStore.fetchProvinces();
     });
 
     return {
@@ -207,8 +197,6 @@ export default {
       closeMenu1,
       toggleMenu2,
       closeMenu2,
-      VisibleOptions,
-      visibleActief,
     };
   }
 };

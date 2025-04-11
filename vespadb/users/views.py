@@ -1,8 +1,8 @@
 """Views for the users app."""
-
+import json
+from django.utils import timezone
 from collections.abc import Sequence
 from typing import Any
-
 from django.contrib.auth import login, logout, update_session_auth_hash
 from rest_framework import permissions, serializers, status, viewsets
 from rest_framework.authentication import BaseAuthentication
@@ -15,7 +15,10 @@ from django.middleware.csrf import get_token
 
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
-
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
+from django.contrib.auth.decorators import login_required
 from vespadb.permissions import IsAdminOrSelf
 from vespadb.users.models import VespaUser as User
 from vespadb.users.serializers import (
@@ -23,7 +26,6 @@ from vespadb.users.serializers import (
     LoginSerializer,
     UserSerializer,
 )
-
 
 class UserViewSet(viewsets.ModelViewSet):
     """Viewset for the User model."""

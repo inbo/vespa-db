@@ -8,7 +8,7 @@ import time
 import logging
 import csv
 import json
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any, Union, List
 from django.http import HttpResponseNotFound
 import os
 from typing import Iterator, Set
@@ -54,18 +54,19 @@ from rest_framework_gis.filters import DistanceToPointFilter
 
 from vespadb.observations.cache import invalidate_geojson_cache, invalidate_observation_cache
 from vespadb.observations.filters import ObservationFilter
-from vespadb.observations.helpers import parse_and_convert_to_utc
+from vespadb.observations.helpers import parse_and_convert_to_cet
 from vespadb.observations.models import Municipality, Observation, Province, Export
-from vespadb.observations.models import Export
 from vespadb.observations.tasks.export_utils import generate_rows
 from vespadb.observations.tasks.generate_export import generate_export
 from vespadb.observations.serializers import ObservationSerializer, MunicipalitySerializer, ProvinceSerializer
-from vespadb.observations.utils import check_if_point_in_anb_area, get_municipality_from_coordinates
+from vespadb.observations.utils import check_if_point_in_anb_area, get_municipality_from_coordinates, get_geojson_cache_key
 from django.utils.decorators import method_decorator
 from django_ratelimit.decorators import ratelimit
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
 from django.shortcuts import get_object_or_404
+from vespadb.observations.constants import MIN_OBSERVATION_DATETIME
+from rest_framework.pagination import CursorPagination
 
 if TYPE_CHECKING:
     from geopy.location import Location
@@ -84,6 +85,11 @@ BBOX_LENGTH = 4
 GEOJSON_REDIS_CACHE_EXPIRATION = 900  # 15 minutes
 GET_REDIS_CACHE_EXPIRATION = 86400  # 1 day
 BATCH_SIZE = 150
+
+class ObservationCursorPagination(CursorPagination):
+    page_size = 50
+    ordering = ('observation_datetime', 'id')
+    
 class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
     """ViewSet for the Observation model."""
 
@@ -99,6 +105,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
     filterset_class = ObservationFilter
     distance_filter_field = "location"
     distance_filter_convert_meters = True
+    pagination_class = ObservationCursorPagination
 
     def get_serializer_context(self) -> dict[str, Any]:
         """
@@ -120,7 +127,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         """
         return super().get_serializer_class()
 
-    def get_permissions(self) -> list[BasePermission]:
+    def get_permissions(self) -> List[BasePermission]:
         """Determine the set of permissions that apply to the current action.
 
         - For 'update' and 'partial_update' actions, authenticated users are allowed to make changes.
@@ -149,9 +156,14 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         Admin users can see all observations. Authenticated users see their reservations and unreserved observations.
         Unauthenticated users see only unreserved observations.
         """
-        base_queryset = super().get_queryset()
+        base_queryset = super().get_queryset().select_related('municipality', 'province')
+    
+        # Add default filter for visible observations
+        visible_param = self.request.query_params.get("visible", "true")
+        if visible_param.lower() != "all" and (not self.request.user.is_authenticated or not self.request.user.is_superuser):
+            base_queryset = base_queryset.filter(visible=True)
+        
         order_params = self.request.query_params.get("ordering", "")
-
         if "municipality_name" in order_params:
             base_queryset = base_queryset.annotate(
                 municipality_name=Coalesce(
@@ -209,7 +221,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                     data[field] = None
                 else:
                     try:
-                        data[field] = parse_and_convert_to_utc(value).isoformat()
+                        data[field] = parse_and_convert_to_cet(value).isoformat()
                     except (ValueError, TypeError):
                         return Response(
                             {field: [f"Invalid datetime format for {field}."]},
@@ -283,28 +295,6 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             logger.exception("Error during delete operation")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    def get_paginated_response(self, data: list[dict[str, Any]]) -> Response:
-        """
-        Construct the paginated response for the observations data.
-
-        This method adds pagination links and the total count of observations to the response.
-
-        Parameters
-        ----------
-        - data (List[Dict[str, Any]]): Serialized data for the current page.
-
-        Returns
-        -------
-        - Response: A response object containing the paginated data and navigation links.
-        """
-        assert self.paginator is not None
-        return Response({
-            "total": self.paginator.page.paginator.count,
-            "next": self.paginator.get_next_link(),
-            "previous": self.paginator.get_previous_link(),
-            "results": data,
-        })
-
     @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
     @swagger_auto_schema(
         operation_description="Retrieve a list of observations. Supports filtering and ordering.",
@@ -312,30 +302,31 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
     )
     def retrieve_list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """
-        Handle requests for the list of observations with pagination.
-
-        Override the default list method to apply pagination and return paginated response.
-
-        Parameters
-        ----------
-        - request (Request): The incoming HTTP request.
-        - *args (Any): Additional positional arguments.
-        - **kwargs (Any): Additional keyword arguments.
-
-        Returns
-        -------
-        - Response: The paginated response containing the observations data or full list if pagination is not applied.
+        Handle requests for the list of observations with pagination and caching.
         """
-        queryset = self.filter_queryset(self.get_queryset())
+        query_params = request.GET.copy()
+        cursor = query_params.get('cursor', '')
+        cache_key = f"observations_list:{hash(str(query_params))}:cursor_{cursor}"
 
+        # Check cache
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            return Response(cached_data)
+
+        queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+            response = self.get_paginated_response(serializer.data)
+            cache.set(cache_key, response.data, timeout=3600)  # Cache for 1 hour
+            return response
 
+        # In case pagination is disabled (should not happen)
         serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
-
+        response_data = {"results": serializer.data}
+        cache.set(cache_key, response_data, timeout=3600)
+        return Response(response_data)
+    
     @swagger_auto_schema(
         operation_description="Retrieve GeoJSON data for observations within a bounding box (bbox).",
         manual_parameters=[
@@ -368,64 +359,57 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         try:
             query_params = request.GET.copy()
             bbox_str = query_params.pop("bbox", None)
+            
+            # Set default visible=true if not specified and not an admin
+            if 'visible' not in query_params and (not request.user.is_authenticated or not request.user.is_superuser):
+                query_params['visible'] = 'true'
+                
+            if 'min_observation_datetime' not in query_params:
+                query_params['min_observation_datetime'] = MIN_OBSERVATION_DATETIME
 
-            sorted_params = "&".join(sorted(f"{key}={value}" for key, value in query_params.items()))
-            cache_key = f"vespadb::{request.path}::{sorted_params}"
-            logger.info(f"Checking cache for {cache_key}")
-
+            cache_key = get_geojson_cache_key(query_params)
             cached_data = cache.get(cache_key)
             if cached_data:
-                logger.info("Cache hit - Returning cached response")
+                logger.info(f"Returning cached GeoJSON data, found cache: {cache_key}")
                 return JsonResponse(cached_data, safe=False)
-
-            bbox_str = request.GET.get("bbox")
+            
+            # Rest of your view logic remains the same
+            bbox = None
             if bbox_str:
-                try:
-                    bbox_coords = list(map(float, bbox_str.split(",")))
-                    if len(bbox_coords) == BBOX_LENGTH:
-                        xmin, ymin, xmax, ymax = bbox_coords
-                        bbox_wkt = (
-                            f"POLYGON(({xmin} {ymin}, {xmin} {ymax}, {xmax} {ymax}, {xmax} {ymin}, {xmin} {ymin}))"
-                        )
-                        bbox = GEOSGeometry(bbox_wkt, srid=4326)
-                    else:
-                        return HttpResponse("Invalid bbox format", status=status.HTTP_400_BAD_REQUEST)
-                except ValueError:
-                    return HttpResponse("Invalid bbox values", status=status.HTTP_400_BAD_REQUEST)
-            else:
-                bbox = None
+                bbox_coords = list(map(float, bbox_str.split(",")))
+                if len(bbox_coords) == BBOX_LENGTH:
+                    xmin, ymin, xmax, ymax = bbox_coords
+                    bbox_wkt = f"POLYGON(({xmin} {ymin}, {xmin} {ymax}, {xmax} {ymax}, {xmax} {ymin}, {xmin} {ymin}))"
+                    bbox = GEOSGeometry(bbox_wkt, srid=4326)
+                else:
+                    return HttpResponse("Invalid bbox format", status=400)
 
-            queryset = self.filter_queryset(self.get_queryset())
-
+            queryset = self.filter_queryset(
+                self.get_queryset().select_related('municipality')
+            ).annotate(point=Transform("location", 4326))
             if bbox:
                 queryset = queryset.filter(location__within=bbox)
 
-            queryset = queryset.annotate(point=Transform("location", 4326))
+            def generate_features(qs):
+                for obs in qs.iterator(chunk_size=1000):
+                    yield {
+                        "type": "Feature",
+                        "properties": {
+                            "id": obs.id,
+                            "status": "eradicated" if obs.eradication_result else "reserved" if obs.reserved_by else "default",
+                        },
+                        "geometry": json.loads(obs.point.geojson) if obs.point else None,
+                    }
 
-            features = [
-                {
-                    "type": "Feature",
-                    "properties": {
-                        "id": obs.id,
-                        "status": "eradicated"
-                        if obs.eradication_result is not None
-                        else "reserved"
-                        if obs.reserved_by
-                        else "default",
-                    },
-                    "geometry": json.loads(obs.location.geojson) if obs.location else None,
-                }
-                for obs in queryset
-            ]
+            features = list(generate_features(queryset))
             geojson_response = {"type": "FeatureCollection", "features": features}
+            logger.info(f"Generating GeoJSON in view with cache_key {cache_key}")
             cache.set(cache_key, geojson_response, GEOJSON_REDIS_CACHE_EXPIRATION)
-            return JsonResponse(geojson_response)
-        except Exception:
-            logger.exception("An error occurred while generating GeoJSON data")
-            return HttpResponse(
-                "An error occurred while generating GeoJSON data", status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
+            return JsonResponse(geojson_response, safe=False)
+        except Exception as e:
+            logger.exception("GeoJSON generation failed")
+            return HttpResponse("Error generating GeoJSON", status=500)
+            
     @swagger_auto_schema(
         operation_description="Bulk import observations from either JSON or CSV file.",
         request_body=openapi.Schema(
@@ -549,7 +533,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 for field in datetime_fields:
                     if row.get(field):
                         try:
-                            row[field] = parse_and_convert_to_utc(row[field])
+                            row[field] = parse_and_convert_to_cet(row[field])
                         except (ValueError, TypeError) as e:
                             logger.exception(f"Invalid datetime format for {field}: {row[field]} - {e}")
                             row[field] = None
@@ -563,139 +547,201 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         try:
             if isinstance(location, str):
                 if location.startswith("SRID"):
-                    # Extract the actual point from the SRID string
                     point_str = location.split(";")[1].strip()
                     geom = GEOSGeometry(point_str, srid=4326)
                 else:
                     geom = GEOSGeometry(location, srid=4326)
                 logger.info(f"Validated GEOSGeometry: {geom}")
-                return geom.wkt
+                return geom
             raise ValidationError("Invalid location data type")
         except (ValueError, TypeError) as e:
             logger.exception(f"Invalid location data: {location} - {e}")
             raise ValidationError("Invalid WKT format for location.") from e
+    
+    def parse_boolean(self, value):
+        """Convert string boolean values to Python boolean."""
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            value = value.lower().strip()
+            if value == 'true':
+                return True
+            elif value == 'false':
+                return False
+        return None
 
-    def process_data(self, data: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-        """Process and validate the incoming data."""
+    def process_data(self, data: List[dict[str, Any]]) -> tuple[List[Observation], List[dict[str, Any]]]:
+        """Process and validate the incoming data, splitting between updates and new records."""
         logger.info("Starting to process import data")
-            
-        valid_observations = []
+        
+        valid_observations: List[Union[dict[str, Any], Observation]] = []
         errors = []
         current_time = now()
         
+        # Define the allowed fields for import
+        allowed_fields = {
+            'id', 'source_id', 'observation_datetime', 'eradication_problems',
+            'source', 'eradication_notes', 'images', 'created_datetime',
+            'longitude', 'latitude', 'eradication_persons', 'nest_size',
+            'visible', 'nest_location', 'eradication_date', 'eradication_product',
+            'nest_type', 'eradicator_name', 'eradication_method',
+            'eradication_aftercare', 'public_domain', 'eradication_duration',
+            'nest_height', 'eradication_result', 'notes', 'admin_notes',
+            'queen_present', 'moth_present', 'duplicate_nest', 'other_species_nest',
+        }
+        
+        # Fields that need boolean conversion
+        boolean_fields = {'visible', 'public_domain', 'queen_present', 'moth_present', 'duplicate_nest', 'other_species_nest'}
+        
         for idx, data_item in enumerate(data, start=1):
-            try:
-                logger.info(f"Processing record #{idx}: {data_item}")
+            # Only allow specific fields
+            data_item = {k: v for k, v in data_item.items() if k in allowed_fields}
+            
+            # Process boolean fields
+            for field in boolean_fields:
+                if field in data_item:
+                    data_item[field] = self.parse_boolean(data_item[field])
+            
+            # If an id is provided, treat as update; otherwise as create.
+            if "id" in data_item and data_item["id"]:
+                result = self.process_update_item(data_item, idx, current_time)
+            else:
+                result = self.process_create_item(data_item, idx, current_time)
                 
-                # Only allow specific fields in import
-                allowed_fields = {
-                    'id', 'source_id', 'observation_datetime', 'eradication_problems',
-                    'source', 'eradication_notes', 'images', 'created_datetime',
-                    'longitude', 'latitude', 'eradication_persons', 'nest_size',
-                    'visible', 'nest_location', 'eradication_date', 'eradication_product',
-                    'nest_type', 'eradicator_name', 'eradication_method',
-                    'eradication_aftercare', 'public_domain', 'eradication_duration',
-                    'nest_height', 'eradication_result', 'notes', 'admin_notes'
-                }
-                
-                data_item = {k: v for k, v in data_item.items() if k in allowed_fields}
-                
-                # Handle record updates vs inserts
-                observation_id = data_item.pop('id', None)
-                
-                if observation_id is not None:  # Update existing record
-                    try:
-                        existing_obj = Observation.objects.get(id=observation_id)
-                        logger.info(f"Updating observation #{observation_id}")
-                        
-                        # Remove created_by/created_datetime for updates
-                        data_item.pop('created_by', None)
-                        data_item.pop('created_datetime', None)
-                        
-                        data_item['modified_by'] = self.request.user
-                        data_item['modified_datetime'] = current_time
-
-                        if 'longitude' in data_item and 'latitude' in data_item:
-                            try:
-                                long = float(data_item.pop('longitude'))
-                                lat = float(data_item.pop('latitude'))
-                                data_item['location'] = Point(long, lat, srid=4326)
-                                logger.info(f"Created point from coordinates: {long}, {lat}")
-                                
-                                municipality = get_municipality_from_coordinates(long, lat)
-                                if municipality:
-                                    data_item['municipality'] = municipality.id
-                                    if municipality.province:
-                                        data_item['province'] = municipality.province.id
-                                data_item['anb'] = check_if_point_in_anb_area(long, lat)
-                            except (ValueError, TypeError) as e:
-                                logger.error(f"Record #{idx}: Invalid coordinates: {e}")
-                                errors.append({"record": idx, "error": f"Invalid coordinates: {str(e)}"})
-                                continue
-
-                        if 'eradication_date' in data_item:
-                            date_str = data_item['eradication_date']
-                            if isinstance(date_str, str):
-                                try:
-                                    data_item['eradication_date'] = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
-                                except ValueError:
-                                    errors.append({"record": idx, "error": f"Invalid date format for eradication_date: {date_str}"})
-                                    continue
-
-                        for key, value in data_item.items():
-                            setattr(existing_obj, key, value)
-                        existing_obj.save()
-                        valid_observations.append(existing_obj)
-                        continue
-                    except Observation.DoesNotExist:
-                        logger.error(f"Record #{idx}: Observation with id {observation_id} not found")
-                        errors.append({"record": idx, "error": f"Observation with id {observation_id} not found"})
-                        continue
-                else:  # New record
-                    data_item['created_by'] = self.request.user.pk if self.request.user else None
-                    if 'created_datetime' not in data_item:
-                        data_item['created_datetime'] = current_time
-                    data_item['modified_by'] = self.request.user.pk if self.request.user else None
-                    data_item['modified_datetime'] = current_time
-
-                    if 'longitude' in data_item and 'latitude' in data_item:
-                        try:
-                            long = float(data_item.pop('longitude'))
-                            lat = float(data_item.pop('latitude'))
-                            data_item['location'] = Point(long, lat, srid=4326)
-                            logger.info(f"Created point from coordinates: {long}, {lat}")
-                            
-                            municipality = get_municipality_from_coordinates(long, lat)
-                            if municipality:
-                                data_item['municipality'] = municipality.id
-                                if municipality.province:
-                                    data_item['province'] = municipality.province.id
-                            data_item['anb'] = check_if_point_in_anb_area(long, lat)
-                        except (ValueError, TypeError) as e:
-                            logger.error(f"Record #{idx}: Invalid coordinates: {e}")
-                            errors.append({"record": idx, "error": f"Invalid coordinates: {str(e)}"})
-                            continue
-
-                    if 'eradication_date' in data_item:
-                        date_str = data_item['eradication_date']
-                        if isinstance(date_str, str):
-                            try:
-                                data_item['eradication_date'] = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
-                            except ValueError:
-                                errors.append({"record": idx, "error": f"Invalid date format for eradication_date: {date_str}"})
-                                continue
-
-                    cleaned_item = self.clean_data(data_item)
-                    serializer = ObservationSerializer(data=cleaned_item)
-                    if serializer.is_valid():
-                        valid_observations.append(serializer.validated_data)
-                    else:
-                        errors.append({"record": idx, "error": serializer.errors})
-            except Exception as e:
-                logger.exception(f"Error processing data item: {data_item} - {e}")
-                errors.append({"error": str(e)})
-                
+            if isinstance(result, dict) and result.get("error"):
+                errors.append({"record": idx, "error": result["error"]})
+            elif result is not None:  # Only add if not None
+                valid_observations.append(result)
+            else:
+                logger.warning(f"Unexpected None result for record {idx}")
+                errors.append({"record": idx, "error": "Unexpected None result"})                
         return valid_observations, errors
+        
+    def process_update_item(self, data_item: dict[str, Any], idx: int, current_time: datetime.datetime) -> Any:
+        """
+        Process a single record as an update.
+        
+        In update mode, we only require an "id" plus any fields that should be updated.
+        For example, if only eradication_result is provided, observation_datetime is not mandatory.
+        """
+        observation_id = data_item.pop("id")
+        try:
+            # First attempt to find by exact ID
+            existing_obj = Observation.objects.get(id=observation_id)
+            logger.info(f"Updating observation #{observation_id}")
+        except Observation.DoesNotExist:
+            logger.warning(f"Observation with id {observation_id} not found directly, trying to create...")
+            # If observation doesn't exist, we'll create it instead of failing
+            return self.process_create_item({**data_item, "id": observation_id}, idx, current_time)
+        
+        # Set the update audit fields
+        data_item['modified_by'] = self.request.user
+        data_item['modified_datetime'] = current_time
+
+        # Process datetime fields - properly handle timezone conversion
+        datetime_fields = [
+            "created_datetime", 
+            "modified_datetime",
+            "observation_datetime",
+            "wn_modified_datetime",
+            "wn_created_datetime",
+            "reserved_datetime"
+        ]
+        
+        for field in datetime_fields:
+            if field in data_item and data_item[field]:
+                try:
+                    # Parse the datetime value and ensure it's in CET
+                    dt_value = parse_and_convert_to_cet(data_item[field])
+                    data_item[field] = dt_value
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"Invalid datetime format for {field}: {data_item[field]} - {e}")
+                    data_item[field] = None
+
+        # If coordinates are provided, update the location, municipality, province, and ANB flag.
+        if 'longitude' in data_item and 'latitude' in data_item:
+            try:
+                long_val = float(data_item.pop('longitude'))
+                lat_val = float(data_item.pop('latitude'))
+                data_item['location'] = Point(long_val, lat_val, srid=4326)
+                municipality = get_municipality_from_coordinates(long_val, lat_val)
+                if municipality:
+                    data_item['municipality'] = municipality
+                    if municipality.province:
+                        data_item['province'] = municipality.province
+                
+                # Always explicitly update ANB status when coordinates change
+                data_item['anb'] = check_if_point_in_anb_area(long_val, lat_val)
+            except (ValueError, TypeError) as e:
+                logger.error(f"Invalid coordinates: {str(e)}")
+                return {"error": f"Invalid coordinates: {str(e)}"}
+        
+        return data_item 
+
+    def process_create_item(self, data_item: dict[str, Any], idx: int, current_time: datetime.datetime) -> Any:
+        """
+        Process a single record as a new observation.
+        
+        In create mode, observation_datetime, latitude and longitude are required.
+        """
+        # Check if ID is specified for explicitly creating with a specific ID
+        observation_id = data_item.get("id")
+        
+        # Ensure required fields for a new record are present
+        required_fields = ["observation_datetime", "longitude", "latitude"]
+        missing_fields = [field for field in required_fields if not data_item.get(field)]
+        if missing_fields:
+            return {"error": f"Missing required fields for new record: {', '.join(missing_fields)}"}
+        
+        # Set user fields   
+        data_item['created_by'] = self.request.user
+        data_item['created_datetime'] = current_time
+        data_item['modified_by'] = self.request.user
+        data_item['modified_datetime'] = current_time
+
+        # Process datetime fields
+        datetime_fields = [
+            "created_datetime", 
+            "modified_datetime",
+            "observation_datetime",
+            "wn_modified_datetime",
+            "wn_created_datetime",
+            "reserved_datetime"
+        ]
+        
+        for field in datetime_fields:
+            if field in data_item and data_item[field]:
+                try:
+                    dt_value = parse_and_convert_to_cet(data_item[field])
+                    data_item[field] = dt_value
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"Invalid datetime format for {field}: {data_item[field]} - {e}")
+                    if field == "observation_datetime":  # This is required
+                        return {"error": f"Invalid datetime format for required field {field}: {data_item[field]}"}
+                    data_item[field] = None
+
+        try:
+            long_val = float(data_item.pop('longitude'))
+            lat_val = float(data_item.pop('latitude'))
+            data_item['location'] = Point(long_val, lat_val, srid=4326)
+            logger.info(f"Created point from coordinates: {long_val}, {lat_val}")
+            
+            municipality = get_municipality_from_coordinates(long_val, lat_val)
+            if municipality:
+                data_item['municipality'] = municipality
+                if municipality.province:
+                    data_item['province'] = municipality.province
+            
+            # Always explicitly set ANB status
+            data_item['anb'] = check_if_point_in_anb_area(long_val, lat_val)            
+            return data_item  # Return the processed dictionary
+        except (ValueError, TypeError) as e:
+            logger.error(f"Error processing coordinates: {str(e)}")
+            return {"error": f"Invalid coordinates: {str(e)}"}
+        except Exception as e:
+            logger.error(f"Unexpected error in process_create_item: {str(e)}")
+            return {"error": f"Unexpected error: {str(e)}"}
+
     def clean_data(self, data_dict: dict[str, Any]) -> dict[str, Any]:
         """Clean the incoming data and remove empty or None values."""
         logger.info("Original data item: %s", data_dict)
@@ -934,7 +980,6 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             # Create the streaming response
             pseudo_buffer = Echo()
             writer = csv.writer(pseudo_buffer)
-            
             response = StreamingHttpResponse(
                 streaming_content=generate_rows(
                     queryset=queryset,
@@ -945,17 +990,14 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 ),
                 content_type='text/csv'
             )
-            
             # Set filename with timestamp
             timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
             response['Content-Disposition'] = f'attachment; filename="observations_export_{timestamp}.csv"'
-            
             # Add CORS headers
             response["Access-Control-Allow-Origin"] = request.META.get('HTTP_ORIGIN', '*')
             response["Access-Control-Allow-Credentials"] = "true"
             response["Access-Control-Allow-Methods"] = "GET, OPTIONS"
             response["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-            
             return response
 
         except Exception as e:
@@ -1013,7 +1055,7 @@ class MunicipalityViewSet(ReadOnlyModelViewSet):
     serializer_class = MunicipalitySerializer
     pagination_class = None
 
-    def get_permissions(self) -> list[BasePermission]:
+    def get_permissions(self) -> List[BasePermission]:
         """Determine the set of permissions that apply to the current action."""
         if self.request.method == "GET":
             return [AllowAny()]
@@ -1067,7 +1109,7 @@ class ProvinceViewSet(ReadOnlyModelViewSet):
     serializer_class = ProvinceSerializer
     pagination_class = None
 
-    def get_permissions(self) -> list[BasePermission]:
+    def get_permissions(self) -> List[BasePermission]:
         """Determine the set of permissions that apply to the current action."""
         if self.request.method == "GET":
             return [AllowAny()]

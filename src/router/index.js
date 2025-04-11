@@ -13,28 +13,43 @@ const routes = [
   },
   {
     path: '/map',
-    name: 'MapPage',
-    component: MapPage
+    name: 'map',
+    component: MapPage,
+    meta: { 
+      activeView: 'map' 
+    }
   },
   {
     path: '/map/observation/:id',
     name: 'ObservationDetailMap',
-    component: MapPage
+    component: MapPage,
+    meta: { 
+      activeView: 'map' 
+    }
   },
   {
     path: '/table/observation/:id',
     name: 'ObservationDetailTable',
-    component: TableViewPage
+    component: TableViewPage,
+    meta: { 
+      activeView: 'table' 
+    }
   },
   {
     path: '/table',
     name: 'TableView',
-    component: TableViewPage
+    component: TableViewPage,
+    meta: { 
+      activeView: 'table' 
+    }
   },
   {
     path: '/',
     name: 'Home',
-    component: MapPage
+    component: MapPage,
+    meta: { 
+      activeView: 'map' 
+    }
   },
   {
     path: '/change-password',

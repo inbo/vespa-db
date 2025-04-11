@@ -98,14 +98,15 @@ export default {
       }
       const date = new Date(isoString);
       if (isNaN(date.getTime())) {
-        return defaultValue;
+          return defaultValue;
       }
       return new Intl.DateTimeFormat('nl-NL', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZone: 'Europe/Brussels'
       }).format(date);
     };
 

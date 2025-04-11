@@ -17,7 +17,6 @@ from celery.schedules import crontab
 from dotenv import load_dotenv
 
 load_dotenv()
-
 secrets = {
     "DJANGO_SECRET_KEY": os.getenv("SECRET_KEY"),
     "CORS_ALLOWED_ORIGINS": os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000").split(",") + ["https://nesten.vespawatch.be", "https://uat-nesten.vespawatch.be","https://db.vespawatch.be","https://uat-db.vespawatch.be",],
@@ -121,15 +120,23 @@ CELERY_RESULT_BACKEND = "django-db"
 CELERY_ACCEPT_CONTENT = ["application/json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
-CELERY_TIMEZONE = "UTC"
+CELERY_TIMEZONE = "Europe/Brussels"
 CELERY_BEAT_SCHEDULE = {
     "fetch_and_update_observations": {
         "task": "vespadb.observations.tasks.observation_sync.fetch_and_update_observations",
-        "schedule": crontab(hour=4, minute=0),  # Runs every day at X AM UTC.
+        "schedule": crontab(hour=4, minute=0),
     },
     "remove_expired_reservations": {
         "task": "vespadb.observations.tasks.reservation_cleanup.free_expired_reservations_and_audit_reservation_count",
-        "schedule": crontab(hour=5, minute=30),  # Runs every day at X AM UTC
+        "schedule": crontab(hour=5, minute=30),
+    },
+    'prewarm-geojson-cache': {
+        'task': "vespadb.observations.tasks.generate_geojson_task",
+        'schedule': crontab(minute='*/13', hour='9-17'),
+        'args': ({
+            'visible': 'true',
+            'min_observation_datetime': '2024-04-01T00:00:00+02:00'
+        },)
     },
 }
 
@@ -219,12 +226,14 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGIN_URL = "/login/"
 WSGI_APPLICATION = "vespadb.wsgi.application"
 LANGUAGE_CODE = "en-us"
-TIME_ZONE = "UTC"
+TIME_ZONE = "Europe/Brussels"
 USE_I18N = True
 USE_TZ = True
-TIME_ZONE = "UTC"
-USE_TZ = True
 
+DATETIME_FORMAT = 'Y-m-d H:i:s'
+DATE_FORMAT = 'Y-m-d'
+DATE_INPUT_FORMATS = ['%Y-%m-%d', '%d-%m-%Y', '%d/%m/%Y']
+DATETIME_INPUT_FORMATS = ['%Y-%m-%d %H:%M:%S', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M:%S.%f', '%Y-%m-%dT%H:%M:%S.%fZ']
 # templates
 TEMPLATES = [
     {
@@ -274,3 +283,4 @@ SERVER_EMAIL = secrets["DEFAULT_FROM_EMAIL"]
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 EXPORTS_DIR = os.path.join(MEDIA_ROOT, 'exports')
+CREATED_START_DATE = "2024-06-13"

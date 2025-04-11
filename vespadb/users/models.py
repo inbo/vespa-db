@@ -3,7 +3,8 @@ from enum import Enum
 
 from django.contrib.auth.models import AbstractUser
 from django.db import models
-
+from django.db import models
+from django.conf import settings
 from vespadb.observations.models import Municipality
 
 logger = logging.getLogger(__name__)

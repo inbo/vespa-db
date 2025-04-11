@@ -2,7 +2,6 @@
 
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
-
 from vespadb.users.views import AuthCheck, ChangePasswordView, LoginView, LogoutView, UserViewSet
 
 app_name = "users"

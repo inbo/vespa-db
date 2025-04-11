@@ -7,6 +7,8 @@ import { createApp } from 'vue';
 import App from './App.vue';
 import router from './router';
 import { useVespaStore } from './stores/vespaStore';
+import Multiselect from 'vue-multiselect';
+import 'vue-multiselect/dist/vue-multiselect.min.css'
 
 // Import CSS
 import '@fortawesome/fontawesome-free/css/all.css';
@@ -21,9 +23,11 @@ const pinia = createPinia();
 app.use(pinia);
 app.use(router);
 
+app.component('Multiselect', Multiselect);
 registerPlugins(app);
 
 const vespaStore = useVespaStore();
-vespaStore.authCheck();
-
-app.mount('#app');
+(async () => {
+    await vespaStore.initializeApp();
+    app.mount('#app');
+})();

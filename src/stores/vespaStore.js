@@ -36,7 +36,6 @@ export const useVespaStore = defineStore('vespaStore', {
             nestStatus: null,
             min_observation_date: null,
             max_observation_date: null,
-            visible: true,
         },
         lastAppliedFilters: null,
         isDetailsPaneOpen: false,
@@ -44,6 +43,11 @@ export const useVespaStore = defineStore('vespaStore', {
         userMunicipalities: [],
         isAdmin: false,
         loginError: null,
+        termsAcceptanceLoading: false,
+        termsAcceptanceError: null,
+        appInitialized: false,
+        termsAcceptanceLoading: false,
+        termsAcceptanceError: null,
     }),
     getters: {
         canEditObservation: (state) => (observation) => {
@@ -61,6 +65,21 @@ export const useVespaStore = defineStore('vespaStore', {
         canEditAdminFields: (state) => state.isAdmin,
     },
     actions: {
+        async initializeApp() {
+            if (this.appInitialized) return;
+            
+            try {
+              await Promise.all([
+                this.fetchMunicipalities(),
+                this.fetchProvinces(),
+                this.authCheck(), // Include auth check here if it should run once on app start
+              ]);
+              this.appInitialized = true;
+            } catch (error) {
+              console.error('Failed to initialize app:', error);
+              this.error = 'Failed to initialize application data';
+            }
+        },
         async getObservations(page = 1, page_size = 25, sortBy = null, sortOrder = 'asc') {
             const currentFilters = JSON.stringify(this.filters);
             this.loadingObservations = true;
@@ -130,10 +149,6 @@ export const useVespaStore = defineStore('vespaStore', {
                 params['anb'] = this.filters.anbAreasActief;
             }
 
-            if (this.filters.visible !== null) {
-                params['visible'] = this.filters.visible;
-            }
-
             if (this.filters.nestType) {
                 params['nest_type'] = this.filters.nestType;
             }
@@ -154,9 +169,10 @@ export const useVespaStore = defineStore('vespaStore', {
         },
         formatDateWithoutTime(date) {
             const d = new Date(date);
-            let month = '' + (d.getMonth() + 1);
-            let day = '' + d.getDate();
-            const year = d.getFullYear();
+            const cetString = new Date(d.toLocaleString('en-US', { timeZone: 'Europe/Brussels' }));
+            let month = '' + (cetString.getMonth() + 1);
+            let day = '' + cetString.getDate();
+            const year = cetString.getFullYear();
 
             if (month.length < 2) month = '0' + month;
             if (day.length < 2) day = '0' + day;
@@ -164,10 +180,13 @@ export const useVespaStore = defineStore('vespaStore', {
             return [year, month, day].join('-');
         },
         formatDateWithEndOfDayTime(date) {
+            // Format to CET
             const d = new Date(date);
-            let month = '' + (d.getMonth() + 1);
-            let day = '' + d.getDate();
-            const year = d.getFullYear();
+            // Ensure the date is interpreted in CET
+            const cetString = new Date(d.toLocaleString('en-US', { timeZone: 'Europe/Brussels' }));
+            let month = '' + (cetString.getMonth() + 1);
+            let day = '' + cetString.getDate();
+            const year = cetString.getFullYear();
 
             if (month.length < 2) month = '0' + month;
             if (day.length < 2) day = '0' + day;
@@ -210,6 +229,20 @@ export const useVespaStore = defineStore('vespaStore', {
                 console.error('Error fetching municipalities:', error);
             }
         },
+        async updateObservations() {
+            if (this.isFetchingGeoJson) return; // Prevent concurrent fetches
+            this.isFetchingGeoJson = true;
+            try {
+              await this.getObservationsGeoJson();
+              // Only fetch table data if explicitly needed (e.g., for a table view)
+              // Remove this line unless you need table_observations separately:
+              // await this.getObservations(1, 25);
+            } catch (error) {
+              console.error('Error updating observations:', error);
+            } finally {
+              this.isFetchingGeoJson = false;
+            }
+        },      
         createCircleMarker(feature, latlng) {
             let fillColor = this.getColorByStatus(feature.properties.status);
             let markerOptions = {
@@ -257,13 +290,43 @@ export const useVespaStore = defineStore('vespaStore', {
                 }
             });
         },
+        async acceptTermsOfService() {
+            this.termsAcceptanceLoading = true;
+            this.termsAcceptanceError = null;
+            
+            try {
+                const response = await ApiService.post("/accept-terms/", {
+                    user_id: this.user.id,
+                    accepted: true
+                });
+                
+                if (response.status === 200) {
+                    this.user = { ...this.user, hasAcceptedTerms: true };
+                    return true;
+                } else {
+                    throw new Error('Failed to record terms acceptance');
+                }
+            } catch (error) {
+                console.error('Error accepting terms of service:', error);
+                
+                if (error.response && error.response.data) {
+                    this.termsAcceptanceError = error.response.data.error || 'Failed to accept terms of service';
+                } else {
+                    this.termsAcceptanceError = error.message || 'Failed to accept terms of service';
+                }
+                
+                return false;
+            } finally {
+                this.termsAcceptanceLoading = false;
+            }
+        },
         async cancelReservation(observation) {
             try {
-                const updatedObservation = {
-                    ...observation,
+                // Only send the reserved_by field, not the entire observation
+                const response = await ApiService.patch(`/observations/${observation.id}/`, {
                     reserved_by: null
-                };
-                const response = await ApiService.patch(`/observations/${observation.id}/`, updatedObservation);
+                });
+                
                 if (response.status === 200) {
                     this.selectedObservation = { ...this.selectedObservation, ...response.data };
                     this.updateMarkerColor(observation.id, '#212529', '#212529', 1);
@@ -293,7 +356,24 @@ export const useVespaStore = defineStore('vespaStore', {
         },
         async updateObservation(observation) {
             try {
-                const response = await ApiService.patch(`/observations/${observation.id}/`, observation);
+                // Make a copy to ensure we don't modify the original
+                const observationToSend = { ...observation };
+                
+                // Convert boolean queen_present to explicit true/false
+                if ('queen_present' in observationToSend) {
+                    observationToSend.queen_present = observationToSend.queen_present === true;
+                }
+                if ('moth_present' in observationToSend) {
+                    observationToSend.moth_present = observationToSend.moth_present === true;
+                }
+                if ('duplicate_nest' in observationToSend) {
+                    observationToSend.duplicate_nest = observationToSend.duplicate_nest === true;
+                }
+                if ('other_species_nest' in observationToSend) {
+                    observationToSend.other_species_nest = observationToSend.other_species_nest === true;
+                }
+                
+                const response = await ApiService.patch(`/observations/${observation.id}/`, observationToSend);
                 if (response.status === 200) {
                     this.selectedObservation = response.data;
                     const colorByResult = this.getColorByStatus(response.data.eradication_result);
@@ -305,6 +385,36 @@ export const useVespaStore = defineStore('vespaStore', {
             } catch (error) {
                 console.error('Error when updating the observation:', error);
                 return null;
+            }
+        },
+        async acceptTermsOfService() {
+            this.termsAcceptanceLoading = true;
+            this.termsAcceptanceError = null;
+            
+            try {
+                const response = await ApiService.post("/accept-terms/", {
+                    user_id: this.user.id,
+                    accepted: true
+                });
+                
+                if (response.status === 200) {
+                    this.user = { ...this.user, hasAcceptedTerms: true };
+                    return true;
+                } else {
+                    throw new Error('Failed to record terms acceptance');
+                }
+            } catch (error) {
+                console.error('Error accepting terms of service:', error);
+                
+                if (error.response && error.response.data) {
+                    this.termsAcceptanceError = error.response.data.error || 'Failed to accept terms of service';
+                } else {
+                    this.termsAcceptanceError = error.message || 'Failed to accept terms of service';
+                }
+                
+                return false;
+            } finally {
+                this.termsAcceptanceLoading = false;
             }
         },
         async exportData(format) {

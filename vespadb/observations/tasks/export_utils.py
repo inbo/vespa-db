@@ -4,6 +4,7 @@ from django.db.models import Model
 import csv
 import logging
 from ..models import Observation
+import pytz
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +50,7 @@ def prepare_row_data(
     is_admin: bool,
     user_municipality_ids: Set[str]
 ) -> List[str]:
+    """Prepare a single row of data for CSV export."""
     try:
         row_data: List[str] = []
         for field in PUBLIC_FIELDS:
@@ -60,9 +62,11 @@ def prepare_row_data(
                 elif field in ["created_datetime", "modified_datetime", "observation_datetime"]:
                     datetime_val = getattr(observation, field, None)
                     if datetime_val:
-                        # Remove microseconds and tzinfo for export consistency
-                        datetime_val = datetime_val.replace(microsecond=0, tzinfo=None)
-                        row_data.append(datetime_val.strftime("%Y-%m-%dT%H:%M:%SZ"))
+                        from vespadb.observations.helpers import parse_and_convert_to_cet
+                        datetime_val = parse_and_convert_to_cet(datetime_val)
+                        datetime_val = datetime_val.replace(microsecond=0)
+                        # Format as CET without timezone indicator
+                        row_data.append(datetime_val.strftime("%Y-%m-%dT%H:%M:%S"))
                     else:
                         row_data.append("")
                 elif field == "province":
@@ -73,7 +77,7 @@ def prepare_row_data(
                     row_data.append(get_status(observation))
                 elif field == "eradication_date":
                     date_val = getattr(observation, "eradication_date", None)
-                    row_data.append(date_val.isoformat() if date_val else "")
+                    row_data.append(date_val.strftime("%Y-%m-%d") if date_val else "")
                 elif field == "eradication_result":
                     value = getattr(observation, "eradication_result", "")
                     row_data.append(str(value) if value is not None else "")
@@ -83,14 +87,11 @@ def prepare_row_data(
                         if not value:
                             row_data.append("")
                         elif len(value) == 1:
-                            # One image → export URL without quotes
                             row_data.append(value[0])
                         else:
-                            # Multiple images → join with commas (no spaces) and enclose in double quotes
                             joined = ",".join(value)
-                            row_data.append(f'"{joined}"')
+                            row_data.append(joined)
                     else:
-                        # In case the field is stored as a string that looks like a list
                         s = str(value)
                         if s.startswith("[") and s.endswith("]"):
                             s = s[1:-1].strip()
@@ -101,7 +102,7 @@ def prepare_row_data(
                                 row_data.append(parts[0])
                             else:
                                 joined = ",".join(parts)
-                                row_data.append(f'"{joined}"')
+                                row_data.append(joined)
                         else:
                             row_data.append(s)
                 elif field == "notes":

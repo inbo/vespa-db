@@ -3,6 +3,7 @@ import logging
 import os
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from django.conf import settings
 
 import requests
 from celery import Task, shared_task
@@ -48,12 +49,13 @@ def get_oauth_token() -> str | None:
     return None
 
 
-def fetch_observations_page(token: str, modified_since: str, offset: int = 0) -> dict[str, Any]:
+def fetch_observations_page(token: str, modified_since: str, created_after: str, offset: int = 0) -> dict[str, Any]:
     """Fetch a page of observations."""
     try:
         headers = {"Authorization": f"Bearer {token}"}
         params: dict[str, str | int | list[str]] = {
             "modified_after": modified_since,
+            "created_after": created_after,
             "limit": 100,
             "offset": offset,
             "validation_status": ["P", "J"],
@@ -208,7 +210,7 @@ def fetch_clusters(token: str, limit: int = 100) -> list[dict[str, Any]]:
 
 
 def manage_observations_visibility(token: str) -> None:
-    """Manage visibility of observations for a specific cluster based on their registration dates."""
+    """Manage visibility of observations for a specific cluster based on their creation dates."""
     clusters = fetch_clusters(token)
     for cluster in clusters:
         observation_ids = cluster.get("observation_ids", [])
@@ -220,17 +222,20 @@ def manage_observations_visibility(token: str) -> None:
             logger.info(f"No observations found for cluster {cluster['id']}.")
             continue  # Skip if no observations are found
 
-        observation_dates = {obs.id: obs.observation_datetime for obs in observations}
+        # Use created_datetime instead of observation_datetime as per #372
+        creation_dates = {obs.id: obs.created_datetime for obs in observations if obs.created_datetime}
+        if not creation_dates:
+            logger.info(f"No valid created_datetime found for observations in cluster {cluster['id']}.")
+            continue
 
-        # Determine observations to hide
-        latest_date = max(observation_dates.values(), default=None)
-        if latest_date:
+        oldest_date = min(creation_dates.values(), default=None)
+        if oldest_date:
+            # Hide all observations except those with the oldest created_datetime
             observation_ids_to_hide = {
-                observation_id for observation_id, date in observation_dates.items() if date < latest_date
+                obs_id for obs_id, created in creation_dates.items() if created > oldest_date
             }
             update_observation_visibility(observations, observation_ids_to_hide)
             logger.info(f"Updated visibility for {len(observations)} observations in cluster {cluster['id']}.")
-
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def fetch_and_update_observations(self: Task, since_week: int | None = None, date: str | None = None) -> None:  # noqa: C901, PLR0912
@@ -245,6 +250,9 @@ def fetch_and_update_observations(self: Task, since_week: int | None = None, dat
     if not token:
         raise self.retry(exc=Exception("Failed to obtain OAuth2 token"))
 
+    # Get the created_start_date from settings
+    created_start_date = getattr(settings, 'CREATED_START_DATE', '2024-06-13')
+    
     if date:
         try:
             modified_since = (
@@ -268,6 +276,13 @@ def fetch_and_update_observations(self: Task, since_week: int | None = None, dat
             .replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=UTC)
             .isoformat()
         )
+    
+    # Parse created_start_date to ISO format
+    created_after = (
+        datetime.strptime(created_start_date, "%Y-%m-%d")
+        .replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=UTC)
+        .isoformat()
+    )
 
     # Pre-fetch existing observations to minimize query overhead
     existing_wn_ids = cache_wn_ids()
@@ -275,7 +290,7 @@ def fetch_and_update_observations(self: Task, since_week: int | None = None, dat
     offset = 0
 
     while True:
-        data = fetch_observations_page(token, modified_since, offset)
+        data = fetch_observations_page(token, modified_since, created_after, offset)
 
         if data:
             observations_to_update = []

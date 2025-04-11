@@ -277,7 +277,8 @@ class Observation(models.Model):
     wn_created_datetime = models.DateTimeField(
         blank=True, null=True, help_text="Datetime when the observation was created in the source system"
     )
-    visible = models.BooleanField(default=True, help_text="Flag indicating if the observation is visible")
+    # TODO: visible True in response & export. Frontend -> visible weg
+    visible = models.BooleanField(null=True, default=True, help_text="Flag indicating if the observation is visible")
     images = models.JSONField(
         default=list, blank=True, null=True, help_text="List of images associated with the observation"
     )
@@ -340,6 +341,17 @@ class Observation(models.Model):
         help_text="Problems encountered during the eradication",
     )
     eradication_notes = models.TextField(blank=True, null=True, help_text="Notes about the eradication")
+    
+    queen_present = models.BooleanField(
+        null=True,
+        blank=True,
+        help_text="Shows if the queen was present during the eradication",
+    )
+    moth_present = models.BooleanField(
+        null=True,
+        blank=True,
+        help_text="Shows if moths were present during the eradication",
+    )
 
     municipality = models.ForeignKey(
         Municipality,
@@ -361,6 +373,17 @@ class Observation(models.Model):
     public_domain = models.BooleanField(
         blank=True, null=True, help_text="Flag indicating if the observation is in the public domain"
     )
+    duplicate_nest = models.BooleanField(
+        null=True,
+        blank=True,
+        help_text="Shows if the nest is a duplicate",
+    )
+    other_species_nest = models.BooleanField(
+        null=True,
+        blank=True,
+        help_text="Shows if the nest belongs to another species",
+    )
+
 
     def __str__(self) -> str:
         """Return the string representation of the model."""
@@ -373,31 +396,27 @@ class Observation(models.Model):
         :param args: Variable length argument list.
         :param kwargs: Arbitrary keyword arguments.
         """
-        logger.info(f"Save method called for observation {self.id if self.id else 'new'}")
-        
-        # Issue #290 - Automatically determine municipality, province and anb
-        if self.location and not (self.municipality and self.province and self.anb is not None):
+        if self.location:
             if not isinstance(self.location, Point):
                 self.location = Point(self.location)
+            long, lat = self.location.x, self.location.y
 
-            long = self.location.x
-            lat = self.location.y
-
-            if self.anb is None:
-                self.anb = check_if_point_in_anb_area(long, lat)
-                
+            self.anb = check_if_point_in_anb_area(long, lat)
+            
             if not self.municipality:
                 municipality = get_municipality_from_coordinates(long, lat)
                 self.municipality = municipality
                 if municipality and not self.province:
                     self.province = municipality.province
-
-            logger.info(f"Save method for observation {self.id if self.id else 'new'}: Setting municipality={self.municipality}, province={self.province}, anb={self.anb}")
-
         super().save(*args, **kwargs)
     
     class Meta:
         ordering = ['id']
+        indexes = [
+            models.Index(fields=['visible', 'observation_datetime']),
+            gis_models.Index(fields=['location'], name='location_idx'),
+            models.Index(fields=['municipality', 'visible']),
+        ]
 
 class Export(models.Model):
     """Model for tracking observation exports."""

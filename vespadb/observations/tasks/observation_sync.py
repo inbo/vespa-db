@@ -210,7 +210,13 @@ def fetch_clusters(token: str, limit: int = 100) -> list[dict[str, Any]]:
 
 
 def manage_observations_visibility(token: str) -> None:
-    """Manage visibility of observations for a specific cluster based on their wn_created_datetime."""
+    """Manage visibility of observations in a cluster based on their wn_created_datetime.
+
+    Rules:
+    - Only the oldest observation (based on wn_created_datetime) should be visible.
+    - All other observations, including those without a date, should be invisible.
+    - If no observation has a valid date, the one with the smallest ID is made visible.
+    """
     clusters = fetch_clusters(token)
     for cluster in clusters:
         observation_ids = cluster.get("observation_ids", [])
@@ -222,29 +228,39 @@ def manage_observations_visibility(token: str) -> None:
             logger.info(f"No observations found for cluster {cluster['id']}.")
             continue
 
-        # Build a mapping of obs.id -> wn_created_datetime
-        datetime_map = {
-            obs.id: obs.wn_created_datetime for obs in observations if obs.wn_created_datetime is not None
-        }
+        # Sort observations:
+        # 1. By wn_created_datetime (oldest first, None values go last)
+        # 2. Then by ID (as a fallback)
+        observations_sorted = sorted(
+            observations,
+            key=lambda obs: (
+                obs.wn_created_datetime if obs.wn_created_datetime else datetime.max,
+                obs.id,
+            )
+        )
 
-        if datetime_map:
-            # At least one observation has a valid wn_created_datetime
-            oldest_datetime = min(datetime_map.values())
-            # Select all observations that do NOT have the oldest datetime
-            observation_ids_to_hide = {
-                obs.id for obs in observations
-                if obs.wn_created_datetime != oldest_datetime
-            }
-        else:
-            # All observations have null wn_created_datetime — fallback: keep the one with the smallest ID
-            sorted_obs = sorted(observations, key=lambda obs: obs.id)
-            observation_ids_to_hide = {obs.id for obs in sorted_obs[1:]}  # Keep the first, hide the rest
+        # Set all to invisible by default
+        for obs in observations:
+            obs.visible = False
 
-        update_observation_visibility(observations, observation_ids_to_hide)
+        # Set the first with a valid wn_created_datetime to visible
+        visible_set = False
+        for obs in observations_sorted:
+            if obs.wn_created_datetime:
+                obs.visible = True
+                visible_set = True
+                break
+
+        # If none had a valid date, fall back to the first by ID
+        if not visible_set and observations_sorted:
+            observations_sorted[0].visible = True
+
+        Observation.objects.bulk_update(observations, ["visible"], batch_size=BATCH_SIZE)
+
         logger.info(
-            f"Updated visibility for cluster {cluster['id']}: "
-            f"{len(observation_ids_to_hide)} observations hidden, "
-            f"{len(observations) - len(observation_ids_to_hide)} kept visible."
+            f"Cluster {cluster['id']}: visibility updated "
+            f"({sum(obs.visible for obs in observations)} visible, "
+            f"{sum(not obs.visible for obs in observations)} hidden)."
         )
         
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)

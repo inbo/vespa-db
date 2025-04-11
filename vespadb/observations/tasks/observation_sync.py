@@ -210,7 +210,7 @@ def fetch_clusters(token: str, limit: int = 100) -> list[dict[str, Any]]:
 
 
 def manage_observations_visibility(token: str) -> None:
-    """Manage visibility of observations for a specific cluster based on their registration dates."""
+    """Manage visibility of observations for a specific cluster based on their creation dates."""
     clusters = fetch_clusters(token)
     for cluster in clusters:
         observation_ids = cluster.get("observation_ids", [])
@@ -222,18 +222,20 @@ def manage_observations_visibility(token: str) -> None:
             logger.info(f"No observations found for cluster {cluster['id']}.")
             continue  # Skip if no observations are found
 
-        observation_dates = {obs.id: obs.observation_datetime for obs in observations}
+        # Use created_datetime instead of observation_datetime as per #372
+        creation_dates = {obs.id: obs.created_datetime for obs in observations if obs.created_datetime}
+        if not creation_dates:
+            logger.info(f"No valid created_datetime found for observations in cluster {cluster['id']}.")
+            continue
 
-        # Determine observations to hide
-        # TODO: We willen de oudste obs op basis van CREATED_DATE laten staan (#372)
-        latest_date = max(observation_dates.values(), default=None)
-        if latest_date:
+        oldest_date = min(creation_dates.values(), default=None)
+        if oldest_date:
+            # Hide all observations except those with the oldest created_datetime
             observation_ids_to_hide = {
-                observation_id for observation_id, date in observation_dates.items() if date < latest_date
+                obs_id for obs_id, created in creation_dates.items() if created > oldest_date
             }
             update_observation_visibility(observations, observation_ids_to_hide)
             logger.info(f"Updated visibility for {len(observations)} observations in cluster {cluster['id']}.")
-
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def fetch_and_update_observations(self: Task, since_week: int | None = None, date: str | None = None) -> None:  # noqa: C901, PLR0912

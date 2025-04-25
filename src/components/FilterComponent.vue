@@ -3,57 +3,125 @@
     <div class="container-fluid mt-1">
       <div class="row">
         <div class="col-12">
-          <h3>Filters</h3>
+          <h3 class="filters-heading">Filters</h3>
         </div>
         <div class="col-12">
-          <v-autocomplete v-model="selectedProvinces" :items="provinces.length ? provinces.map(province => ({
-            title: province.name,
-            value: province.id
-          })) : []" item-text="title" item-value="value" label="provincie(s)" multiple chips dense solo
-            @change="emitFilterUpdate">
-          </v-autocomplete>
+          <v-autocomplete
+            v-model="selectedProvinces"
+            :items="
+              provinces.length
+                ? provinces.map((province) => ({
+                    title: province.name,
+                    value: province.id,
+                  }))
+                : []
+            "
+            item-text="title"
+            item-value="value"
+            label="provincie(s)"
+            multiple
+            chips
+            dense
+            solo
+            background-color="#f8f9fa"
+            class="filter-autocomplete"
+            @change="emitFilterUpdate"
+          ></v-autocomplete>
         </div>
         <div class="col-12">
-          <v-autocomplete v-model="selectedMunicipalities" :items="municipalities.length ? municipalities.map(municipality => ({
-            title: municipality.name,
-            value: municipality.id
-          })) : []" item-text="title" item-value="value" label="gemeente(s)" multiple chips dense solo
-            @change="emitFilterUpdate">
-          </v-autocomplete>
+          <v-autocomplete
+            v-model="selectedMunicipalities"
+            :items="
+              municipalities.length
+                ? municipalities.map((municipality) => ({
+                    title: municipality.name,
+                    value: municipality.id,
+                  }))
+                : []
+            "
+            item-text="title"
+            item-value="value"
+            label="gemeente(s)"
+            multiple
+            chips
+            dense
+            solo
+            background-color="#f8f9fa"
+            class="filter-autocomplete"
+            @change="emitFilterUpdate"
+          ></v-autocomplete>
         </div>
         <div class="col-12">
-          <v-text-field v-model="minDate" label="Observaties vanaf" prepend-icon="mdi-calendar" readonly
-            @click="toggleMenu1"></v-text-field>
-          <v-date-picker v-model="minDate" v-show="menu1" @input="closeMenu1" @change="closeMenu1"></v-date-picker>
+          <DateFilter />
         </div>
         <div class="col-12">
-          <v-text-field v-model="maxDate" label="Observaties tot" prepend-icon="mdi-calendar" readonly
-            @click="toggleMenu2"></v-text-field>
-          <v-date-picker v-model="maxDate" v-show="menu2" @input="closeMenu2" @change="closeMenu2"></v-date-picker>
+          <v-autocomplete
+            v-model="selectedNestType"
+            :items="
+              nestType.length
+                ? nestType.map((nesttype) => ({
+                    title: nesttype.name,
+                    value: nesttype.value,
+                  }))
+                : []
+            "
+            item-text="title"
+            item-value="value"
+            label="nest type"
+            multiple
+            chips
+            dense
+            solo
+            background-color="#f8f9fa"
+            class="filter-autocomplete"
+            @change="emitFilterUpdate"
+          ></v-autocomplete>
         </div>
         <div class="col-12">
-          <v-autocomplete v-model="selectedNestType" :items="nestType.length ? nestType.map(nesttype => ({
-            title: nesttype.name,
-            value: nesttype.value
-          })) : []" item-text="title" item-value="value" label="nest type" multiple chips dense solo
-            @change="emitFilterUpdate">
-          </v-autocomplete>
+          <v-autocomplete
+            v-model="selectedNestStatus"
+            :items="
+              nestStatus.length
+                ? nestStatus.map((neststatus) => ({
+                    title: neststatus.name,
+                    value: neststatus.value,
+                  }))
+                : []
+            "
+            item-text="title"
+            item-value="value"
+            label="nest status"
+            multiple
+            chips
+            dense
+            solo
+            background-color="#f8f9fa"
+            class="filter-autocomplete"
+            @change="emitFilterUpdate"
+          ></v-autocomplete>
         </div>
         <div class="col-12">
-          <v-autocomplete v-model="selectedNestStatus" :items="nestStatus.length ? nestStatus.map(neststatus => ({
-            title: neststatus.name,
-            value: neststatus.value
-          })) : []" item-text="title" item-value="value" label="nest status" multiple chips dense solo
-            @change="emitFilterUpdate">
-          </v-autocomplete>
-        </div>
-        <div class="col-12">
-          <v-autocomplete v-model="anbAreasActief" :items="anbAreaOptions.length ? anbAreaOptions.map(anb => ({
-            title: anb.name,
-            value: anb.value
-          })) : []" item-text="title" item-value="value" label="ANB" multiple chips dense solo
-            @change="emitFilterUpdate">
-          </v-autocomplete>
+          <v-autocomplete
+            v-model="anbAreasActief"
+            :items="
+              anbAreaOptions.length
+                ? anbAreaOptions.map((anb) => ({
+                    title: anb.name,
+                    value: anb.value,
+                  }))
+                : []
+            "
+            item-text="title"
+            item-value="value"
+            label="ANB"
+            multiple
+            chips
+            dense
+            solo
+            background-color="#f8f9fa"
+            class="filter-autocomplete"
+            @change="emitFilterUpdate"
+          ></v-autocomplete>
         </div>
       </div>
     </div>
@@ -63,10 +131,13 @@
 <script>
 import { useVespaStore } from '@/stores/vespaStore';
 import debounce from 'lodash/debounce';
-import { DateTime } from 'luxon';
 import { computed, onMounted, ref, watch } from 'vue';
+import DateFilter from '@/components/DateFilter.vue';
 
 export default {
+  components: {
+    DateFilter,
+  },
   setup() {
     const vespaStore = useVespaStore();
 
@@ -87,52 +158,29 @@ export default {
     const nestStatus = ref([
       { name: 'Bestreden nest', value: 'eradicated' },
       { name: 'Gereserveerd nest', value: 'reserved' },
-      { name: 'Gerapporteerd nest', value: 'open' }
+      { name: 'Gerapporteerd nest', value: 'open' },
     ]);
     const anbAreaOptions = ref([
       { name: 'Niet in ANB gebied', value: false },
-      { name: 'Wel in ANB gebied', value: true }
+      { name: 'Wel in ANB gebied', value: true },
     ]);
-    const minDate = ref(new Date(2024, 3, 1));
-    const maxDate = ref(null);
-    const selectedObservationStart = ref(false);
-    const selectedObservationEnd = ref(false);
-    const menu1 = ref(false);
-    const menu2 = ref(false);
 
     const emitFilterUpdate = debounce(() => {
-      const minDateCET = minDate.value ? DateTime.fromJSDate(minDate.value).setZone('Europe/Brussels').toFormat('yyyy-MM-dd\'T\'HH:mm:ss') : null;
-      const maxDateCET = maxDate.value ? DateTime.fromJSDate(maxDate.value).setZone('Europe/Brussels').toFormat('yyyy-MM-dd\'T\'HH:mm:ss') : null;
-
       vespaStore.applyFilters({
-        municipalities: selectedMunicipalities.value.length > 0 ? selectedMunicipalities.value : [],
-        provinces: selectedProvinces.value.length > 0 ? selectedProvinces.value : [],
+        municipalities:
+          selectedMunicipalities.value.length > 0
+            ? selectedMunicipalities.value
+            : [],
+        provinces:
+          selectedProvinces.value.length > 0 ? selectedProvinces.value : [],
         anbAreasActief: anbAreasActief.value,
-        nestType: selectedNestType.value.length > 0 ? selectedNestType.value : null,
-        nestStatus: selectedNestStatus.value.length > 0 ? selectedNestStatus.value : null,
-        min_observation_date: minDateCET,
-        max_observation_date: maxDateCET,
+        nestType:
+          selectedNestType.value.length > 0 ? selectedNestType.value : null,
+        nestStatus:
+          selectedNestStatus.value.length > 0 ? selectedNestStatus.value : null,
+        // min_observation_date and max_observation_date are handled by DateFilter component
       });
-
     }, 300);
-
-    const toggleMenu1 = () => {
-      menu1.value = !menu1.value;
-    };
-
-    const closeMenu1 = () => {
-      menu1.value = false;
-      emitFilterUpdate();
-    };
-
-    const toggleMenu2 = () => {
-      menu2.value = !menu2.value;
-    };
-
-    const closeMenu2 = () => {
-      menu2.value = false;
-      emitFilterUpdate();
-    };
 
     const fetchMunicipalitiesByProvinces = async () => {
       if (selectedProvinces.value.length > 0) {
@@ -144,25 +192,31 @@ export default {
 
     watch(selectedProvinces, fetchMunicipalitiesByProvinces, { deep: true });
 
-    watch([minDate, maxDate], emitFilterUpdate, { immediate: true });
+    watch(
+      [selectedMunicipalities, selectedProvinces, selectedNestType, selectedNestStatus, anbAreasActief],
+      () => {
+        emitFilterUpdate();
+      },
+      { deep: true }
+    );
 
-    watch([selectedMunicipalities, selectedProvinces, selectedNestType, selectedNestStatus, anbAreasActief, selectedObservationStart, selectedObservationEnd], () => {
-      emitFilterUpdate();
-    }, { deep: true });
+    // Watch store filters for changes from other components
+    watch(
+      () => vespaStore.filters,
+      (newFilters, oldFilters) => {
+        const hasChanged = JSON.stringify(newFilters) !== JSON.stringify(oldFilters);
 
-    watch(() => vespaStore.filters, (newFilters, oldFilters) => {
-      const hasChanged = JSON.stringify(newFilters) !== JSON.stringify(oldFilters);
-
-      if (hasChanged) {
-        selectedMunicipalities.value = newFilters.municipalities || [];
-        selectedProvinces.value = newFilters.provinces || [];
-        anbAreasActief.value = newFilters.anbAreasActief || null;
-        selectedNestType.value = newFilters.nestType || [];
-        selectedNestStatus.value = newFilters.nestStatus || [];
-        minDate.value = newFilters.min_observation_date ? new Date(newFilters.min_observation_date) : null;
-        maxDate.value = newFilters.max_observation_date ? new Date(newFilters.max_observation_date) : null;
-      }
-    }, { immediate: true, deep: true });
+        if (hasChanged) {
+          selectedMunicipalities.value = newFilters.municipalities || [];
+          selectedProvinces.value = newFilters.provinces || [];
+          anbAreasActief.value = newFilters.anbAreasActief || null;
+          selectedNestType.value = newFilters.nestType || [];
+          selectedNestStatus.value = newFilters.nestStatus || [];
+          // min_observation_date and max_observation_date are handled by DateFilter component
+        }
+      },
+      { immediate: true, deep: true }
+    );
 
     onMounted(async () => {
       selectedMunicipalities.value = vespaStore.filters.municipalities || [];
@@ -170,8 +224,7 @@ export default {
       anbAreasActief.value = vespaStore.filters.anbAreasActief;
       selectedNestType.value = vespaStore.filters.nestType || [];
       selectedNestStatus.value = vespaStore.filters.nestStatus || [];
-      minDate.value = vespaStore.filters.min_observation_date ? new Date(vespaStore.filters.min_observation_date) : new Date(2024, 3, 1);
-      maxDate.value = vespaStore.filters.max_observation_date ? new Date(vespaStore.filters.max_observation_date) : null;
+      // min_observation_date and max_observation_date are handled by DateFilter component
     });
 
     return {
@@ -179,9 +232,6 @@ export default {
       provinces,
       loading,
       nestType,
-      minDate,
-      selectedObservationStart,
-      selectedObservationEnd,
       nestStatus,
       anbAreaOptions,
       selectedMunicipalities,
@@ -190,14 +240,98 @@ export default {
       selectedNestStatus,
       anbAreasActief,
       emitFilterUpdate,
-      maxDate,
-      menu1,
-      menu2,
-      toggleMenu1,
-      closeMenu1,
-      toggleMenu2,
-      closeMenu2,
     };
-  }
+  },
 };
 </script>
+
+<style scoped>
+.filters-heading {
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.filter-autocomplete {
+  margin-bottom: 24px;
+}
+
+/* Override vuetify autocomplete styles to match with our DateFilter */
+:deep(.v-text-field__slot) {
+  font-size: 14px;
+}
+
+:deep(.v-select__selection) {
+  font-size: 14px;
+}
+
+:deep(.v-chip) {
+  font-size: 12px;
+  background-color: #e9ecef !important;
+  color: #495057 !important;
+  border-radius: 4px !important;
+}
+
+:deep(.v-chip__close) {
+  color: #6c757d !important;
+}
+
+:deep(.v-text-field.v-text-field--solo .v-input__control) {
+  min-height: 44px;
+}
+
+:deep(.v-text-field.v-text-field--solo .v-input__slot) {
+  border-radius: 4px;
+  border: 1px solid #ced4da;
+  transition: all 0.2s ease;
+}
+
+:deep(.v-text-field.v-text-field--solo .v-input__slot:hover) {
+  border-color: #adb5bd;
+  background-color: #fff !important;
+}
+
+:deep(.v-text-field.v-text-field--solo.v-input--is-focused .v-input__slot) {
+  border-color: #007bff;
+  background-color: #fff !important;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+:deep(.v-text-field__details) {
+  display: none;
+}
+
+:deep(.v-label) {
+  font-size: 14px;
+  color: #495057;
+}
+
+:deep(.v-label--active) {
+  color: #007bff;
+}
+
+:deep(.v-messages) {
+  min-height: 0;
+}
+
+/* Add responsive styling to match the rest of the application */
+@media (min-width: 768px) {
+  .container-fluid {
+    padding: 0 24px;
+  }
+  
+  #filtersCollapse {
+    background-color: transparent;
+  }
+}
+
+/* Make this work with the filter-panel class from global CSS */
+:deep(.filter-panel) {
+  background-color: #fff;
+  height: 100%;
+  overflow-y: auto;
+}
+</style>

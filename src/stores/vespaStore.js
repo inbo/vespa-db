@@ -115,7 +115,7 @@ export const useVespaStore = defineStore('vespaStore', {
             this.loadingObservations = true;
             let filterQuery = this.createFilterQuery();
             if (!this.filters.min_observation_date && !this.isLoggedIn) {
-                const defaultMinDate = this.formatDateWithoutTime(new Date('April 1, 2021').toISOString());
+                const defaultMinDate = this.formatDateWithoutTime(new Date('April 1, 2024').toISOString());
                 filterQuery += (filterQuery ? '&' : '') + `min_observation_datetime=${defaultMinDate}`;
             }
 

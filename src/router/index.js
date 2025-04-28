@@ -22,19 +22,11 @@ const routes = [
     }
   },
   {
-    path: '/map/observation/:id',
+    path: '/observation/:id',
     name: 'ObservationDetailMap',
     component: MapPage,
     meta: { 
       activeView: 'map' 
-    }
-  },
-  {
-    path: '/table/observation/:id',
-    name: 'ObservationDetailTable',
-    component: TableViewPage,
-    meta: { 
-      activeView: 'table' 
     }
   },
   {

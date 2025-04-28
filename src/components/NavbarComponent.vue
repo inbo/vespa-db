@@ -6,12 +6,6 @@
         Vespa-Watch
       </a>
       <div class="d-flex align-items-center">
-        <!-- View Mode Toggle (Hidden on Medium Devices and below)-->
-        <div class="btn-group me-2 d-none d-md-inline-flex" role="group">
-          <router-link to="/map" class="btn btn-outline-dark" :class="{ active: isMapActive }" aria-current="page">Kaart</router-link>
-          <router-link to="/table" class="btn btn-outline-dark" :class="{ active: isTableActive }">Tabel</router-link>
-        </div>
-
         <!-- Export Toggle (Hidden on Medium Devices and below) -->
         <div class="btn-group me-2 d-none d-md-inline-flex">
           <button type="button" class="btn btn-outline-dark dropdown-toggle" data-bs-toggle="dropdown"
@@ -68,7 +62,7 @@ import ModalMessage from '@/components/ModalMessage.vue';
 import { useVespaStore } from '@/stores/vespaStore';
 import { Dropdown } from 'bootstrap';
 import { computed, ref, watch } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
+import { useRouter } from 'vue-router';
 
 export default {
   components: {
@@ -76,7 +70,6 @@ export default {
   },
   setup() {
     const router = useRouter();
-    const route = useRoute();
     const vespaStore = useVespaStore();
     const isLoggedIn = computed(() => vespaStore.isLoggedIn);
     const loadingAuth = computed(() => vespaStore.loadingAuth);
@@ -86,18 +79,6 @@ export default {
     const modalTitle = ref('');
     const modalMessage = ref('');
     const isExporting = computed(() => vespaStore.isExporting);
-
-    // Computed properties for active navigation states
-    const isMapActive = computed(() => {
-      return route.path === '/' || 
-             route.path === '/map' || 
-             route.path.startsWith('/map/');
-    });
-    
-    const isTableActive = computed(() => {
-      return route.path === '/table' || 
-             route.path.startsWith('/table/');
-    });
 
     watch(() => vespaStore.error, (newError) => {
       if (newError) {
@@ -147,9 +128,7 @@ export default {
       isModalVisible, 
       modalTitle, 
       modalMessage, 
-      isExporting,
-      isMapActive,
-      isTableActive
+      isExporting
     };
   },
   mounted() {
@@ -162,9 +141,6 @@ export default {
 </script>
 
 <style>
-/* Bestaande CSS behouden */
-
-/* Nieuwe styling voor de notificatiebanner */
 .notification-banner {
   background-color: #fff3cd;
   border-bottom: 1px solid #ffeeba;

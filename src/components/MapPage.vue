@@ -115,7 +115,7 @@ export default {
     const toggleDetailsPane = () => {
       vespaStore.isDetailsPaneOpen = !vespaStore.isDetailsPaneOpen;
       if (!vespaStore.isDetailsPaneOpen) {
-        router.push({ path: '/map' });
+        router.push({ path: '/' });
       }
     };
 
@@ -130,7 +130,7 @@ export default {
           return;
         }
         vespaStore.isDetailsPaneOpen = true;
-        router.push({ path: `/map/observation/${properties.id}` });
+        router.push({ path: `/observation/${properties.id}` });
       } catch (error) {
         console.error("Failed to fetch observation details:", error);
       }
@@ -186,14 +186,14 @@ export default {
       } finally {
         isFetchingGeoJson.value = false;
         isMapLoading.value = false;
-        vespaStore.getObservations(1, 25).catch(error => console.error('Error fetching observations:', error));
+        // Removed call to getObservations since we don't need table data anymore
       }
     }, 300);
 
     watch(selectedObservation, (newObservation, oldObservation) => {
       if (newObservation && !newObservation.visible) {
         vespaStore.isDetailsPaneOpen = false;
-        router.push({ path: '/map' });
+        router.push({ path: '/' });
         return;
       }
       if (newObservation && oldObservation && newObservation.id !== oldObservation.id) {
@@ -224,7 +224,6 @@ export default {
       () => vespaStore.filters,
       (newFilters) => {
         filtersUpdated.value = true;
-
         clearAndUpdateMarkers();
       },
       { deep: true }
@@ -241,6 +240,13 @@ export default {
 
     onMounted(async () => {
       await vespaStore.initializeApp();
+      
+      if (!vespaStore.filters.min_observation_date && !vespaStore.isLoggedIn) {
+        vespaStore.applyFilters({
+          min_observation_date: new Date('April 1, 2024').toISOString()
+        });
+      }
+      
       vespaStore.markerClusterGroup = L.markerClusterGroup({
         spiderfyOnMaxZoom: false,
         showCoverageOnHover: true,
@@ -316,12 +322,7 @@ export default {
       }
 
       vespaStore.map = map.value;
-      // if (vespaStore.lastAppliedFilters === null || vespaStore.lastAppliedFilters === 'null') {
-      //   vespaStore.setLastAppliedFilters();
-      // }
       updateMarkers();
-
-
     });
 
     return {

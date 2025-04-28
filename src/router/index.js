@@ -38,14 +38,6 @@ const routes = [
     }
   },
   {
-    path: '/table',
-    name: 'TableView',
-    component: TableViewPage,
-    meta: { 
-      activeView: 'table' 
-    }
-  },
-  {
     path: '/',
     name: 'Home',
     component: MapPage,

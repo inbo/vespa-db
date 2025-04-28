@@ -805,9 +805,29 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                         data.save()
                         created_ids.append(data.id)
                     else:
-                        obs = Observation.objects.create(**data)
-                        created_ids.append(obs.id)
-                        
+                        # Check if this is an update (ID provided) or a new record
+                        observation_id = data.pop('id', None)
+                        if observation_id:
+                            # This is an update - get the existing record
+                            try:
+                                obs = Observation.objects.get(id=observation_id)
+                                # Update all fields
+                                for field, value in data.items():
+                                    setattr(obs, field, value)
+                                obs.save()
+                                created_ids.append(obs.id)
+                                logger.info(f"Updated existing observation #{observation_id}")
+                            except Observation.DoesNotExist:
+                                # Record with this ID doesn't exist, create it
+                                data['id'] = observation_id  # Put the ID back
+                                obs = Observation.objects.create(**data)
+                                created_ids.append(obs.id)
+                                logger.info(f"Created new observation with specified ID #{observation_id}")
+                        else:
+                            # This is a new record
+                            obs = Observation.objects.create(**data)
+                            created_ids.append(obs.id)
+                            logger.info(f"Created new observation #{obs.id}")
             invalidate_geojson_cache()
             return Response(
                 {"message": f"Successfully imported {len(created_ids)} observations.",

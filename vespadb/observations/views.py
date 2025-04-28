@@ -676,7 +676,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 logger.error(f"Invalid coordinates: {str(e)}")
                 return {"error": f"Invalid coordinates: {str(e)}"}
         
-        return data_item 
+        return data_item
 
     def process_create_item(self, data_item: dict[str, Any], idx: int, current_time: datetime.datetime) -> Any:
         """
@@ -693,15 +693,18 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         if missing_fields:
             return {"error": f"Missing required fields for new record: {', '.join(missing_fields)}"}
         
-        # Set user fields   
+        # Store original created_datetime if provided
+        original_created_datetime = data_item.get('created_datetime')
+        
+        # Set user fields
         data_item['created_by'] = self.request.user
-        data_item['created_datetime'] = current_time
+        if 'created_datetime' not in data_item:
+            data_item['created_datetime'] = current_time
         data_item['modified_by'] = self.request.user
         data_item['modified_datetime'] = current_time
 
         # Process datetime fields
         datetime_fields = [
-            "created_datetime", 
             "modified_datetime",
             "observation_datetime",
             "wn_modified_datetime",
@@ -709,6 +712,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             "reserved_datetime"
         ]
         
+        # Process other datetime fields (excluding created_datetime)
         for field in datetime_fields:
             if field in data_item and data_item[field]:
                 try:
@@ -719,6 +723,16 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                     if field == "observation_datetime":  # This is required
                         return {"error": f"Invalid datetime format for required field {field}: {data_item[field]}"}
                     data_item[field] = None
+        
+        # Process created_datetime separately
+        if original_created_datetime:
+            try:
+                data_item['created_datetime'] = parse_and_convert_to_cet(original_created_datetime)
+                logger.info(f"Using provided created_datetime: {data_item['created_datetime']}")
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Invalid datetime format for created_datetime: {original_created_datetime} - {e}")
+                data_item['created_datetime'] = current_time
+                logger.info(f"Using current time for created_datetime: {data_item['created_datetime']}")
 
         try:
             long_val = float(data_item.pop('longitude'))
@@ -741,7 +755,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         except Exception as e:
             logger.error(f"Unexpected error in process_create_item: {str(e)}")
             return {"error": f"Unexpected error: {str(e)}"}
-
+        
     def clean_data(self, data_dict: dict[str, Any]) -> dict[str, Any]:
         """Clean the incoming data and remove empty or None values."""
         logger.info("Original data item: %s", data_dict)
@@ -793,6 +807,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                     else:
                         obs = Observation.objects.create(**data)
                         created_ids.append(obs.id)
+                        
             invalidate_geojson_cache()
             return Response(
                 {"message": f"Successfully imported {len(created_ids)} observations.",

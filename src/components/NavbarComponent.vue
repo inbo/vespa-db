@@ -1,7 +1,7 @@
 <template>
   <nav class="navbar navbar-expand-lg navbar-light bg-light">
     <div class="container-fluid">
-      <a class="navbar-brand d-flex align-items-center" href="/">
+      <a class="navbar-brand d-flex align-items-center" href="https://vespawatch.be">
         <img class="me-3" src="../assets/logo.png" alt="Vespa-Watch">
         Vespa-Watch
       </a>

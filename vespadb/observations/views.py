@@ -624,7 +624,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         In update mode, we only require an "id" plus any fields that should be updated.
         For example, if only eradication_result is provided, observation_datetime is not mandatory.
         """
-        observation_id = data_item.pop("id")
+        observation_id = data_item.get("id")
         try:
             # First attempt to find by exact ID
             existing_obj = Observation.objects.get(id=observation_id)
@@ -632,7 +632,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         except Observation.DoesNotExist:
             logger.warning(f"Observation with id {observation_id} not found directly, trying to create...")
             # If observation doesn't exist, we'll create it instead of failing
-            return self.process_create_item({**data_item, "id": observation_id}, idx, current_time)
+            return self.process_create_item(data_item, idx, current_time)
         
         # Set the update audit fields
         data_item['modified_by'] = self.request.user
@@ -676,6 +676,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 logger.error(f"Invalid coordinates: {str(e)}")
                 return {"error": f"Invalid coordinates: {str(e)}"}
         
+        data_item['id'] = observation_id
         return data_item
 
     def process_create_item(self, data_item: dict[str, Any], idx: int, current_time: datetime.datetime) -> Any:
@@ -798,41 +799,53 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         """Save the valid observations to the database."""
         try:
             logger.info(f"Saving {len(valid_data)} valid observations")
-            created_ids = []
+            created_ids: list[int] = []
+            updated_ids: list[int] = []
+
             with transaction.atomic():
                 for data in valid_data:
                     if isinstance(data, Observation):
                         data.save()
                         created_ids.append(data.id)
-                    else:
-                        # Check if this is an update (ID provided) or a new record
-                        observation_id = data.pop('id', None)
-                        if observation_id:
-                            # This is an update - get the existing record
-                            try:
-                                obs = Observation.objects.get(id=observation_id)
-                                # Update all fields
-                                for field, value in data.items():
-                                    setattr(obs, field, value)
-                                obs.save()
-                                created_ids.append(obs.id)
-                                logger.info(f"Updated existing observation #{observation_id}")
-                            except Observation.DoesNotExist:
-                                # Record with this ID doesn't exist, create it
-                                data['id'] = observation_id  # Put the ID back
-                                obs = Observation.objects.create(**data)
-                                created_ids.append(obs.id)
-                                logger.info(f"Created new observation with specified ID #{observation_id}")
-                        else:
-                            # This is a new record
+                        continue
+
+                    observation_id = data.pop('id', None)
+                    if observation_id:
+                        try:
+                            obs = Observation.objects.get(id=observation_id)
+                            for field, value in data.items():
+                                setattr(obs, field, value)
+                            obs.save()
+                            updated_ids.append(obs.id)
+                            logger.info(f"Updated observation #{obs.id}")
+                        except Observation.DoesNotExist:
+                            data['id'] = observation_id
                             obs = Observation.objects.create(**data)
                             created_ids.append(obs.id)
                             logger.info(f"Created new observation #{obs.id}")
+                    else:
+                        obs = Observation.objects.create(**data)
+                        created_ids.append(obs.id)
+                        logger.info(f"Created new observation #{obs.id}")
+
             invalidate_geojson_cache()
+
+            parts: list[str] = []
+            if created_ids:
+                c = len(created_ids)
+                parts.append(f"{c} new record{'s' if c != 1 else ''} created")
+            if updated_ids:
+                c = len(updated_ids)
+                parts.append(f"{c} existing record{'s' if c != 1 else ''} updated")
+            summary = "; ".join(parts) or "No changes made"
+
             return Response(
-                {"message": f"Successfully imported {len(created_ids)} observations.",
-                "observation_ids": created_ids},
-                status=status.HTTP_201_CREATED
+                {
+                    "message": summary + ".",
+                    "created_ids": created_ids,
+                    "updated_ids": updated_ids,
+                },
+                status=status.HTTP_201_CREATED  # always 201 on success
             )
         except IntegrityError as e:
             logger.exception("Error during bulk import")
@@ -840,7 +853,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 {"error": f"An error occurred during bulk import: {e!s}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-        
+            
     @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
     @action(detail=False, methods=["get"], permission_classes=[AllowAny])
     def export(self, request: HttpRequest) -> JsonResponse:

@@ -659,6 +659,7 @@ export default {
         const closeDetails = () => {
             emit('closeDetails');
             vespaStore.isDetailsPaneOpen = false;
+            vespaStore.selectedObservation = null;
             errorMessage.value = '';
             eradicationResultError.value = '';
             emit('updateMarkerColor', null);

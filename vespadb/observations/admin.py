@@ -272,14 +272,39 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         api_request = factory.post("/observations/bulk_import/", data=request.data, format=content_type)
         api_request.user = request.user
 
-        # Initialize the viewset with the new request
+        # Call the API endpoint
         viewset = ObservationsViewSet.as_view({"post": "bulk_import"})
         response = viewset(api_request)
-        if response.status_code == 201:
-            imported_ids = response.data.get("observation_ids", [])
-            self.message_user(request, f"Observations imported successfully. IDs: {imported_ids}")
+
+        # On success (create or update), show meaningful messages
+        if response.status_code in (200, 201):
+            data = response.data
+            created = data.get("created_ids", [])
+            updated = data.get("updated_ids", [])
+
+            if created:
+                messages.success(
+                    request,
+                    f"Created new observation{'s' if len(created) > 1 else ''} with ID"
+                    f"{'s' if len(created) > 1 else ''}: {', '.join(map(str, created))}."
+                )
+            if updated:
+                if len(updated) == 1:
+                    messages.success(
+                        request,
+                        f"Observation with ID {updated[0]} already exists; update successful."
+                    )
+                else:
+                    messages.success(
+                        request,
+                        f"Updated existing observations with IDs: {', '.join(map(str, updated))}."
+                    )
+            if not created and not updated:
+                messages.info(request, "No observations were created or updated.")
         else:
-            self.message_user(request, f"Failed to import observations: {response.data}", level="error")
+            # On error, display the error details
+            messages.error(request, f"Failed to import observations: {response.data}")
+
         return redirect("admin:observations_observation_changelist")
     
     def send_email_view(self, request: HttpRequest) -> HttpResponse:

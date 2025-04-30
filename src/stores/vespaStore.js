@@ -43,6 +43,7 @@ export const useVespaStore = defineStore('vespaStore', {
         termsAcceptanceError: null,
         appInitialized: false,
         successMessage: null,
+        markerCache: {},
     }),
     getters: {
         canEditObservation: (state) => (observation) => {
@@ -210,17 +211,23 @@ export const useVespaStore = defineStore('vespaStore', {
             }
         },      
         createCircleMarker(feature, latlng) {
-            let fillColor = this.getColorByStatus(feature.properties.status);
-            let markerOptions = {
-                radius: 10 + (feature.properties.observations_count || 0) * 0.5,
-                fillColor: fillColor,
-                color: feature.properties.id === this.selectedObservation?.id ? '#ea792a' : '#3c3c3c',
-                weight: feature.properties.id === this.selectedObservation?.id ? 4 : 1,
-                opacity: 1,
-                fillOpacity: 0.8,
-                className: feature.properties.id === this.selectedObservation?.id ? 'active-marker' : ''
+            const isSelected = feature.properties.id === this.selectedObservation?.id;
+            const edge = isSelected ? '#ea792a' : '#3c3c3c';
+          
+            const opts = {
+              radius: 10 + (feature.properties.observations_count || 0) * 0.5,
+              fillColor: this.getColorByStatus(feature.properties.status),
+              color: edge,
+              weight: isSelected ? 4 : 1,
+              opacity: 1,
+              fillOpacity: 0.8,
+              className: `observation-marker${isSelected ? ' active-marker' : ''}`
             };
-            const marker = L.circleMarker(latlng, markerOptions);
+          
+            const marker = L.circleMarker(latlng, opts);
+            // stash the original edge color for easy resets later
+            marker.originalEdgeColor = opts.color;
+            marker.feature = feature;
             return marker;
         },
         async reserveObservation(observation) {
@@ -239,22 +246,25 @@ export const useVespaStore = defineStore('vespaStore', {
                 alert('You have reached the maximum number of reservations.');
             }
         },
-        updateMarkerColor(observationId, fillColor, edgeColor = fillColor, weight = 4, className = '') {
-            const markers = this.markerClusterGroup.getLayers();
-            markers.forEach((marker) => {
-                if (marker.feature.properties.id === observationId) {
-                    marker.setStyle({
-                        fillColor: fillColor,
-                        color: edgeColor,
-                        weight: weight
-                    });
-                    if (className) {
-                        marker._path.classList.add(className);
-                    } else {
-                        marker._path.classList.remove('active-marker');
-                    }
+        updateMarkerColor(observationId, fillColor, edgeColor = '#3c3c3c', weight = 4, className = '') {
+            if (!observationId || !this.markerCache) return;
+  
+            const marker = this.markerCache[observationId];
+            if (marker) {
+              marker.setStyle({
+                fillColor: fillColor,
+                color: edgeColor,
+                weight: weight
+              });
+              
+              if (marker._path) {
+                if (className) {
+                  marker._path.classList.add(className);
+                } else {
+                  marker._path.classList.remove('active-marker');
                 }
-            });
+              }
+            }
         },
         async acceptTermsOfService() {
             this.termsAcceptanceLoading = true;

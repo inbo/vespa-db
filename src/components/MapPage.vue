@@ -46,6 +46,7 @@
 
 <script>
 import { useVespaStore } from '@/stores/vespaStore';
+import { nextTick } from 'vue';
 import 'leaflet.markercluster';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import 'leaflet/dist/leaflet.css';
@@ -220,21 +221,31 @@ export default {
     }, 600);
 
 
-    watch(selectedObservation, (newObservation, oldObservation) => {
-      if (newObservation && !newObservation.visible) {
-        vespaStore.isDetailsPaneOpen = false;
-        router.push({ path: '/' });
-        return;
-      }
-      if (newObservation && oldObservation && newObservation.id !== oldObservation.id) {
-        const oldMarker = vespaStore.markerClusterGroup.getLayers().find(marker => marker.feature.properties.id === oldObservation.id);
+    watch(selectedObservation, async (newObs, oldObs) => {
+      if (newObs && oldObs && newObs.id !== oldObs.id) {
+        // 1) Reset the old marker’s border
+        const oldMarker = vespaStore.markerCache[oldObs.id];
         if (oldMarker) {
-          vespaStore.updateMarkerColor(oldObservation.id, oldMarker.options.fillColor, oldMarker.options.fillColor, 1, '');
+          // grab the original edge color
+          const originalEdge = oldMarker.originalEdgeColor || oldMarker.options.color;
+          oldMarker.setStyle({
+            fillColor: oldMarker.options.fillColor,
+            color: originalEdge,
+            weight: 1
+          });
+          oldMarker._path?.classList.remove('active-marker');
         }
 
-        const newMarker = vespaStore.markerClusterGroup.getLayers().find(marker => marker.feature.properties.id === newObservation.id);
+        // 2) Highlight the new one (after Vue has applied the DOM update)
+        await nextTick();
+        const newMarker = vespaStore.markerCache[newObs.id];
         if (newMarker) {
-          vespaStore.updateMarkerColor(newObservation.id, newMarker.options.fillColor, '#ea792a', 4, 'active-marker');
+          newMarker.setStyle({
+            fillColor: newMarker.options.fillColor,
+            color: '#ea792a',
+            weight: 4
+          });
+          newMarker._path?.classList.add('active-marker');
         }
       }
     });
@@ -363,6 +374,7 @@ export default {
 
             // Highlight the marker if it exists
             if (vespaStore.markerCache[observationId]) {
+              console.log("bf3")
               vespaStore.updateMarkerColor(
                 observationId,
                 vespaStore.markerCache[observationId].options.fillColor,

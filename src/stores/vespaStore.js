@@ -211,17 +211,22 @@ export const useVespaStore = defineStore('vespaStore', {
             }
         },      
         createCircleMarker(feature, latlng) {
-            let fillColor = this.getColorByStatus(feature.properties.status);
-            let markerOptions = {
+            const isSelected = feature.properties.id === this.selectedObservation?.id;
+            const edge = isSelected ? '#ea792a' : '#3c3c3c';
+          
+            const opts = {
               radius: 10 + (feature.properties.observations_count || 0) * 0.5,
-              fillColor: fillColor,
-              color: feature.properties.id === this.selectedObservation?.id ? '#ea792a' : '#3c3c3c',
-              weight: feature.properties.id === this.selectedObservation?.id ? 4 : 1,
+              fillColor: this.getColorByStatus(feature.properties.status),
+              color: edge,
+              weight: isSelected ? 4 : 1,
               opacity: 1,
               fillOpacity: 0.8,
-              className: `observation-marker ${feature.properties.id === this.selectedObservation?.id ? 'active-marker' : ''}`,
+              className: `observation-marker${isSelected ? ' active-marker' : ''}`
             };
-            const marker = L.circleMarker(latlng, markerOptions);
+          
+            const marker = L.circleMarker(latlng, opts);
+            // stash the original edge color for easy resets later
+            marker.originalEdgeColor = opts.color;
             marker.feature = feature;
             return marker;
         },

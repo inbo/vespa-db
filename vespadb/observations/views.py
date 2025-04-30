@@ -67,7 +67,11 @@ from rest_framework.permissions import AllowAny
 from django.shortcuts import get_object_or_404
 from vespadb.observations.constants import MIN_OBSERVATION_DATETIME
 from rest_framework.pagination import CursorPagination
-
+from vespadb.observations.models import (
+    NestHeightEnum, NestSizeEnum, NestLocationEnum, NestTypeEnum,
+    EradicationResultEnum, EradicationProductEnum, EradicationMethodEnum,
+    EradicationAfterCareEnum, EradicationProblemsEnum,
+)
 if TYPE_CHECKING:
     from geopy.location import Location
 
@@ -106,7 +110,33 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
     distance_filter_field = "location"
     distance_filter_convert_meters = True
     pagination_class = ObservationCursorPagination
+    CHOICE_FIELDS = {
+        'nest_height': NestHeightEnum,
+        'nest_size': NestSizeEnum,
+        'nest_location': NestLocationEnum,
+        'nest_type': NestTypeEnum,
+        'eradication_result': EradicationResultEnum,
+        'eradication_product': EradicationProductEnum,
+        'eradication_method': EradicationMethodEnum,
+        'eradication_aftercare': EradicationAfterCareEnum,
+        'eradication_problems': EradicationProblemsEnum,
+    }
 
+    def _validate_choice_fields(self, data_item: dict[str, Any]) -> str | None:
+        """
+        Ensure any incoming choice fields use a valid database value.
+        Returns an error message if invalid, otherwise None.
+        """
+        for field, enum_cls in self.CHOICE_FIELDS.items():
+            if field in data_item and data_item[field] is not None:
+                val = data_item[field]
+                valid_values = [choice[0] for choice in enum_cls.choices]
+                if val not in valid_values:
+                    return (
+                        f"Invalid value for '{field}': '{val}'. "
+                        f"Allowed values are: {', '.join(valid_values)}."
+                    )
+        return None
     def get_serializer_context(self) -> dict[str, Any]:
         """
         Add the request to the serializer context.
@@ -624,6 +654,9 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         In update mode, we only require an "id" plus any fields that should be updated.
         For example, if only eradication_result is provided, observation_datetime is not mandatory.
         """
+        if err := self._validate_choice_fields(data_item):
+            return {"error": f"Record {idx}: {err}"}
+        
         observation_id = data_item.get("id")
         try:
             # First attempt to find by exact ID
@@ -685,6 +718,8 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         
         In create mode, observation_datetime, latitude and longitude are required.
         """
+        if err := self._validate_choice_fields(data_item):
+            return {"error": f"Record {idx}: {err}"}
         # Check if ID is specified for explicitly creating with a specific ID
         observation_id = data_item.get("id")
         

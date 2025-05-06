@@ -26,6 +26,8 @@ from vespadb.observations.forms import SendEmailForm
 from vespadb.observations.models import Municipality, Observation, Province
 from vespadb.observations.utils import check_if_point_in_anb_area, get_municipality_from_coordinates
 from vespadb.observations.views import ObservationsViewSet
+from vespadb.users.models import UserType
+from vespadb.users.utils import get_import_user
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +103,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
 
     list_display = (
         "id",
+        "wn_id",
         "wn_validation_status",
         "created_by",
         "observation_datetime",
@@ -141,7 +144,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         "modified_by",
         ObserverReceivedEmailFilter,
     )
-    search_fields = ("id", "eradicator_name", "observer_name")
+    search_fields = ("id", "wn_id", "eradicator_name", "observer_name")
     filter_horizontal = ()
     ordering = ("-observation_datetime",)
     raw_id_fields = ("municipality", "province")
@@ -270,7 +273,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         factory = APIRequestFactory()
         content_type = "json" if request.content_type == "application/json" else "multipart"
         api_request = factory.post("/observations/bulk_import/", data=request.data, format=content_type)
-        api_request.user = request.user
+        api_request.user = get_import_user(UserType.IMPORT)  # Use import user
 
         # Call the API endpoint
         viewset = ObservationsViewSet.as_view({"post": "bulk_import"})

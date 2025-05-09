@@ -30,16 +30,6 @@ export default defineConfig(({ mode }) => {
             styles: 'wght@100;300;400;500;700;900',
           }],
         },
-        custom: {
-          families: [
-            {
-              name: 'MaterialDesignIcons',
-              local: 'MaterialDesignIcons',
-              src: './src/assets/materialdesignicons-webfont.woff2',
-            },
-          ],
-          preload: false,
-        }
       }),
     ],
     resolve: {

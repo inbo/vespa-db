@@ -8,7 +8,7 @@ from django.contrib.gis.db import models as gis_models
 from django.contrib.gis.geos import Point
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-
+from datetime import datetime
 from vespadb.observations.utils import check_if_point_in_anb_area, get_municipality_from_coordinates
 
 logger = logging.getLogger(__name__)
@@ -217,7 +217,7 @@ class Observation(models.Model):
 
     id = models.AutoField(primary_key=True)
     wn_id = models.IntegerField(unique=True, blank=True, null=True, help_text="Unique ID for the observation")
-    created_datetime = models.DateTimeField(auto_now_add=True, help_text="Datetime when the observation was created")
+    created_datetime = models.DateTimeField(help_text="Datetime when the observation was created") 
     modified_datetime = models.DateTimeField(auto_now=True, help_text="Datetime when the observation was last modified")
     location = gis_models.PointField(help_text="Geographical location of the observation")
     source = models.CharField(max_length=255, blank=True, null=True, help_text="Source of the observation")
@@ -396,20 +396,25 @@ class Observation(models.Model):
         :param args: Variable length argument list.
         :param kwargs: Arbitrary keyword arguments.
         """
+        logger.info(f"Saving observation with created_datetime={self.created_datetime}, pk={self.pk}")
         if self.location:
             if not isinstance(self.location, Point):
                 self.location = Point(self.location)
             long, lat = self.location.x, self.location.y
-
             self.anb = check_if_point_in_anb_area(long, lat)
-            
             if not self.municipality:
                 municipality = get_municipality_from_coordinates(long, lat)
                 self.municipality = municipality
                 if municipality and not self.province:
                     self.province = municipality.province
+        if self.modified_datetime is None:
+            self.modified_datetime = datetime.now()
+        if self.created_datetime is None and not self.pk:
+            self.created_datetime = datetime.now()
+            logger.info(f"Setting created_datetime to now: {self.created_datetime}")
         super().save(*args, **kwargs)
-    
+        logger.info(f"Saved observation with created_datetime={self.created_datetime}")
+        
     class Meta:
         ordering = ['id']
         indexes = [

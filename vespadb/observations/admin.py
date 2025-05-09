@@ -26,6 +26,8 @@ from vespadb.observations.forms import SendEmailForm
 from vespadb.observations.models import Municipality, Observation, Province
 from vespadb.observations.utils import check_if_point_in_anb_area, get_municipality_from_coordinates
 from vespadb.observations.views import ObservationsViewSet
+from vespadb.users.models import UserType
+from vespadb.users.utils import get_import_user
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +103,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
 
     list_display = (
         "id",
+        "wn_id",
         "wn_validation_status",
         "created_by",
         "observation_datetime",
@@ -141,7 +144,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         "modified_by",
         ObserverReceivedEmailFilter,
     )
-    search_fields = ("id", "eradicator_name", "observer_name")
+    search_fields = ("id", "wn_id", "eradicator_name", "observer_name")
     filter_horizontal = ()
     ordering = ("-observation_datetime",)
     raw_id_fields = ("municipality", "province")
@@ -270,16 +273,41 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         factory = APIRequestFactory()
         content_type = "json" if request.content_type == "application/json" else "multipart"
         api_request = factory.post("/observations/bulk_import/", data=request.data, format=content_type)
-        api_request.user = request.user
+        api_request.user = get_import_user(UserType.IMPORT)  # Use import user
 
-        # Initialize the viewset with the new request
+        # Call the API endpoint
         viewset = ObservationsViewSet.as_view({"post": "bulk_import"})
         response = viewset(api_request)
-        if response.status_code == 201:
-            imported_ids = response.data.get("observation_ids", [])
-            self.message_user(request, f"Observations imported successfully. IDs: {imported_ids}")
+
+        # On success (create or update), show meaningful messages
+        if response.status_code in (200, 201):
+            data = response.data
+            created = data.get("created_ids", [])
+            updated = data.get("updated_ids", [])
+
+            if created:
+                messages.success(
+                    request,
+                    f"Created new observation{'s' if len(created) > 1 else ''} with ID"
+                    f"{'s' if len(created) > 1 else ''}: {', '.join(map(str, created))}."
+                )
+            if updated:
+                if len(updated) == 1:
+                    messages.success(
+                        request,
+                        f"Observation with ID {updated[0]} already exists; update successful."
+                    )
+                else:
+                    messages.success(
+                        request,
+                        f"Updated existing observations with IDs: {', '.join(map(str, updated))}."
+                    )
+            if not created and not updated:
+                messages.info(request, "No observations were created or updated.")
         else:
-            self.message_user(request, f"Failed to import observations: {response.data}", level="error")
+            # On error, display the error details
+            messages.error(request, f"Failed to import observations: {response.data}")
+
         return redirect("admin:observations_observation_changelist")
     
     def send_email_view(self, request: HttpRequest) -> HttpResponse:

@@ -1,9 +1,11 @@
 import { useVespaStore } from '@/stores/vespaStore';
 import { createRouter, createWebHashHistory } from 'vue-router';
-import ChangePasswordPage from '../components/ChangePasswordPage.vue';
-import Login from '../components/LoginPage.vue';
-import MapPage from '../components/MapPage.vue';
-import TableViewPage from '../components/TableViewPage.vue';
+import { defineAsyncComponent } from 'vue';
+const ModalMessage = defineAsyncComponent(() => import('@/components/ModalMessage.vue'));
+const ChangePasswordPage = () => import('../components/ChangePasswordPage.vue');
+const Login = () => import('../components/LoginPage.vue');
+const MapPage = () => import('../components/MapPage.vue');
+const TableViewPage = () => import('../components/TableViewPage.vue');
 
 const routes = [
   {
@@ -20,27 +22,11 @@ const routes = [
     }
   },
   {
-    path: '/map/observation/:id',
+    path: '/observation/:id',
     name: 'ObservationDetailMap',
     component: MapPage,
     meta: { 
       activeView: 'map' 
-    }
-  },
-  {
-    path: '/table/observation/:id',
-    name: 'ObservationDetailTable',
-    component: TableViewPage,
-    meta: { 
-      activeView: 'table' 
-    }
-  },
-  {
-    path: '/table',
-    name: 'TableView',
-    component: TableViewPage,
-    meta: { 
-      activeView: 'table' 
     }
   },
   {

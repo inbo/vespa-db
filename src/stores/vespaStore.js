@@ -1,3 +1,4 @@
+
 import ApiService from '@/services/apiService';
 import L from 'leaflet';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
@@ -16,17 +17,12 @@ export const useVespaStore = defineStore('vespaStore', {
         provincesFetched: false,
         selectedMunicipalities: [],
         observations: [],
-        table_observations: [],
-        totalObservations: 0,
-        selectedObservation: null,
-        nextPage: null,
-        previousPage: null,
         loadingObservations: false,
+        selectedObservation: null,
         markerClusterGroup: null,
         authInterval: null,
         isEditing: false,
         map: null,
-        viewMode: 'map',
         isExporting: false,
         filters: {
             municipalities: [],
@@ -46,8 +42,8 @@ export const useVespaStore = defineStore('vespaStore', {
         termsAcceptanceLoading: false,
         termsAcceptanceError: null,
         appInitialized: false,
-        termsAcceptanceLoading: false,
-        termsAcceptanceError: null,
+        successMessage: null,
+        markerCache: {},
     }),
     getters: {
         canEditObservation: (state) => (observation) => {
@@ -80,45 +76,20 @@ export const useVespaStore = defineStore('vespaStore', {
               this.error = 'Failed to initialize application data';
             }
         },
-        async getObservations(page = 1, page_size = 25, sortBy = null, sortOrder = 'asc') {
-            const currentFilters = JSON.stringify(this.filters);
-            this.loadingObservations = true;
-            const orderQuery = sortBy ? `&ordering=${sortOrder === 'asc' ? '' : '-'}${sortBy}` : '';
-            const filterQuery = this.createFilterQuery();
-
-            try {
-                const response = await ApiService.get(`/observations?${filterQuery}${orderQuery}&page=${page}&page_size=${page_size}`);
-                if (response.status === 200) {
-                    this.table_observations = response.data.results;
-                    this.totalObservations = response.data.total;
-                    this.nextPage = response.data.next;
-                    this.previousPage = response.data.previous;
-                    this.setLastAppliedFilters();
-                    return Promise.resolve();
-                } else {
-                    throw new Error(`Network response was not ok, status code: ${response.status}`);
-                }
-            } catch (error) {
-                console.error('There has been a problem with your fetch operation:', error);
-                this.error = error.message || 'Failed to fetch observations';
-                return Promise.reject(error);
-            } finally {
-                this.loadingObservations = false;
-            }
-        },
         async getObservationsGeoJson() {
             const currentFilters = JSON.stringify(this.filters);
 
+        
             // Check if data needs to be reloaded
             if (this.observations.length > 0 && currentFilters === this.lastAppliedFilters) return;
-
+        
             this.loadingObservations = true;
             let filterQuery = this.createFilterQuery();
             if (!this.filters.min_observation_date && !this.isLoggedIn) {
-                const defaultMinDate = this.formatDateWithoutTime(new Date('April 1, 2021').toISOString());
+                const defaultMinDate = this.formatDateWithoutTime(new Date('April 1, 2024').toISOString());
                 filterQuery += (filterQuery ? '&' : '') + `min_observation_datetime=${defaultMinDate}`;
             }
-
+        
             try {
                 const response = await ApiService.get(`/observations/dynamic-geojson/?${filterQuery}`);
                 if (response.status === 200) {
@@ -136,35 +107,37 @@ export const useVespaStore = defineStore('vespaStore', {
         },
         createFilterQuery() {
             let params = {};
-
+        
             if (this.filters.municipalities.length > 0) {
                 params['municipality_id'] = this.filters.municipalities.join(',');
             }
-
+        
             if (this.filters.provinces.length > 0) {
                 params['province_id'] = this.filters.provinces.join(',');
             }
-
+        
             if (this.filters.anbAreasActief !== null) {
                 params['anb'] = this.filters.anbAreasActief;
             }
-
+        
             if (this.filters.nestType) {
                 params['nest_type'] = this.filters.nestType;
             }
-
+        
             if (this.filters.nestStatus) {
                 params['nest_status'] = this.filters.nestStatus;
             }
-
+        
             if (this.filters.min_observation_date) {
                 params['min_observation_datetime'] = this.formatDateWithoutTime(this.filters.min_observation_date);
+            } else if (!this.isLoggedIn) {
+                params['min_observation_datetime'] = this.formatDateWithoutTime(new Date('April 1, 2024').toISOString());
             }
-
+        
             if (this.filters.max_observation_date) {
                 params['max_observation_datetime'] = this.formatDateWithEndOfDayTime(this.filters.max_observation_date);
             }
-
+        
             return Object.entries(params).map(([key, value]) => `${key}=${encodeURIComponent(value)}`).join('&');
         },
         formatDateWithoutTime(date) {
@@ -195,9 +168,6 @@ export const useVespaStore = defineStore('vespaStore', {
         },
         async applyFilters(filters) {
             this.filters = { ...this.filters, ...filters };
-            // await this.getObservations();
-            // await this.getObservationsGeoJson();
-            //await this.getObservations();
         },
         async fetchProvinces() {
             if (this.provincesFetched) return;  // Skip fetching if data is already available
@@ -234,9 +204,6 @@ export const useVespaStore = defineStore('vespaStore', {
             this.isFetchingGeoJson = true;
             try {
               await this.getObservationsGeoJson();
-              // Only fetch table data if explicitly needed (e.g., for a table view)
-              // Remove this line unless you need table_observations separately:
-              // await this.getObservations(1, 25);
             } catch (error) {
               console.error('Error updating observations:', error);
             } finally {
@@ -244,17 +211,23 @@ export const useVespaStore = defineStore('vespaStore', {
             }
         },      
         createCircleMarker(feature, latlng) {
-            let fillColor = this.getColorByStatus(feature.properties.status);
-            let markerOptions = {
-                radius: 10 + (feature.properties.observations_count || 0) * 0.5,
-                fillColor: fillColor,
-                color: feature.properties.id === this.selectedObservation?.id ? '#ea792a' : '#3c3c3c',
-                weight: feature.properties.id === this.selectedObservation?.id ? 4 : 1,
-                opacity: 1,
-                fillOpacity: 0.8,
-                className: feature.properties.id === this.selectedObservation?.id ? 'active-marker' : ''
+            const isSelected = feature.properties.id === this.selectedObservation?.id;
+            const edge = isSelected ? '#ea792a' : '#3c3c3c';
+          
+            const opts = {
+              radius: 10 + (feature.properties.observations_count || 0) * 0.5,
+              fillColor: this.getColorByStatus(feature.properties.status),
+              color: edge,
+              weight: isSelected ? 4 : 1,
+              opacity: 1,
+              fillOpacity: 0.8,
+              className: `observation-marker${isSelected ? ' active-marker' : ''}`
             };
-            const marker = L.circleMarker(latlng, markerOptions);
+          
+            const marker = L.circleMarker(latlng, opts);
+            // stash the original edge color for easy resets later
+            marker.originalEdgeColor = opts.color;
+            marker.feature = feature;
             return marker;
         },
         async reserveObservation(observation) {
@@ -273,22 +246,25 @@ export const useVespaStore = defineStore('vespaStore', {
                 alert('You have reached the maximum number of reservations.');
             }
         },
-        updateMarkerColor(observationId, fillColor, edgeColor = fillColor, weight = 4, className = '') {
-            const markers = this.markerClusterGroup.getLayers();
-            markers.forEach((marker) => {
-                if (marker.feature.properties.id === observationId) {
-                    marker.setStyle({
-                        fillColor: fillColor,
-                        color: edgeColor,
-                        weight: weight
-                    });
-                    if (className) {
-                        marker._path.classList.add(className);
-                    } else {
-                        marker._path.classList.remove('active-marker');
-                    }
+        updateMarkerColor(observationId, fillColor, edgeColor = '#3c3c3c', weight = 4, className = '') {
+            if (!observationId || !this.markerCache) return;
+  
+            const marker = this.markerCache[observationId];
+            if (marker) {
+              marker.setStyle({
+                fillColor: fillColor,
+                color: edgeColor,
+                weight: weight
+              });
+              
+              if (marker._path) {
+                if (className) {
+                  marker._path.classList.add(className);
+                } else {
+                  marker._path.classList.remove('active-marker');
                 }
-            });
+              }
+            }
         },
         async acceptTermsOfService() {
             this.termsAcceptanceLoading = true;

@@ -5,19 +5,20 @@
  */
 
 // Styles
-import '@mdi/font/css/materialdesignicons.css'
 import 'vuetify/styles'
-
-// Composables
 import { createVuetify } from 'vuetify'
+import {
+  VAutocomplete,
+  VTextField,
+  VDatePicker,
+  VChip,
+} from 'vuetify/components'
 
-// https://vuetifyjs.com/en/introduction/why-vuetify/#feature-guides
 export default createVuetify({
-  theme: {
-    themes: {
-      light: {
-        customGreen: '#4C7742',
-      },
-    },
+  components: {
+    VAutocomplete,
+    VTextField,
+    VDatePicker,
+    VChip,
   },
 })

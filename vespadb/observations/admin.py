@@ -134,6 +134,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         MunicipalityExcludeFilter,
         "municipality",
         "anb",
+        "visible",
         "reserved_by",
         "modified_datetime",
         "modified_by",

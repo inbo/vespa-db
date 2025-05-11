@@ -42,6 +42,7 @@ services:
 
   db:
     image: postgis/postgis:latest
+    platform: linux/amd64
     environment:
       POSTGRES_DB: vespadb
       POSTGRES_USER: vespauser
@@ -49,7 +50,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U vespauser -d vespadb" ]
+      test: ["CMD-SHELL", "pg_isready -U vespauser -d vespadb"]
       interval: 10s
       timeout: 5s
       retries: 5

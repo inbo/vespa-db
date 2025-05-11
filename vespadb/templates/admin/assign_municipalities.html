@@ -1,0 +1,105 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static admin_modify %}
+
+{% block extrahead %}{{ block.super }}
+<style type="text/css">
+    .selected-users {
+        margin-bottom: 20px;
+        padding: 10px;
+        background-color: #f8f8f8;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+    .user-list {
+        margin-top: 10px;
+        padding-left: 20px;
+    }
+    .help-text {
+        color: #666;
+        font-size: 0.9em;
+        margin-top: 5px;
+    }
+    .form-row {
+        margin-bottom: 15px;
+    }
+    .form-group {
+        margin-bottom: 20px;
+    }
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+    }
+    .errorlist {
+        color: #ba2121;
+        margin: 0;
+        padding: 0;
+        list-style-type: none;
+    }
+</style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a> &rsaquo;
+    <a href="{% url 'admin:app_list' app_label='users' %}">Users</a> &rsaquo;
+    <a href="{% url 'admin:users_vespauser_changelist' %}">Users</a> &rsaquo;
+    {% trans 'Assign Municipalities' %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <h1>{% trans "Assign Municipalities to Users" %}</h1>
+    
+    <div class="selected-users">
+        <h2>{% trans "Selected Users" %}</h2>
+        <div class="user-list">
+            <ul>
+                {% for user in users %}
+                <li>{{ user.username }} ({{ user.email }})</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+
+    <form action="" method="post">
+        {% csrf_token %}
+        
+        {% if form.non_field_errors %}
+        <div class="errornote">
+            {% for error in form.non_field_errors %}
+            {{ error }}
+            {% endfor %}
+        </div>
+        {% endif %}
+        
+        <div class="form-group">
+            <h2>{% trans "Option 1: Select a Province" %}</h2>
+            <p class="help-text">{% trans "All municipalities in the selected province will be assigned to the users." %}</p>
+            {{ form.province.errors }}
+            <label for="{{ form.province.id_for_label }}">{{ form.province.label }}</label>
+            {{ form.province }}
+            <p class="help-text">{{ form.province.help_text }}</p>
+        </div>
+        
+        <div class="form-group">
+            <h2>{% trans "Option 2: Enter Municipality Names" %}</h2>
+            <p class="help-text">{% trans "Enter a comma-separated list of municipality names to assign them to the users." %}</p>
+            {{ form.municipality_names.errors }}
+            <label for="{{ form.municipality_names.id_for_label }}">{{ form.municipality_names.label }}</label>
+            {{ form.municipality_names }}
+            <p class="help-text">{{ form.municipality_names.help_text }}</p>
+        </div>
+        
+        <div class="submit-row">
+            <input type="submit" value="{% trans 'Assign Municipalities' %}" class="default" />
+            <a href="{% url 'admin:users_vespauser_changelist' %}" class="button cancel-link">{% trans "Cancel" %}</a>
+        </div>
+        
+        {% for user in users %}
+        <input type="hidden" name="_selected_action" value="{{ user.id }}">
+        {% endfor %}
+    </form>
+</div>
+{% endblock %}

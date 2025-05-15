@@ -1,0 +1,41 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+  <h1>{{ title }}</h1>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>{% trans "Import ID" %}</th>
+        <th>{% trans "Status" %}</th>
+        <th>{% trans "Progress (%)" %}</th>
+        <th>{% trans "Created At" %}</th>
+        <th>{% trans "Completed At" %}</th>
+        <th>{% trans "User" %}</th>
+        <th>{% trans "Created Observations" %}</th>
+        <th>{% trans "Updated Observations" %}</th>
+        <th>{% trans "Error Message" %}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for import in imports %}
+        <tr>
+          <td><a href="{% url 'admin:observations_import_change' import.id %}">{{ import.id }}</a></td>
+          <td>{{ import.status|capfirst }}</td>
+          <td>{{ import.progress }}%</td>
+          <td>{{ import.created_at|date:"Y-m-d H:i:s" }}</td>
+          <td>{{ import.completed_at|date:"Y-m-d H:i:s"|default:"—" }}</td>
+          <td>{{ import.user|default:"—" }}</td>
+          <td>{{ import.created_ids|length }}</td>
+          <td>{{ import.updated_ids|length }}</td>
+          <td>{{ import.error_message|default:"—"|truncatechars:100 }}</td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="9">{% trans "No recent imports found." %}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p><a href="{% url 'admin:observations_observation_changelist' %}">{% trans "Back to Observations" %}</a></p>
+{% endblock %}

@@ -139,6 +139,18 @@ CELERY_BEAT_SCHEDULE = {
             'min_observation_datetime': '2024-04-01T00:00:00+02:00'
         },)
     },
+    "generate-hourly-export": {
+        "task": "vespadb.observations.tasks.generate_export.generate_hourly_export",
+        "schedule": crontab(minute=0, hour="*"),  # Run every hour at minute 0
+    },
+    "cleanup-old-exports": {
+        "task": "vespadb.observations.tasks.generate_export.cleanup_old_exports",
+        "schedule": crontab(minute=0, hour="*/6"),  # Run every 6 hours
+    },
+    "cleanup-old-imports": {
+        "task": "vespadb.observations.tasks.generate_import.cleanup_old_imports",
+        "schedule": crontab(minute=0, hour="*/6"),  # Every 6 hours
+    },
 }
 
 AUTH_USER_MODEL = "users.VespaUser"
@@ -283,5 +295,18 @@ DEFAULT_FROM_EMAIL = secrets["DEFAULT_FROM_EMAIL"]
 SERVER_EMAIL = secrets["DEFAULT_FROM_EMAIL"]
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-EXPORTS_DIR = os.path.join(MEDIA_ROOT, 'exports')
 CREATED_START_DATE = "2024-06-13"
+# S3 Configuration
+AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME", "vespadb-imports")
+AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME", "eu-west-1")
+AWS_DEFAULT_ACL = None
+AWS_S3_FILE_OVERWRITE = False
+DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+
+# Use LocalStack for local development
+if os.getenv("DEBUG", "False").lower() == "true":
+    AWS_S3_ENDPOINT_URL = "http://localstack:4566"  # LocalStack endpoint
+    AWS_ACCESS_KEY_ID = "test"  # Dummy credentials for LocalStack
+    AWS_SECRET_ACCESS_KEY = "test"
+else:
+    AWS_S3_ENDPOINT_URL = None  # Use real AWS S3 in UAT/production

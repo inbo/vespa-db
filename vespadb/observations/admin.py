@@ -4,6 +4,7 @@ import json
 import logging
 from typing import Any
 
+from django.utils import timezone
 from django import forms
 from django.contrib import admin, messages
 from django.contrib.admin import SimpleListFilter
@@ -20,6 +21,12 @@ from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from rest_framework.test import APIRequestFactory
 from django.conf import settings
+from django.contrib import admin
+from django.shortcuts import render
+from django.urls import path
+from vespadb.observations.models import Import
+from django.urls import reverse
+from django.utils.html import format_html
 
 from vespadb.observations.filters import MunicipalityExcludeFilter, ObserverReceivedEmailFilter, ProvinceFilter
 from vespadb.observations.forms import SendEmailForm
@@ -238,28 +245,48 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
             if form.is_valid():
                 file = form.cleaned_data["file"]
                 file_name = file.name
+                if Import.objects.filter(file_path__endswith=file_name, created_at__gte=timezone.now() - timezone.timedelta(hours=1)).exists():
+                    self.message_user(request, f"File {file_name} was recently imported. Are you sure you want to import it again?", level="warning")
 
-                if file_name.endswith(".json"):
-                    try:
-                        data = json.load(file)
-                        if not isinstance(data, list):
-                            raise TypeError("Invalid JSON format. Expected a list of objects.")
-                        request.data = {"data": data}
-                        request.content_type = "application/json"
-                    except json.JSONDecodeError as e:
-                        self.message_user(request, f"JSON decode error: {e}", level="error")
-                        return redirect("admin:observations_observation_changelist")
-                    except ValueError as e:
-                        self.message_user(request, str(e), level="error")
-                        return redirect("admin:observations_observation_changelist")
-                elif file_name.endswith(".csv"):
-                    request.data = {"file": file}
-                    request.content_type = "multipart/form-data"
-                else:
+                if not (file_name.endswith(".json") or file_name.endswith(".csv")):
                     self.message_user(request, "Unsupported file format.", level="error")
                     return redirect("admin:observations_observation_changelist")
 
-                return self.bulk_import_view(request)
+                if Import.objects.filter(file_path__endswith=file_name, created_at__gte=timezone.now() - timezone.timedelta(hours=1)).exists():
+                    self.message_user(request, f"File {file_name} was recently imported. Are you sure you want to import it again?", level="warning")
+
+                try:
+                    factory = APIRequestFactory()
+                    api_request = factory.post(
+                        "/observations/async_bulk_import/",
+                        data={"file": file},
+                        format="multipart",
+                    )
+                    api_request.user = get_import_user(UserType.IMPORT)
+                    viewset = ObservationsViewSet.as_view({"post": "async_bulk_import"})
+                    response = viewset(api_request)
+
+                    if response.status_code == 202:
+                        data = response.data
+                        import_id = data["import_id"]
+                        detail_url = reverse("admin:observations_import_change", args=[import_id])
+                        status_url = reverse("admin:import_status")
+                        self.message_user(
+                            request,
+                            format_html(
+                                'Import job initiated. Import ID: <a href="{}">{}</a>. '
+                                'Check <a href="{}">status page</a> for progress.',
+                                detail_url, import_id, status_url
+                            ),
+                            level="success",
+                        )
+                    else:
+                        self.message_user(request, f"Failed to initiate import: {response.data}", level="error")
+                except Exception as e:
+                    self.message_user(request, f"Error initiating import: {str(e)}", level="error")
+                    logger.exception(f"Import error: {str(e)}")
+
+                return redirect("admin:observations_observation_changelist")
         else:
             form = FileImportForm()
         return render(request, "admin/file_form.html", {"form": form})
@@ -417,7 +444,67 @@ class MunicipalityAdmin(admin.ModelAdmin):
     list_filter = ("province",)
     search_fields = ("name",)
 
+@admin.register(Import)
+class ImportAdmin(admin.ModelAdmin):
+    list_display = [
+        "id",
+        "status",
+        "progress",
+        "created_at",
+        "completed_at",
+        "user",
+        "created_count",
+        "updated_count",
+        "error_message_summary",
+    ]
+    list_filter = ["status", "created_at"]
+    search_fields = ["id", "error_message"]
+    readonly_fields = [
+        "id",
+        "file_path",
+        "status",
+        "progress",
+        "created_at",
+        "completed_at",
+        "user",
+        "error_message",
+        "task_id",
+        "created_ids",
+        "updated_ids",
+    ]
 
+    def created_count(self, obj):
+        """Display the number of created observations."""
+        return len(obj.created_ids)
+    created_count.short_description = "Created Observations"
+
+    def updated_count(self, obj):
+        """Display the number of updated observations."""
+        return len(obj.updated_ids)
+    updated_count.short_description = "Updated Observations"
+
+    def error_message_summary(self, obj):
+        """Display a truncated error message in the list view."""
+        return obj.error_message[:100] + "..." if obj.error_message and len(obj.error_message) > 100 else obj.error_message
+    error_message_summary.short_description = "Error Message"
+
+    def get_urls(self):
+        """Add a custom URL for the import status page."""
+        urls = super().get_urls()
+        custom_urls = [
+            path("status/", self.admin_site.admin_view(self.import_status_view), name="import_status"),
+        ]
+        return custom_urls + urls
+
+    def import_status_view(self, request):
+        """Display a custom page with recent import statuses."""
+        imports = Import.objects.all().order_by("-created_at")[:10]
+        context = {
+            "imports": imports,
+            "title": "Recent Imports",
+        }
+        return render(request, "admin/import_status.html", context)
+    
 admin.site.register(Observation, ObservationAdmin)
 admin.site.register(Province, ProvinceAdmin)
 admin.site.register(Municipality, MunicipalityAdmin)

@@ -51,13 +51,18 @@ from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_gis.filters import DistanceToPointFilter
+from rest_framework.parsers import MultiPartParser
+from django.core.files.storage import default_storage
+from vespadb.observations.models import Import
+from vespadb.observations.tasks.generate_import import process_import
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 
 from vespadb.observations.cache import invalidate_geojson_cache, invalidate_observation_cache
 from vespadb.observations.filters import ObservationFilter
 from vespadb.observations.helpers import parse_and_convert_to_cet
 from vespadb.observations.models import Municipality, Observation, Province, Export
-from vespadb.observations.tasks.export_utils import generate_rows
-from vespadb.observations.tasks.generate_export import generate_export
+from vespadb.observations.tasks.generate_export import generate_export, generate_rows
 from vespadb.observations.serializers import ObservationSerializer, MunicipalitySerializer, ProvinceSerializer
 from vespadb.observations.utils import check_if_point_in_anb_area, get_municipality_from_coordinates, get_geojson_cache_key
 from django.utils.decorators import method_decorator
@@ -657,29 +662,29 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         """
         Process a single record as an update.
         
-        In update mode, we only require an "id" plus any fields that should be updated.
-        For example, if only eradication_result is provided, observation_datetime is not mandatory.
+        When an ID is provided:
+        - If ID exists in database: update
+        - If ID doesn't exist in database: error (never create)
         """
         if err := self._validate_choice_fields(data_item):
             return {"error": f"Record {idx}: {err}"}
         
         observation_id = data_item.get("id")
         try:
-            # First attempt to find by exact ID
+            # Find by exact ID
             existing_obj = Observation.objects.get(id=observation_id)
             logger.info(f"Found existing observation #{observation_id} for update")
         except Observation.DoesNotExist:
-            logger.warning(f"Observation with id {observation_id} not found, falling back to create for record {idx}")
-            return self.process_create_item(data_item, idx, current_time)
+            # Return error instead of falling back to create
+            logger.error(f"Observation with id {observation_id} not found for record {idx}")
+            return {"error": f"Record {idx}: Observation with ID {observation_id} not found. Cannot create with a specific ID."}
         
-        # Get the import user
+        # Rest of the update logic remains the same
         import_user = get_import_user(UserType.IMPORT)
-        
-        # Set the update audit fields
         data_item['modified_by'] = import_user
         data_item['modified_datetime'] = current_time
-
-        # Remove created_by and created_datetime to prevent modification
+        
+        # Remove created fields to prevent modification
         data_item.pop('created_by', None)
         data_item.pop('created_datetime', None)
 
@@ -727,20 +732,45 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         """
         Process a single record as a new observation.
         
-        In create mode, observation_datetime, latitude and longitude are required.
+        When no ID is provided:
+        - If wn_id/source OR source_id/source combination provided:
+        - If combination exists: error
+        - If combination doesn't exist: create
+        - If neither combination provided: error
         """
         if err := self._validate_choice_fields(data_item):
             return {"error": f"Record {idx}: {err}"}
         
-        # Check if ID is specified
-        observation_id = data_item.get("id")
+        # Check for valid identifier combinations
+        has_wn_id_source = 'wn_id' in data_item and data_item['wn_id'] is not None and 'source' in data_item and data_item['source']
+        has_source_id_source = 'source_id' in data_item and data_item['source_id'] is not None and 'source' in data_item and data_item['source']
         
+        if not (has_wn_id_source or has_source_id_source):
+            return {"error": f"Record {idx}: Either wn_id/source or source_id/source combination is required for import"}
+        
+        # Check if combination already exists
+        existing_observation = None
+        if has_wn_id_source:
+            try:
+                existing_observation = Observation.objects.get(wn_id=data_item['wn_id'], source=data_item['source'])
+                return {"error": f"Record {idx}: Observation with wn_id={data_item['wn_id']} and source='{data_item['source']}' already exists"}
+            except Observation.DoesNotExist:
+                pass
+        
+        if has_source_id_source:
+            try:
+                existing_observation = Observation.objects.get(source_id=data_item['source_id'], source=data_item['source'])
+                return {"error": f"Record {idx}: Observation with source_id={data_item['source_id']} and source='{data_item['source']}' already exists"}
+            except Observation.DoesNotExist:
+                pass
+        
+        # Continue with standard validation
         # Ensure required fields for a new record are present
         required_fields = ["observation_datetime", "longitude", "latitude"]
         missing_fields = [field for field in required_fields if not data_item.get(field)]
         if missing_fields:
-            return {"error": f"Missing required fields for new record: {', '.join(missing_fields)}"}
-        
+            return {"error": f"Record {idx}: Missing required fields for new record: {', '.join(missing_fields)}"}
+                
         # Get the import user
         import_user = get_import_user(UserType.IMPORT)
         
@@ -1108,6 +1138,166 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         except Exception as e:
             logger.exception("Export failed")
             return JsonResponse({"error": str(e)}, status=500)
+    
+    @swagger_auto_schema(
+        operation_description="Initiate an asynchronous bulk import of observations from a JSON or CSV file.",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                "file": openapi.Schema(type=openapi.TYPE_FILE, description="JSON or CSV file containing observations"),
+            },
+            required=["file"],
+        ),
+        responses={
+            202: openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    "import_id": openapi.Schema(type=openapi.TYPE_INTEGER, description="ID of the import job"),
+                    "task_id": openapi.Schema(type=openapi.TYPE_STRING, description="Celery task ID"),
+                    "message": openapi.Schema(type=openapi.TYPE_STRING, description="Status message"),
+                },
+            ),
+            400: "Bad Request",
+            415: "Unsupported Media Type",
+        },
+    )
+    @action(detail=False, methods=["post"], permission_classes=[IsAdminUser], parser_classes=[MultiPartParser])
+    def async_bulk_import(self, request: Request) -> Response:
+        """Initiate an asynchronous bulk import of observations."""
+        logger.info("Async bulk import request received.")
+
+        file = request.FILES.get("file")
+        if not file:
+            logger.error("No file provided.")
+            return Response({"error": "File is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not (file.name.endswith(".json") or file.name.endswith(".csv")):
+            logger.error("Unsupported file format.")
+            return Response({"error": "Unsupported file format. Only JSON or CSV allowed."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Save file to S3 under VESPADB/IMPORT/
+        file_path = f"VESPADB/IMPORT/{file.name}"
+        try:
+            file_path = default_storage.save(file_path, file)
+            logger.info(f"File saved to S3 at: {file_path}")
+        except Exception as e:
+            logger.exception("Failed to save file to S3")
+            return Response({"error": f"Failed to save file: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # Create Import record
+        import_record = Import.objects.create(
+            user=request.user if request.user.is_authenticated else None,
+            file_path=file_path,
+            status="pending",
+        )
+
+        # Trigger Celery task
+        task = process_import.delay(import_record.id)
+        import_record.task_id = task.id
+        import_record.save()
+
+        return Response(
+            {
+                "import_id": import_record.id,
+                "task_id": task.id,
+                "message": "Import job initiated. Check status for progress.",
+            },
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+    @swagger_auto_schema(
+        operation_description="Check the status of an import job.",
+        manual_parameters=[
+            openapi.Parameter(
+                "import_id",
+                openapi.IN_QUERY,
+                description="The ID of the import to check the status of.",
+                type=openapi.TYPE_INTEGER,
+                required=True,
+            )
+        ],
+        responses={
+            200: openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    "status": openapi.Schema(type=openapi.TYPE_STRING),
+                    "progress": openapi.Schema(type=openapi.TYPE_INTEGER),
+                    "error": openapi.Schema(type=openapi.TYPE_STRING, nullable=True),
+                    "created_ids": openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Schema(type=openapi.TYPE_INTEGER)),
+                    "updated_ids": openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Schema(type=openapi.TYPE_INTEGER)),
+                },
+            ),
+            400: "Bad Request",
+            404: "Import not found",
+        },
+    )
+    @action(detail=False, methods=["get"], permission_classes=[IsAdminUser])
+    def import_status(self, request: HttpRequest) -> JsonResponse:
+        """Check the status of an import job."""
+        import_id = request.query_params.get("import_id")
+        if not import_id:
+            return Response({"error": "import_id is required"}, status=400)
+        try:
+            import_record = Import.objects.get(id=import_id)
+            return Response({
+                "id": import_record.id,
+                "status": import_record.status,
+                "progress": import_record.progress,
+                "error_message": import_record.error_message,
+                "created_ids": import_record.created_ids,
+                "updated_ids": import_record.updated_ids,
+            })
+        except Import.DoesNotExist:
+            return Response({"error": "Import not found"}, status=404)
+
+    @swagger_auto_schema(
+        operation_description="Download a completed export file from S3.",
+        manual_parameters=[
+            openapi.Parameter(
+                "export_id",
+                openapi.IN_QUERY,
+                description="The ID of the export to download.",
+                type=openapi.TYPE_INTEGER,
+                required=True,
+            )
+        ],
+        responses={
+            200: "CSV file",
+            400: "Bad Request",
+            404: "Export not found",
+            500: "Server Error",
+        },
+    )
+    @action(detail=False, methods=["get"])
+    def download_export(self, request: HttpRequest) -> StreamingHttpResponse:
+        """Stream the export file from S3."""
+        export_id = request.GET.get("export_id")
+        if not export_id:
+            logger.error("Export ID not provided")
+            return HttpResponseBadRequest("Export ID is required")
+
+        try:
+            export = Export.objects.get(id=export_id)
+            if export.status != "completed":
+                logger.error(f"Export {export_id} is not completed: {export.status}")
+                return HttpResponseBadRequest("Export is not ready")
+
+            # Stream file from S3
+            file = default_storage.open(export.file_path)
+            response = StreamingHttpResponse(
+                file,
+                content_type="text/csv",
+            )
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            response["Content-Disposition"] = f'attachment; filename="observations_export_{timestamp}.csv"'
+            return response
+
+        except Export.DoesNotExist:
+            logger.error(f"Export {export_id} not found")
+            return HttpResponseNotFound("Export not found")
+        except Exception as e:
+            logger.exception(f"Error streaming export {export_id}: {str(e)}")
+            return HttpResponseServerError("Error downloading export")
         
 @require_GET
 def search_address(request: Request) -> JsonResponse:

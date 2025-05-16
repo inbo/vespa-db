@@ -28,8 +28,8 @@ python manage.py load_anb
 echo "Assign provinces to municipalities..."
 python manage.py assign_provinces_to_municipalities
 
-echo "Update observations linked municipalities, provinces, anb areas..."
-python manage.py update_observations
+echo "Need to update observations? Run python manage.py update_observations..."
+#python manage.py update_observations
 
 echo "Create django admin user with python manage.py createsuperuser"
 echo "Load waarnemingen observation data via: python manage.py load_waarnemingen_observations"

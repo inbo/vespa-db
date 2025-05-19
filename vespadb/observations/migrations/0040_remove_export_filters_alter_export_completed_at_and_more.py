@@ -35,7 +35,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='export',
             name='file_path',
-            field=models.CharField(blank=True, help_text='Path to the exported file in S3', max_length=255),
+            field=models.CharField(null=True,blank=True, help_text='Path to the exported file in S3', max_length=255),
         ),
         migrations.AlterField(
             model_name='export',

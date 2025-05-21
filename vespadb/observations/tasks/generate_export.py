@@ -304,12 +304,16 @@ def generate_hourly_export() -> Dict[str, Any]:
     logger.info("Starting hourly export of all observations")
     
     try:
-        # Get all observations
-        queryset = Observation.objects.all().select_related("province", "municipality", "reserved_by").order_by("id")
+        # Get all observations with optimized query
+        queryset = (Observation.objects
+                   .all()
+                   .select_related("province", "municipality", "reserved_by")
+                   .order_by("id"))
+        
         initial_count = queryset.count()
         logger.info(f"Total observations to export: {initial_count}")
 
-        # Generate file path
+        # Generate file path with timestamp
         timestamp = timezone.now().strftime("%Y%m%d_%H%M%S")
         new_file_path = f"VESPADB/EXPORT/observations_{timestamp}.csv"
 
@@ -317,19 +321,22 @@ def generate_hourly_export() -> Dict[str, Any]:
         previous_files = default_storage.listdir("VESPADB/EXPORT/")[1]  # Get files only
         previous_files = [f for f in previous_files if f.startswith("observations_") and f.endswith(".csv")]
         
-        # Generate and save new CSV to S3
+        # Generate and save new CSV to S3 using batch processing for memory efficiency
         generate_csv_to_s3(queryset, new_file_path, is_admin=True)
 
-        # Delete previous files
-        for old_file in previous_files:
-            old_file_path = f"VESPADB/EXPORT/{old_file}"
-            try:
-                default_storage.delete(old_file_path)
-                logger.info(f"Deleted previous export file: {old_file_path}")
-            except Exception as e:
-                logger.warning(f"Failed to delete previous export file {old_file_path}: {str(e)}")
+        # Delete previous files - keep at most the 2 most recent previous files as backup
+        # Sort files by name (which includes timestamp)
+        if len(previous_files) > 2:
+            files_to_delete = sorted(previous_files)[:-2]
+            for old_file in files_to_delete:
+                old_file_path = f"VESPADB/EXPORT/{old_file}"
+                try:
+                    default_storage.delete(old_file_path)
+                    logger.info(f"Deleted previous export file: {old_file_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to delete previous export file {old_file_path}: {str(e)}")
 
-        logger.info("Hourly export completed successfully")
+        logger.info(f"Hourly export completed successfully: {new_file_path}")
         return {
             "status": "completed",
             "file_path": new_file_path,
@@ -339,3 +346,21 @@ def generate_hourly_export() -> Dict[str, Any]:
     except Exception as e:
         logger.exception(f"Hourly export failed: {str(e)}")
         return {"status": "failed", "error": str(e)}
+
+def get_latest_hourly_export() -> str:
+    """Get the file path of the latest hourly export."""
+    try:
+        # List existing files in S3 export directory
+        export_files = default_storage.listdir("VESPADB/EXPORT/")[1]  # Get files only
+        hourly_files = [f for f in export_files if f.startswith("observations_") and f.endswith(".csv")]
+        
+        if not hourly_files:
+            logger.warning("No hourly export files found")
+            return None
+            
+        # Sort by name (which includes timestamp) to get the latest
+        latest_file = sorted(hourly_files, reverse=True)[0]
+        return f"VESPADB/EXPORT/{latest_file}"
+    except Exception as e:
+        logger.error(f"Error finding latest hourly export: {str(e)}")
+        return None

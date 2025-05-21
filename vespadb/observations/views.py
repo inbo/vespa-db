@@ -4,21 +4,18 @@ import csv
 import datetime
 import io
 import json
-import time
 import logging
 import csv
 import json
 from typing import TYPE_CHECKING, Any, Union, List
 from django.http import HttpResponseNotFound
 import os
-from typing import Iterator, Set
 from django.db.models.query import QuerySet
-from django.db.models import Model
 from csv import writer as _writer
 from django.db.models.query import QuerySet
 from django.contrib.gis.geos import Point
 from dateutil import parser
-
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.gis.db.models.functions import Transform
 from django.contrib.gis.geos import GEOSGeometry
@@ -945,49 +942,27 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
     @action(detail=False, methods=["get"], permission_classes=[AllowAny])
     def export(self, request: HttpRequest) -> JsonResponse:
         """Initiate the export of observations and trigger a Celery task."""
-        # Initialize the filterset
-        filterset = self.filterset_class(data=request.GET, queryset=self.get_queryset())
-
-        # Validate the filterset
-        if not filterset.is_valid():
-            return JsonResponse({"error": filterset.errors}, status=400)
-
-        # Get the filtered queryset count first
-        filtered_count = filterset.qs.count()
-        if filtered_count > 10000:
+        from vespadb.observations.tasks.generate_export import get_latest_hourly_export
+        latest_file = get_latest_hourly_export()
+        
+        if latest_file:
+            logger.info(f"Using pre-generated hourly export: {latest_file}")
+            # Create an Export record for tracking
+            export = Export.objects.create(
+                user=request.user if request.user.is_authenticated else None,
+                file_path=latest_file,
+                status='completed',
+                completed_at=timezone.now(),
+                progress=100,
+            )
+            
             return JsonResponse({
-                "error": f"Export too large. Found {filtered_count} records, maximum allowed is 10,000"
-            }, status=400)
-
-        # Prepare the filter parameters - only include valid filters
-        filters = {}
-        for key, value in request.GET.items():
-            if key in filterset.filters and value:
-                filters[key] = value
-
-        # Create an Export record
-        export = Export.objects.create(
-            user=request.user if request.user.is_authenticated else None,
-            filters=filters,
-            status='pending',
-        )
-
-        # Trigger the Celery task
-        task = generate_export.delay(
-            export.id,
-            filters,
-            user_id=request.user.id if request.user.is_authenticated else None
-        )
-
-        # Update the Export record with the task ID
-        export.task_id = task.id
-        export.save()
-
-        return JsonResponse({
-            'export_id': export.id,
-            'task_id': task.id,
-            'total_records': filtered_count
-        })
+                'export_id': export.id,
+                'status': 'completed',
+                'total_records': 'all',
+                'pre_generated': True
+            })
+    
         
     @swagger_auto_schema(
         operation_description="Check the status of an export.",

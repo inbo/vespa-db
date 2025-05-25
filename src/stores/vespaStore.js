@@ -394,29 +394,183 @@ export const useVespaStore = defineStore('vespaStore', {
             }
         },
         async exportData(format) {
-            this.isExporting = true;
-            this.exportProgress = 0;
             try {
-                // Start the export
-                const response = await api.get('/observations/export/');
-                const { export_id, status } = response.data;
-                
-                // If the export is already completed (pre-generated file)
+                this.isExporting = true;
+        
+                const response = await ApiService.get('/observations/export/');
+                const exportData = response.data;
+                const { export_id, status } = exportData;
+        
+                // Handle immediate success (pre-generated file available)
                 if (status === 'completed') {
-                    // Directly download the file
-                    window.location.href = `/observations/download_export/?export_id=${export_id}`;
-                    this.isExporting = false;
+                    await this.downloadFileFromApi(`/observations/download_export/?export_id=${export_id}`);
                     return;
                 }
-                
-                // Otherwise poll for status
-                await this.pollExportStatus(export_id);
+        
+                // Handle generation in progress (202 status with generating status)
+                if (status === 'generating') {
+                    // Show user-friendly message about generation
+                    this.modalTitle = 'Export Being Prepared';
+                    this.modalMessage = `${exportData.message || 'Your export is being generated.'} Estimated wait time: ${exportData.estimated_wait_time || '5-10 minutes'}`;
+                    this.isModalVisible = true;
+                    
+                    // Start polling with longer intervals for generation
+                    await this.pollForGeneratedExport(export_id);
+                    return;
+                }
+        
+                // Handle other statuses
+                if (status === 'pending') {
+                    await this.pollForExportCompletion(export_id);
+                    return;
+                }
+        
+                // If we get here, something unexpected happened
+                throw new Error(exportData.error || 'Unexpected export status');
+        
             } catch (error) {
-                this.error = 'Export failed: ' + (error.response?.data?.error || error.message);
+                console.error('Export error:', error);
+                
+                // Handle HTTP errors specifically
+                if (error.response) {
+                    const statusCode = error.response.status;
+                    const errorData = error.response.data;
+                    
+                    if (statusCode === 202 && errorData.status === 'generating') {
+                        // Handle 202 response (generation triggered)
+                        this.modalTitle = 'Export Being Prepared';
+                        this.modalMessage = `${errorData.message || 'Your export is being generated.'} Estimated wait time: ${errorData.estimated_wait_time || '5-10 minutes'}`;
+                        this.isModalVisible = true;
+                        
+                        try {
+                            await this.pollForGeneratedExport(errorData.export_id);
+                            return;
+                        } catch (pollError) {
+                            this.modalTitle = 'Export Error';
+                            this.modalMessage = pollError.message || 'Failed to generate export';
+                            this.isModalVisible = true;
+                            return;
+                        }
+                    }
+                    
+                    // Handle other HTTP errors
+                    this.modalTitle = 'Export Error';
+                    this.modalMessage = errorData.error || errorData.message || 'Export request failed';
+                    this.isModalVisible = true;
+                } else {
+                    // Handle network or other errors
+                    this.modalTitle = 'Export Error';
+                    this.modalMessage = error.message || 'An unexpected error occurred';
+                    this.isModalVisible = true;
+                }
             } finally {
                 this.isExporting = false;
             }
         },
+        async downloadFileFromApi(url) {
+            try {
+                console.log('Downloading file from:', url);
+                
+                const response = await ApiService.get(url, {
+                    responseType: 'blob',
+                });
+        
+                const downloadUrl = window.URL.createObjectURL(new Blob([response.data]));
+                const link = document.createElement('a');
+                link.href = downloadUrl;
+                
+                let filename = 'observations_export.csv';
+                const disposition = response.headers['content-disposition'];
+                if (disposition && disposition.indexOf('filename=') !== -1) {
+                    filename = disposition.split('filename=')[1].replace(/"/g, '');
+                }
+                
+                link.setAttribute('download', filename);
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                window.URL.revokeObjectURL(downloadUrl);
+            } catch (error) {
+                console.error('Error downloading file:', error);
+                throw new Error('Failed to download file: ' + error.message);
+            }
+        },
+        async pollForGeneratedExport(exportId) {
+            let completed = false;
+            let attempts = 0;
+            const maxAttempts = 40; // Poll for up to 20 minutes (30s intervals)
+        
+            while (!completed && attempts < maxAttempts) {
+                await new Promise(resolve => setTimeout(resolve, 30000)); // Wait 30 seconds for generation
+                attempts++;
+        
+                try {
+                    const statusResponse = await ApiService.get(`/observations/export_status/?export_id=${exportId}`);
+                    const statusData = statusResponse.data;
+        
+                    if (statusData.status === 'completed') {
+                        // Hide the waiting modal and start download
+                        this.isModalVisible = false;
+                        await this.downloadFileFromApi(`/observations/download_export/?export_id=${exportId}`);
+                        completed = true;
+                        break;
+                    } else if (statusData.status === 'failed') {
+                        throw new Error(statusData.error || 'Export generation failed');
+                    } else if (statusData.status === 'pending') {
+                        // Update modal with current status
+                        if (statusData.message) {
+                            this.modalMessage = `${statusData.message} (${attempts}/${maxAttempts} checks)`;
+                        }
+                        console.log(`Export generation in progress... (attempt ${attempts}/${maxAttempts})`);
+                    }
+        
+                } catch (pollError) {
+                    console.warn('Error checking export status:', pollError);
+                    // Continue polling despite error, but throw after max attempts
+                    if (attempts >= maxAttempts) {
+                        throw new Error('Export generation timed out. Please try again later.');
+                    }
+                }
+            }
+        
+            if (!completed) {
+                throw new Error('Export generation timed out. Please try again later.');
+            }
+        },
+        
+        async pollForExportCompletion(exportId) {
+            // Original polling logic for regular exports (shorter intervals)
+            let completed = false;
+            let attempts = 0;
+        
+            while (!completed && attempts < 60) {
+                await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second intervals
+                attempts++;
+        
+                try {
+                    const statusResponse = await ApiService.get(`/observations/export_status/?export_id=${exportId}`);
+                    const statusData = statusResponse.data;
+        
+                    if (statusData.status === 'completed') {
+                        await this.downloadFileFromApi(`/observations/download_export/?export_id=${exportId}`);
+                        completed = true;
+                        break;
+                    } else if (statusData.status === 'failed') {
+                        throw new Error(statusData.error || 'Export failed');
+                    }
+        
+                    if (statusData.progress) {
+                        console.log(`Export progress: ${statusData.progress}%`);
+                    }
+                } catch (pollError) {
+                    console.warn('Error checking export status:', pollError);
+                }
+            }
+        
+            if (!completed) {
+                throw new Error('Export timed out. Please try again later.');
+            }
+        },     
         async fetchMunicipalitiesByProvinces(provinceIds) {
             try {
                 const response = await ApiService.get(`/municipalities/by_provinces/?province_ids=${provinceIds.join(',')}`);

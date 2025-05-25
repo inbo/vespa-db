@@ -14,7 +14,6 @@ function getCookie(name) {
     return null;
 }
 
-
 const ApiService = {
     getAxiosInstance() {
         instance.interceptors.request.use((config) => {

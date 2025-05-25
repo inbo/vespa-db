@@ -140,9 +140,9 @@ def generate_rows(
     is_admin: bool,
     user_municipality_ids: Set[str],
     batch_size: int = 200
-) -> Iterator[Any]:
+) -> Iterator[List[str]]:
     """Generate CSV rows for streaming with memory optimization."""
-    yield writer.writerow(PUBLIC_FIELDS)
+    yield PUBLIC_FIELDS  # just yield the header row
 
     for observation in queryset.iterator(chunk_size=batch_size):
         try:
@@ -151,125 +151,28 @@ def generate_rows(
                 is_admin, 
                 user_municipality_ids
             )
-            yield writer.writerow(row)
+            yield row
         except Exception as e:
             logger.error(f"Error processing observation {observation.id}: {e}")
             continue
 
 def generate_csv_to_s3(queryset: Any, file_path: str, is_admin: bool = True, user_municipality_ids: Set[int] = set()) -> None:
-    """Generate a CSV file and save it to S3."""
     logger.info(f"Generating CSV and saving to S3 at: {file_path}")
     buffer = io.StringIO()
     writer = csv.writer(buffer)
     
-    # Generate rows
-    rows = generate_rows(queryset, writer, is_admin, user_municipality_ids)
-    for row in rows:
-        writer.writerow(row)
-    
-    # Save to S3
-    buffer.seek(0)
     try:
+        for row in generate_rows(queryset, writer, is_admin, user_municipality_ids):
+            writer.writerow(row)
+
+        buffer.seek(0)
         default_storage.save(file_path, io.StringIO(buffer.getvalue()))
         logger.info(f"Successfully saved CSV to S3: {file_path}")
     except Exception as e:
         logger.error(f"Failed to save CSV to S3 at {file_path}: {str(e)}")
         raise
     finally:
-        buffer.close()
-        
-@shared_task(
-    name="generate_export",
-    max_retries=3,
-    default_retry_delay=60,
-    soft_time_limit=1700,
-    time_limit=1800,
-    acks_late=True
-)
-def generate_export(export_id: int, filters: Dict[str, Any], user_id: Optional[int] = None) -> Dict[str, Any]:
-    """Generate CSV export of observations based on filters and save to S3."""
-    logger.info(f"Starting export {export_id} for user {user_id} with filters: {filters}")
-    export = Export.objects.get(id=export_id)
-
-    try:
-        # Update export status
-        export.status = 'processing'
-        export.save()
-
-        # Apply filters and get initial count
-        queryset = Observation.objects.filter(**filters)
-        initial_count = queryset.count()
-        logger.info(f"Initial queryset count: {initial_count}")
-
-        # Add optimizations
-        queryset = (queryset
-                   .select_related('province', 'municipality', 'reserved_by')
-                   .order_by('id'))
-
-        # Process in batches
-        batch_size = 1000
-        processed = 0
-        output = io.StringIO()
-        writer = csv.writer(output)
-
-        # Write headers
-        writer.writerow(PUBLIC_FIELDS)
-
-        # Get user permissions
-        is_admin = False
-        user_municipality_ids: Set[str] = set()
-        if user_id:
-            try:
-                user = User.objects.get(id=user_id)
-                is_admin = user.is_superuser
-                user_municipality_ids = set(user.municipalities.values_list('id', flat=True))
-            except User.DoesNotExist:
-                logger.warning(f"User {user_id} not found")
-
-        # Process in batches to reduce memory usage
-        for i in range(0, initial_count, batch_size):
-            batch = queryset[i:i + batch_size]
-            
-            for observation in batch:
-                try:
-                    row = prepare_row_data(observation, is_admin, user_municipality_ids)
-                    writer.writerow(row)
-                    processed += 1
-                    
-                    if processed % 100 == 0:
-                        progress = int((processed / initial_count) * 100)
-                        export.progress = progress
-                        export.save()
-                        logger.info(f"Processed {processed}/{initial_count} records")
-                except Exception as e:
-                    logger.error(f"Error processing observation {observation.id}: {e}")
-                    continue
-
-        # Save to S3
-        file_path = f"VESPADB/EXPORT/export_{export_id}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.csv"
-        default_storage.save(file_path, io.StringIO(output.getvalue()))
-        output.close()
-
-        # Update export record
-        export.status = 'completed'
-        export.file_path = file_path
-        export.completed_at = timezone.now()
-        export.progress = 100
-        export.save()
-
-        logger.info(f"Export {export_id} completed successfully and saved to S3 at {file_path}")
-        return {
-            'status': 'completed',
-            'file_path': file_path,
-            'total_processed': processed
-        }
-
-    except Exception as e:
-        logger.exception(f"Export {export_id} failed: {str(e)}")
-        export.status = 'failed'
-        export.error_message = str(e)
-        export.save()
-        raise
+        buffer.close() 
 
 @shared_task
 def cleanup_old_exports() -> None:
@@ -300,7 +203,7 @@ def cleanup_old_exports() -> None:
     acks_late=True
 )
 def generate_hourly_export() -> Dict[str, Any]:
-    """Generate a CSV export of all observations hourly and save to S3, deleting the previous file."""
+    """Generate a CSV export of all observations hourly and save to S3, deleting old files."""
     logger.info("Starting hourly export of all observations")
     
     try:
@@ -318,23 +221,39 @@ def generate_hourly_export() -> Dict[str, Any]:
         new_file_path = f"VESPADB/EXPORT/observations_{timestamp}.csv"
 
         # List existing files in S3 export directory
-        previous_files = default_storage.listdir("VESPADB/EXPORT/")[1]  # Get files only
-        previous_files = [f for f in previous_files if f.startswith("observations_") and f.endswith(".csv")]
+        try:
+            dirs, files = default_storage.listdir("VESPADB/EXPORT/")
+            previous_files = [f for f in files if f.startswith("observations_") and f.endswith(".csv")]
+        except FileNotFoundError:
+            logger.info("Export directory doesn't exist yet, will be created")
+            previous_files = []
+        except Exception as e:
+            logger.warning(f"Could not list existing files: {str(e)}")
+            previous_files = []
         
         # Generate and save new CSV to S3 using batch processing for memory efficiency
         generate_csv_to_s3(queryset, new_file_path, is_admin=True)
 
-        # Delete previous files - keep at most the 2 most recent previous files as backup
-        # Sort files by name (which includes timestamp)
+        # Clean up old files - keep only the 2 most recent files as backup
         if len(previous_files) > 2:
-            files_to_delete = sorted(previous_files)[:-2]
+            files_to_delete = sorted(previous_files)[:-2]  # Keep the 2 most recent
             for old_file in files_to_delete:
                 old_file_path = f"VESPADB/EXPORT/{old_file}"
                 try:
                     default_storage.delete(old_file_path)
-                    logger.info(f"Deleted previous export file: {old_file_path}")
+                    logger.info(f"Deleted old export file: {old_file_path}")
                 except Exception as e:
-                    logger.warning(f"Failed to delete previous export file {old_file_path}: {str(e)}")
+                    logger.warning(f"Failed to delete old export file {old_file_path}: {str(e)}")
+
+        # Update any pending Export records that might be waiting for this file
+        pending_exports = Export.objects.filter(status='pending', file_path__isnull=True)
+        for export in pending_exports:
+            export.file_path = new_file_path
+            export.status = 'completed'
+            export.completed_at = timezone.now()
+            export.progress = 100
+            export.save()
+            logger.info(f"Updated pending export record {export.id}")
 
         logger.info(f"Hourly export completed successfully: {new_file_path}")
         return {
@@ -345,8 +264,15 @@ def generate_hourly_export() -> Dict[str, Any]:
 
     except Exception as e:
         logger.exception(f"Hourly export failed: {str(e)}")
+        
+        # Update any pending Export records to failed status
+        pending_exports = Export.objects.filter(status='pending', file_path__isnull=True)
+        for export in pending_exports:
+            export.status = 'failed'
+            export.error_message = str(e)
+            export.save()
+        
         return {"status": "failed", "error": str(e)}
-
 def get_latest_hourly_export() -> str:
     """Get the file path of the latest hourly export."""
     try:

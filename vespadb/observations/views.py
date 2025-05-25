@@ -4,21 +4,18 @@ import csv
 import datetime
 import io
 import json
-import time
 import logging
 import csv
 import json
 from typing import TYPE_CHECKING, Any, Union, List
 from django.http import HttpResponseNotFound
 import os
-from typing import Iterator, Set
 from django.db.models.query import QuerySet
-from django.db.models import Model
 from csv import writer as _writer
 from django.db.models.query import QuerySet
 from django.contrib.gis.geos import Point
 from dateutil import parser
-
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.gis.db.models.functions import Transform
 from django.contrib.gis.geos import GEOSGeometry
@@ -62,7 +59,7 @@ from vespadb.observations.cache import invalidate_geojson_cache, invalidate_obse
 from vespadb.observations.filters import ObservationFilter
 from vespadb.observations.helpers import parse_and_convert_to_cet
 from vespadb.observations.models import Municipality, Observation, Province, Export
-from vespadb.observations.tasks.generate_export import generate_export, generate_rows
+from vespadb.observations.tasks.generate_export import generate_rows
 from vespadb.observations.serializers import ObservationSerializer, MunicipalitySerializer, ProvinceSerializer
 from vespadb.observations.utils import check_if_point_in_anb_area, get_municipality_from_coordinates, get_geojson_cache_key
 from django.utils.decorators import method_decorator
@@ -175,16 +172,22 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         -------
             List[BasePermission]: A list of permission instances that should be applied to the action.
         """
+        permission_classes = [AllowAny()]
+    
         if self.action in {"create", "update", "partial_update"}:
-            if  self.request.user.is_superuser:
+            if self.request.user.is_superuser:
                 permission_classes = [IsAdminUser()]
             elif self.request.user.is_authenticated and self.request.user.get_permission_level() == "logged_in_with_municipality":
                 permission_classes = [IsAuthenticated()]
         elif self.action == "destroy":
             permission_classes = [IsAdminUser()]
+        elif self.action in {"debug_s3_files", "debug_exports"}:
+            permission_classes = [IsAdminUser()]
         else:
             permission_classes = [AllowAny()]
+            
         return permission_classes
+
 
     def get_queryset(self) -> QuerySet:
         """
@@ -941,54 +944,116 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
             
+
     @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
     @action(detail=False, methods=["get"], permission_classes=[AllowAny])
     def export(self, request: HttpRequest) -> JsonResponse:
-        """Initiate the export of observations and trigger a Celery task."""
-        # Initialize the filterset
-        filterset = self.filterset_class(data=request.GET, queryset=self.get_queryset())
-
-        # Validate the filterset
-        if not filterset.is_valid():
-            return JsonResponse({"error": filterset.errors}, status=400)
-
-        # Get the filtered queryset count first
-        filtered_count = filterset.qs.count()
-        if filtered_count > 10000:
+        """Export observations using pre-generated S3 files only."""
+        # Try to get the latest hourly export from S3
+        from vespadb.observations.tasks.generate_export import get_latest_hourly_export, generate_hourly_export
+        latest_file = get_latest_hourly_export()
+        
+        if latest_file:
+            logger.info(f"Using pre-generated hourly export: {latest_file}")
+            # Create an Export record for tracking
+            export = Export.objects.create(
+                user=request.user if request.user.is_authenticated else None,
+                file_path=latest_file,
+                status='completed',
+                completed_at=timezone.now(),
+                progress=100,
+            )
+            
             return JsonResponse({
-                "error": f"Export too large. Found {filtered_count} records, maximum allowed is 10,000"
-            }, status=400)
-
-        # Prepare the filter parameters - only include valid filters
-        filters = {}
-        for key, value in request.GET.items():
-            if key in filterset.filters and value:
-                filters[key] = value
-
-        # Create an Export record
+                'export_id': export.id,
+                'status': 'completed',
+                'total_records': 'all',
+                'pre_generated': True
+            })
+        
+        # No pre-generated file exists, trigger generation
+        logger.info("No pre-generated export found, triggering hourly export generation")
+        
+        # Trigger the hourly export task
+        task = generate_hourly_export.delay()
+        
+        # Create an Export record to track this request
         export = Export.objects.create(
             user=request.user if request.user.is_authenticated else None,
-            filters=filters,
             status='pending',
+            task_id=task.id,
         )
-
-        # Trigger the Celery task
-        task = generate_export.delay(
-            export.id,
-            filters,
-            user_id=request.user.id if request.user.is_authenticated else None
-        )
-
-        # Update the Export record with the task ID
-        export.task_id = task.id
-        export.save()
-
-        return JsonResponse({
-            'export_id': export.id,
-            'task_id': task.id,
-            'total_records': filtered_count
-        })
         
+        return JsonResponse({
+            "error": "No export file is currently available. We're generating a new one now.",
+            "message": "Please try again in a few minutes. The export is being prepared.",
+            "export_id": export.id,
+            "task_id": task.id,
+            "estimated_wait_time": "5-10 minutes",
+            "status": "generating"
+        }, status=202) 
+    
+    @action(detail=False, methods=["get"])
+    def download_export(self, request: HttpRequest) -> Union[StreamingHttpResponse, HttpResponse]:
+        """Stream the export directly to the user from S3."""
+        export_id = request.GET.get('export_id')
+        if not export_id:
+            return HttpResponseBadRequest("Export ID is required")
+
+        try:
+            export = Export.objects.get(id=export_id)
+            logger.info(f"Found export {export_id}: status={export.status}, file_path={export.file_path}")
+            
+            if export.status != 'completed':
+                return HttpResponseBadRequest("Export is not ready")
+
+            if not export.file_path:
+                return HttpResponseBadRequest("Export file path not found")
+
+            # Check if file exists in S3
+            if not default_storage.exists(export.file_path):
+                logger.error(f"File does not exist in S3: {export.file_path}")
+                return HttpResponseNotFound("Export file not found in storage")
+
+            # Stream the file from S3
+            try:
+                # Open file in binary mode for proper streaming
+                file_obj = default_storage.open(export.file_path, 'rb')
+                
+                # Create streaming response with proper content type
+                response = StreamingHttpResponse(
+                    streaming_content=file_obj,
+                    content_type='application/octet-stream'
+                )
+                
+                # Extract filename from file_path or create a default one
+                filename = export.file_path.split('/')[-1]
+                if not filename.endswith('.csv'):
+                    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+                    filename = f'observations_export_{timestamp}.csv'
+                
+                response['Content-Disposition'] = f'attachment; filename="{filename}"'
+                response['Content-Type'] = 'text/csv'
+                
+                # Add CORS headers if needed
+                response["Access-Control-Allow-Origin"] = request.META.get('HTTP_ORIGIN', '*')
+                response["Access-Control-Allow-Credentials"] = "true"
+                response["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+                response["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+                
+                logger.info(f"Successfully streaming export {export_id} from {export.file_path}")
+                return response
+                
+            except Exception as e:
+                logger.error(f"Error opening file from S3: {str(e)}")
+                return HttpResponseServerError("Error accessing export file")
+
+        except Export.DoesNotExist:
+            logger.error(f"Export {export_id} not found")
+            return HttpResponseNotFound("Export not found")
+        except Exception as e:
+            logger.exception(f"Error in download_export: {str(e)}")
+            return HttpResponseServerError("Error processing download request")
     @swagger_auto_schema(
         operation_description="Check the status of an export.",
         manual_parameters=[
@@ -1008,6 +1073,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                     'progress': openapi.Schema(type=openapi.TYPE_INTEGER),
                     'error': openapi.Schema(type=openapi.TYPE_STRING, nullable=True),
                     'download_url': openapi.Schema(type=openapi.TYPE_STRING, nullable=True),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING, nullable=True),
                 },
             ),
             400: "Bad Request",
@@ -1021,62 +1087,102 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         if not export_id:
             logger.error("Export ID not provided")
             return JsonResponse({"error": "Export ID is required"}, status=400)
-        
+
         try:
             export = get_object_or_404(Export, id=export_id)
         except Exception as e:
             logger.exception(f"Export ID {export_id} not found or invalid: {str(e)}")
             return JsonResponse({"error": f"Export ID {export_id} not found"}, status=404)
-        
+
         if export.status == 'completed':
             download_url = request.build_absolute_uri(f'/observations/download_export/?export_id={export_id}')
             return JsonResponse({
                 'status': 'completed',
-                'download_url': download_url
+                'download_url': download_url,
+                'message': 'Export is ready for download'
             })
-
-        return JsonResponse({
-            'status': export.status,
-            'progress': export.progress,
-            'error': export.error_message
-        })
-
+        elif export.status == 'pending':
+            return JsonResponse({
+                'status': 'pending',
+                'progress': export.progress,
+                'message': 'Export is being generated. Please wait...',
+                'estimated_wait_time': '5-10 minutes'
+            })
+        elif export.status == 'failed':
+            return JsonResponse({
+                'status': 'failed',
+                'error': export.error_message or 'Export generation failed',
+                'message': 'Export failed. Please try again later.'
+            })
+        else:
+            return JsonResponse({
+                'status': export.status,
+                'progress': export.progress,
+                'error': export.error_message
+            })
     @action(detail=False, methods=["get"])
-    def download_export(self, request: HttpRequest) -> Union[StreamingHttpResponse, HttpResponse]:
-        """Stream the export directly to the user."""
+    def debug_export(self, request: HttpRequest) -> JsonResponse:
+        """Debug endpoint to check specific export."""
         export_id = request.GET.get('export_id')
         if not export_id:
-            return HttpResponseBadRequest("Export ID is required")
-
+            return JsonResponse({"error": "export_id is required"}, status=400)
+        
         try:
             export = Export.objects.get(id=export_id)
-            if export.status != 'completed':
-                return HttpResponseBadRequest("Export is not ready")
-
-            # Get the data iterator from cache
-            cache_key = f'export_{export_id}_data'
-            rows = cache.get(cache_key)
-            if not rows:
-                return HttpResponseNotFound("Export data not found or expired")
-
-            # Create the streaming response
-            pseudo_buffer = Echo()
-            writer = csv.writer(pseudo_buffer)
-            response = StreamingHttpResponse(
-                (writer.writerow(row) for row in rows),
-                content_type='text/csv'
-            )
             
-            timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-            response['Content-Disposition'] = f'attachment; filename="observations_export_{timestamp}.csv"'
-            return response
-
+            debug_info = {
+                "export_record": {
+                    "id": export.id,
+                    "status": export.status,
+                    "file_path": export.file_path,
+                    "created_at": export.created_at.isoformat() if export.created_at else None,
+                    "completed_at": export.completed_at.isoformat() if export.completed_at else None,
+                    "progress": export.progress,
+                    "error_message": export.error_message,
+                    "task_id": export.task_id,
+                }
+            }
+            
+            # Check S3 file
+            if export.file_path:
+                try:
+                    debug_info["s3_file"] = {
+                        "exists": default_storage.exists(export.file_path),
+                        "path": export.file_path,
+                    }
+                    
+                    if debug_info["s3_file"]["exists"]:
+                        try:
+                            file_obj = default_storage.open(export.file_path)
+                            debug_info["s3_file"]["size"] = file_obj.size
+                            debug_info["s3_file"]["readable"] = True
+                            file_obj.close()
+                        except Exception as e:
+                            debug_info["s3_file"]["readable"] = False
+                            debug_info["s3_file"]["read_error"] = str(e)
+                            
+                except Exception as e:
+                    debug_info["s3_file"] = {
+                        "error": str(e)
+                    }
+            else:
+                debug_info["s3_file"] = {"error": "No file path in export record"}
+            
+            # Check cache (legacy)
+            cache_key = f'export_{export_id}_data'
+            cached_data = cache.get(cache_key)
+            debug_info["cache"] = {
+                "key": cache_key,
+                "has_data": cached_data is not None,
+                "data_type": type(cached_data).__name__ if cached_data else None,
+            }
+            
+            return JsonResponse(debug_info)
+            
         except Export.DoesNotExist:
-            return HttpResponseNotFound("Export not found")
+            return JsonResponse({"error": f"Export {export_id} not found"}, status=404)
         except Exception as e:
-            logger.error(f"Error streaming export: {str(e)}")
-            return HttpResponseServerError("Error generating export")
-
+            return JsonResponse({"error": f"Debug failed: {str(e)}"}, status=500)
     @method_decorator(csrf_exempt)
     @action(detail=False, methods=['get'], permission_classes=[AllowAny])
     def export_direct(self, request: HttpRequest) -> Union[StreamingHttpResponse, JsonResponse]:
@@ -1184,6 +1290,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             logger.exception("Failed to save file to S3")
             return Response({"error": f"Failed to save file: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+        logger.info("File saved successfully, creating import record.")
         # Create Import record
         import_record = Import.objects.create(
             user=request.user if request.user.is_authenticated else None,
@@ -1192,6 +1299,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         )
 
         # Trigger Celery task
+        logger.info("triggering Celery task for import processing.")
         task = process_import.delay(import_record.id)
         import_record.task_id = task.id
         import_record.save()
@@ -1249,55 +1357,6 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             })
         except Import.DoesNotExist:
             return Response({"error": "Import not found"}, status=404)
-
-    @swagger_auto_schema(
-        operation_description="Download a completed export file from S3.",
-        manual_parameters=[
-            openapi.Parameter(
-                "export_id",
-                openapi.IN_QUERY,
-                description="The ID of the export to download.",
-                type=openapi.TYPE_INTEGER,
-                required=True,
-            )
-        ],
-        responses={
-            200: "CSV file",
-            400: "Bad Request",
-            404: "Export not found",
-            500: "Server Error",
-        },
-    )
-    @action(detail=False, methods=["get"])
-    def download_export(self, request: HttpRequest) -> StreamingHttpResponse:
-        """Stream the export file from S3."""
-        export_id = request.GET.get("export_id")
-        if not export_id:
-            logger.error("Export ID not provided")
-            return HttpResponseBadRequest("Export ID is required")
-
-        try:
-            export = Export.objects.get(id=export_id)
-            if export.status != "completed":
-                logger.error(f"Export {export_id} is not completed: {export.status}")
-                return HttpResponseBadRequest("Export is not ready")
-
-            # Stream file from S3
-            file = default_storage.open(export.file_path)
-            response = StreamingHttpResponse(
-                file,
-                content_type="text/csv",
-            )
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            response["Content-Disposition"] = f'attachment; filename="observations_export_{timestamp}.csv"'
-            return response
-
-        except Export.DoesNotExist:
-            logger.error(f"Export {export_id} not found")
-            return HttpResponseNotFound("Export not found")
-        except Exception as e:
-            logger.exception(f"Error streaming export {export_id}: {str(e)}")
-            return HttpResponseServerError("Error downloading export")
         
 @require_GET
 def search_address(request: Request) -> JsonResponse:
@@ -1341,6 +1400,51 @@ def search_address(request: Request) -> JsonResponse:
         return JsonResponse({"error": f"Geocoding service error: {e!s}"}, status=503)
     except (ValueError, TypeError) as e:
         return JsonResponse({"error": f"Unexpected error: {e!s}"}, status=500)
+
+@action(detail=False, methods=["get"], permission_classes=[IsAdminUser])  
+def debug_exports(self, request: HttpRequest) -> JsonResponse:
+    """Debug endpoint to check Export records."""
+    try:
+        from vespadb.observations.models import Export
+        
+        # Get recent export records
+        recent_exports = Export.objects.all().order_by('-created_at')[:10]
+        
+        export_data = []
+        for export in recent_exports:
+            export_info = {
+                "id": export.id,
+                "status": export.status,
+                "file_path": export.file_path,
+                "created_at": export.created_at.isoformat() if export.created_at else None,
+                "completed_at": export.completed_at.isoformat() if export.completed_at else None,
+                "progress": export.progress,
+                "error_message": export.error_message,
+            }
+            
+            # Check if file exists in S3
+            if export.file_path:
+                try:
+                    export_info["file_exists_in_s3"] = default_storage.exists(export.file_path)
+                    if export_info["file_exists_in_s3"]:
+                        file_obj = default_storage.open(export.file_path)
+                        export_info["file_size"] = file_obj.size
+                        file_obj.close()
+                except Exception as e:
+                    export_info["file_check_error"] = str(e)
+            
+            export_data.append(export_info)
+        
+        return JsonResponse({
+            "total_exports": Export.objects.count(),
+            "recent_exports": export_data,
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            "error": "Debug exports failed",
+            "details": str(e)
+        })
 
 
 class MunicipalityViewSet(ReadOnlyModelViewSet):

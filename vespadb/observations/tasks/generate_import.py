@@ -35,7 +35,8 @@ def process_import(import_id: int) -> Dict[str, Any]:
         # Read file from S3
         file_path = import_record.file_path
         logger.info(f"Reading file from S3: {file_path}")
-        file = default_storage.open(file_path)
+        file = default_storage.open(file_path, 'r')
+        logger.info(f"File opened: {file_path}")
         content_type = "application/json" if file_path.endswith(".json") else "text/csv"
         data = []
 

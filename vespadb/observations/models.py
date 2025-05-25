@@ -439,7 +439,7 @@ class Export(models.Model):
         blank=True,
         help_text="User who initiated the export",
     )
-    file_path = models.CharField(max_length=255, null=True, blank=True, verbose_name=_("File Path"))
+    file_path = models.CharField(max_length=255, null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
     progress = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)

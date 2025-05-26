@@ -466,7 +466,7 @@ class Import(models.Model):
         blank=True,
         help_text="User who initiated the import",
     )
-    file_path = models.CharField(max_length=255, verbose_name=_("File Path"))
+    file_path = models.CharField(max_length=255, null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending", help_text="Status of the import")
     progress = models.IntegerField(default=0, help_text="Progress percentage of the import")
     created_at = models.DateTimeField(auto_now_add=True, help_text="Datetime when the import was created")

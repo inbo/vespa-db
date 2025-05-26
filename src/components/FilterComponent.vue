@@ -5,125 +5,182 @@
         <div class="col-12">
           <h3 class="filters-heading">Filters</h3>
         </div>
-        <div class="col-12">
-          <v-autocomplete
+      </div>
+
+      <!-- Provinces Filter -->
+      <div class="row mb-2">
+        <label class="col-4 col-form-label">Provincie(s)</label>
+        <div class="col-8">
+          <multiselect
             v-model="selectedProvinces"
-            :items="
-              provinces.length
-                ? provinces.map((province) => ({
-                    title: province.name,
-                    value: province.id,
-                  }))
-                : []
-            "
-            item-text="title"
-            item-value="value"
-            label="provincie(s)"
-            multiple
-            chips
-            dense
-            solo
-            background-color="#f8f9fa"
-            class="filter-autocomplete"
-            @change="emitFilterUpdate"
-          ></v-autocomplete>
+            :options="provinceOptions"
+            :multiple="true"
+            track-by="value"
+            label="title"
+            placeholder="Selecteer provincie(s)"
+            :close-on-select="false"
+            :searchable="true"
+            :disabled="!provinces.length"
+            :select-label="''"
+            :deselect-label="''"
+            :selected-label="''"
+            @input="emitFilterUpdate"
+          >
+            <template #option="{ option }">
+              <div class="multiselect-option" :class="{ 'is-selected': selectedProvinces.some(p => p.value === option.value) }">
+                <span class="option-label">{{ option.title }}</span>
+              </div>
+            </template>
+            <template #tag="{ option, remove }">
+              <span class="multiselect-tag">
+                {{ option.title }}
+                <button 
+                  type="button" 
+                  class="remove-tag" 
+                  @click="remove(option)"
+                  aria-label="Remove option"
+                >×</button>
+              </span>
+            </template>
+          </multiselect>
         </div>
-        <div class="col-12">
-          <v-autocomplete
+      </div>
+
+      <!-- Municipalities Filter -->
+      <div class="row mb-2">
+        <label class="col-4 col-form-label">Gemeente(s)</label>
+        <div class="col-8">
+          <multiselect
             v-model="selectedMunicipalities"
-            :items="
-              municipalities.length
-                ? municipalities.map((municipality) => ({
-                    title: municipality.name,
-                    value: municipality.id,
-                  }))
-                : []
-            "
-            item-text="title"
-            item-value="value"
-            label="gemeente(s)"
-            multiple
-            chips
-            dense
-            solo
-            background-color="#f8f9fa"
-            class="filter-autocomplete"
-            @change="emitFilterUpdate"
-          ></v-autocomplete>
+            :options="municipalityOptions"
+            :multiple="true"
+            track-by="value"
+            label="title"
+            placeholder="Selecteer gemeente(s)"
+            :close-on-select="false"
+            :searchable="true"
+            :disabled="!municipalities.length"
+            :select-label="''"
+            :deselect-label="''"
+            :selected-label="''"
+            @input="emitFilterUpdate"
+          >
+            <template #option="{ option }">
+              <div class="multiselect-option" :class="{ 'is-selected': selectedMunicipalities.some(m => m.value === option.value) }">
+                <span class="option-label">{{ option.title }}</span>
+              </div>
+            </template>
+            <template #tag="{ option, remove }">
+              <span class="multiselect-tag">
+                {{ option.title }}
+                <button 
+                  type="button" 
+                  class="remove-tag" 
+                  @click="remove(option)"
+                  aria-label="Remove option"
+                >×</button>
+              </span>
+            </template>
+          </multiselect>
         </div>
+      </div>
+
+      <!-- Date Filter -->
+      <div class="row mb-2">
         <div class="col-12">
           <DateFilter />
         </div>
-        <div class="col-12">
-          <v-autocomplete
+      </div>
+
+      <!-- Nest Type Filter -->
+      <div class="row mb-2">
+        <label class="col-4 col-form-label">Nest type</label>
+        <div class="col-8">
+          <multiselect
             v-model="selectedNestType"
-            :items="
-              nestType.length
-                ? nestType.map((nesttype) => ({
-                    title: nesttype.name,
-                    value: nesttype.value,
-                  }))
-                : []
-            "
-            item-text="title"
-            item-value="value"
-            label="nest type"
-            multiple
-            chips
-            dense
-            solo
-            background-color="#f8f9fa"
-            class="filter-autocomplete"
-            @change="emitFilterUpdate"
-          ></v-autocomplete>
-        </div>
-        <div class="col-12">
-          <v-autocomplete
-            v-model="selectedNestStatus"
-            :items="
-              nestStatus.length
-                ? nestStatus.map((neststatus) => ({
-                    title: neststatus.name,
-                    value: neststatus.value,
-                  }))
-                : []
-            "
-            item-text="title"
-            item-value="value"
-            label="nest status"
-            multiple
-            chips
-            dense
-            solo
-            background-color="#f8f9fa"
-            class="filter-autocomplete"
-            @change="emitFilterUpdate"
-          ></v-autocomplete>
-        </div>
-        <div class="col-12">
-          <v-autocomplete
-            v-model="anbAreasActief"
-            :items="
-              anbAreaOptions.length
-                ? anbAreaOptions.map((anb) => ({
-                    title: anb.name,
-                    value: anb.value,
-                  }))
-                : []
-            "
-            item-text="title"
-            item-value="value"
-            label="ANB"
-            multiple
-            chips
-            dense
-            solo
-            background-color="#f8f9fa"
-            class="filter-autocomplete"
-            @change="emitFilterUpdate"
-          ></v-autocomplete>
+            :options="nestTypeOptions"
+            :multiple="true"
+            track-by="value"
+            label="title"
+            placeholder="Selecteer nest type(s)"
+            :close-on-select="false"
+            :searchable="false"
+            :select-label="''"
+            :deselect-label="''"
+            :selected-label="''"
+            @input="emitFilterUpdate"
+          >
+            <template #option="{ option }">
+              <div class="multiselect-option" :class="{ 'is-selected': selectedNestType.some(n => n.value === option.value) }">
+                <span class="option-label">{{ option.title }}</span>
+              </div>
+            </template>
+            <template #tag="{ option, remove }">
+              <span class="multiselect-tag">
+                {{ option.title }}
+                <button 
+                  type="button" 
+                  class="remove-tag" 
+                  @click="remove(option)"
+                  aria-label="Remove option"
+                >×</button>
+              </span>
+            </template>
+          </multiselect>
         </div>
       </div>
+
+      <!-- Nest Status Filter -->
+      <div class="row mb-2">
+        <label class="col-4 col-form-label">Nest status</label>
+        <div class="col-8">
+          <multiselect
+            v-model="selectedNestStatus"
+            :options="nestStatusOptions"
+            :multiple="true"
+            track-by="value"
+            label="title"
+            placeholder="Selecteer nest status(sen)"
+            :close-on-select="false"
+            :searchable="false"
+            :select-label="''"
+            :deselect-label="''"
+            :selected-label="''"
+            @input="emitFilterUpdate"
+          >
+            <template #option="{ option }">
+              <div class="multiselect-option" :class="{ 'is-selected': selectedNestStatus.some(s => s.value === option.value) }">
+                <span class="option-label">{{ option.title }}</span>
+              </div>
+            </template>
+            <template #tag="{ option, remove }">
+              <span class="multiselect-tag">
+                {{ option.title }}
+                <button 
+                  type="button" 
+                  class="remove-tag" 
+                  @click="remove(option)"
+                  aria-label="Remove option"
+                >×</button>
+              </span>
+            </template>
+          </multiselect>
+        </div>
+      </div>
+
+      <!-- ANB Areas Filter -->
+      <div class="row mb-2">
+        <label class="col-4 col-form-label">ANB</label>
+        <div class="col-8">
+          <select v-model="anbAreasActief" class="form-select" @change="emitFilterUpdate">
+            <option :value="null">Alle gebieden</option>
+            <option v-for="option in anbAreaOptions" :key="option.value" :value="option.value">
+              {{ option.name }}
+            </option>
+          </select>
+        </div>
+      </div>
+
     </div>
   </div>
 </template>
@@ -133,10 +190,13 @@ import { useVespaStore } from '@/stores/vespaStore';
 import debounce from 'lodash/debounce';
 import { computed, onMounted, ref, watch } from 'vue';
 import DateFilter from '@/components/DateFilter.vue';
+import Multiselect from 'vue-multiselect';
+import 'vue-multiselect/dist/vue-multiselect.min.css';
 
 export default {
   components: {
     DateFilter,
+    Multiselect,
   },
   setup() {
     const vespaStore = useVespaStore();
@@ -144,22 +204,45 @@ export default {
     const loading = computed(() => vespaStore.loadingObservations);
     const municipalities = computed(() => vespaStore.municipalities);
     const provinces = computed(() => vespaStore.provinces);
+    
     const selectedMunicipalities = ref([]);
     const selectedProvinces = ref([]);
     const selectedNestType = ref([]);
     const selectedNestStatus = ref([]);
     const anbAreasActief = ref(null);
-    const nestType = ref([
-      { name: 'Actief embryonaal nest', value: 'actief_embryonaal_nest' },
-      { name: 'Actief primair nest', value: 'actief_primair_nest' },
-      { name: 'Actief secundair nest', value: 'actief_secundair_nest' },
-      { name: 'Inactief/leeg nest', value: 'inactief_leeg_nest' },
+
+    // Convert data to multiselect format
+    const provinceOptions = computed(() => 
+      provinces.value.length
+        ? provinces.value.map((province) => ({
+            title: province.name,
+            value: province.id,
+          }))
+        : []
+    );
+
+    const municipalityOptions = computed(() => 
+      municipalities.value.length
+        ? municipalities.value.map((municipality) => ({
+            title: municipality.name,
+            value: municipality.id,
+          }))
+        : []
+    );
+
+    const nestTypeOptions = computed(() => [
+      { title: 'Actief embryonaal nest', value: 'actief_embryonaal_nest' },
+      { title: 'Actief primair nest', value: 'actief_primair_nest' },
+      { title: 'Actief secundair nest', value: 'actief_secundair_nest' },
+      { title: 'Inactief/leeg nest', value: 'inactief_leeg_nest' },
     ]);
-    const nestStatus = ref([
-      { name: 'Bestreden nest', value: 'eradicated' },
-      { name: 'Gereserveerd nest', value: 'reserved' },
-      { name: 'Gerapporteerd nest', value: 'open' },
+
+    const nestStatusOptions = computed(() => [
+      { title: 'Bestreden nest', value: 'eradicated' },
+      { title: 'Gereserveerd nest', value: 'reserved' },
+      { title: 'Gerapporteerd nest', value: 'open' },
     ]);
+
     const anbAreaOptions = ref([
       { name: 'Niet in ANB gebied', value: false },
       { name: 'Wel in ANB gebied', value: true },
@@ -169,22 +252,28 @@ export default {
       vespaStore.applyFilters({
         municipalities:
           selectedMunicipalities.value.length > 0
-            ? selectedMunicipalities.value
+            ? selectedMunicipalities.value.map(m => m.value)
             : [],
         provinces:
-          selectedProvinces.value.length > 0 ? selectedProvinces.value : [],
+          selectedProvinces.value.length > 0 
+            ? selectedProvinces.value.map(p => p.value) 
+            : [],
         anbAreasActief: anbAreasActief.value,
         nestType:
-          selectedNestType.value.length > 0 ? selectedNestType.value : null,
+          selectedNestType.value.length > 0 
+            ? selectedNestType.value.map(n => n.value) 
+            : null,
         nestStatus:
-          selectedNestStatus.value.length > 0 ? selectedNestStatus.value : null,
+          selectedNestStatus.value.length > 0 
+            ? selectedNestStatus.value.map(s => s.value) 
+            : null,
         // min_observation_date and max_observation_date are handled by DateFilter component
       });
     }, 300);
 
     const fetchMunicipalitiesByProvinces = async () => {
       if (selectedProvinces.value.length > 0) {
-        await vespaStore.fetchMunicipalitiesByProvinces(selectedProvinces.value);
+        await vespaStore.fetchMunicipalitiesByProvinces(selectedProvinces.value.map(p => p.value));
       } else {
         await vespaStore.fetchMunicipalities();
       }
@@ -207,32 +296,60 @@ export default {
         const hasChanged = JSON.stringify(newFilters) !== JSON.stringify(oldFilters);
 
         if (hasChanged) {
-          selectedMunicipalities.value = newFilters.municipalities || [];
-          selectedProvinces.value = newFilters.provinces || [];
+          // Convert array values back to multiselect format
+          selectedMunicipalities.value = (newFilters.municipalities || []).map(id => 
+            municipalityOptions.value.find(m => m.value === id)
+          ).filter(Boolean);
+          
+          selectedProvinces.value = (newFilters.provinces || []).map(id => 
+            provinceOptions.value.find(p => p.value === id)
+          ).filter(Boolean);
+          
+          selectedNestType.value = (newFilters.nestType || []).map(value => 
+            nestTypeOptions.value.find(n => n.value === value)
+          ).filter(Boolean);
+          
+          selectedNestStatus.value = (newFilters.nestStatus || []).map(value => 
+            nestStatusOptions.value.find(s => s.value === value)
+          ).filter(Boolean);
+          
           anbAreasActief.value = newFilters.anbAreasActief || null;
-          selectedNestType.value = newFilters.nestType || [];
-          selectedNestStatus.value = newFilters.nestStatus || [];
-          // min_observation_date and max_observation_date are handled by DateFilter component
         }
       },
       { immediate: true, deep: true }
     );
 
     onMounted(async () => {
-      selectedMunicipalities.value = vespaStore.filters.municipalities || [];
-      selectedProvinces.value = vespaStore.filters.provinces || [];
-      anbAreasActief.value = vespaStore.filters.anbAreasActief;
-      selectedNestType.value = vespaStore.filters.nestType || [];
-      selectedNestStatus.value = vespaStore.filters.nestStatus || [];
-      // min_observation_date and max_observation_date are handled by DateFilter component
+      // Initialize from store filters
+      const filters = vespaStore.filters;
+      
+      selectedMunicipalities.value = (filters.municipalities || []).map(id => 
+        municipalityOptions.value.find(m => m.value === id)
+      ).filter(Boolean);
+      
+      selectedProvinces.value = (filters.provinces || []).map(id => 
+        provinceOptions.value.find(p => p.value === id)
+      ).filter(Boolean);
+      
+      selectedNestType.value = (filters.nestType || []).map(value => 
+        nestTypeOptions.value.find(n => n.value === value)
+      ).filter(Boolean);
+      
+      selectedNestStatus.value = (filters.nestStatus || []).map(value => 
+        nestStatusOptions.value.find(s => s.value === value)
+      ).filter(Boolean);
+      
+      anbAreasActief.value = filters.anbAreasActief;
     });
 
     return {
       municipalities,
       provinces,
       loading,
-      nestType,
-      nestStatus,
+      provinceOptions,
+      municipalityOptions,
+      nestTypeOptions,
+      nestStatusOptions,
       anbAreaOptions,
       selectedMunicipalities,
       selectedProvinces,
@@ -255,69 +372,171 @@ export default {
   border-bottom: 1px solid #e9ecef;
 }
 
-.filter-autocomplete {
-  margin-bottom: 24px;
-}
-
-/* Override vuetify autocomplete styles to match with our DateFilter */
-:deep(.v-text-field__slot) {
+/* Form styling to match observation details panel */
+.col-form-label {
   font-size: 14px;
+  font-weight: 500;
+  color: #495057;
+  padding-top: calc(0.375rem + 1px);
+  padding-bottom: calc(0.375rem + 1px);
+  margin-bottom: 0;
+  line-height: 1.5;
 }
 
-:deep(.v-select__selection) {
-  font-size: 14px;
-}
-
-:deep(.v-chip) {
-  font-size: 12px;
-  background-color: #e9ecef !important;
-  color: #495057 !important;
-  border-radius: 4px !important;
-}
-
-:deep(.v-chip__close) {
-  color: #6c757d !important;
-}
-
-:deep(.v-text-field.v-text-field--solo .v-input__control) {
-  min-height: 44px;
-}
-
-:deep(.v-text-field.v-text-field--solo .v-input__slot) {
-  border-radius: 4px;
+.form-select {
+  background-color: #f8f9fa;
   border: 1px solid #ced4da;
+  border-radius: 4px;
+  padding: 0.375rem 2.25rem 0.375rem 0.75rem;
+  font-size: 14px;
+  color: #495057;
   transition: all 0.2s ease;
 }
 
-:deep(.v-text-field.v-text-field--solo .v-input__slot:hover) {
+.form-select:hover {
+  background-color: #fff;
   border-color: #adb5bd;
-  background-color: #fff !important;
 }
 
-:deep(.v-text-field.v-text-field--solo.v-input--is-focused .v-input__slot) {
+.form-select:focus {
+  background-color: #fff;
   border-color: #007bff;
-  background-color: #fff !important;
+  outline: none;
   box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
 }
 
-:deep(.v-text-field__details) {
-  display: none;
+/* Multiselect styling to match the observation details panel */
+.multiselect {
+  min-height: 40px;
+  background-color: #f8f9fa;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: all 0.2s ease;
 }
 
-:deep(.v-label) {
+.multiselect:hover {
+  background-color: #fff;
+  border-color: #adb5bd;
+}
+
+.multiselect.multiselect--active {
+  background-color: #fff;
+  border-color: #007bff;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+:deep(.multiselect__tags) {
+  background-color: transparent;
+  border: none;
+  padding: 4px 8px;
+  min-height: 38px;
+}
+
+:deep(.multiselect__placeholder) {
+  color: #6c757d;
+  padding-top: 4px;
+  margin-bottom: 0;
   font-size: 14px;
+}
+
+:deep(.multiselect__input) {
+  background-color: transparent;
+  border: none;
+  font-size: 14px;
+  padding: 0;
+  margin: 0;
+}
+
+:deep(.multiselect__select) {
+  height: 38px;
+  width: 30px;
+}
+
+:deep(.multiselect__select:before) {
+  border-color: #6c757d transparent transparent;
+  border-width: 5px 4px 0;
+}
+
+:deep(.multiselect__content-wrapper) {
+  border: 1px solid #e9ecef;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  background-color: #fff;
+  max-height: 200px;
+}
+
+:deep(.multiselect__content) {
+  background-color: #fff;
+}
+
+:deep(.multiselect__element) {
+  background-color: #fff;
+}
+
+:deep(.multiselect__option) {
+  padding: 8px 12px;
+  font-size: 14px;
+  color: #495057;
+  background-color: #fff;
+  transition: background-color 0.2s ease;
+}
+
+:deep(.multiselect__option:hover) {
+  background-color: #f8f9fa;
   color: #495057;
 }
 
-:deep(.v-label--active) {
-  color: #007bff;
+:deep(.multiselect__option--highlight) {
+  background-color: #007bff;
+  color: #fff;
 }
 
-:deep(.v-messages) {
-  min-height: 0;
+:deep(.multiselect__option--selected) {
+  background-color: #e9ecef;
+  color: #495057;
+  font-weight: 500;
 }
 
-/* Add responsive styling to match the rest of the application */
+/* Custom tag styling */
+.multiselect-tag {
+  background-color: #e9ecef;
+  color: #495057;
+  border-radius: 4px;
+  padding: 2px 8px;
+  margin: 2px 4px 2px 0;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1.2;
+}
+
+.remove-tag {
+  background: none;
+  border: none;
+  color: #6c757d;
+  font-size: 14px;
+  margin-left: 4px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.remove-tag:hover {
+  color: #343a40;
+}
+
+.multiselect-option {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.option-label {
+  flex: 1;
+}
+
+/* Responsive styling */
 @media (min-width: 768px) {
   .container-fluid {
     padding: 0 24px;
@@ -328,7 +547,7 @@ export default {
   }
 }
 
-/* Make this work with the filter-panel class from global CSS */
+/* Filter panel class compatibility */
 :deep(.filter-panel) {
   background-color: #fff;
   height: 100%;

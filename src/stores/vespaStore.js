@@ -78,14 +78,15 @@ export const useVespaStore = defineStore('vespaStore', {
         },
         async getObservationsGeoJson() {
             const currentFilters = JSON.stringify(this.filters);
-
         
             // Check if data needs to be reloaded
             if (this.observations.length > 0 && currentFilters === this.lastAppliedFilters) return;
         
             this.loadingObservations = true;
             let filterQuery = this.createFilterQuery();
-            if (!this.filters.min_observation_date && !this.isLoggedIn) {
+            
+            // ALWAYS apply min date filter - regardless of login status
+            if (!this.filters.min_observation_date) {
                 const defaultMinDate = this.formatDateWithoutTime(new Date('April 1, 2024').toISOString());
                 filterQuery += (filterQuery ? '&' : '') + `min_observation_datetime=${defaultMinDate}`;
             }
@@ -130,7 +131,7 @@ export const useVespaStore = defineStore('vespaStore', {
         
             if (this.filters.min_observation_date) {
                 params['min_observation_datetime'] = this.formatDateWithoutTime(this.filters.min_observation_date);
-            } else if (!this.isLoggedIn) {
+            } else {
                 params['min_observation_datetime'] = this.formatDateWithoutTime(new Date('April 1, 2024').toISOString());
             }
         

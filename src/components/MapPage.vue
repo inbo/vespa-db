@@ -333,11 +333,10 @@ export default {
       // Fetch app data in background
       await vespaStore.initializeApp();
 
-      // Apply default date filter if not logged in
-      if (!vespaStore.filters.min_observation_date && !vespaStore.isLoggedIn) {
-        vespaStore.applyFilters({
-          min_observation_date: new Date('April 1, 2024').toISOString(),
-        });
+      if (!vespaStore.filters.min_observation_date) {
+          vespaStore.applyFilters({
+              min_observation_date: new Date('April 1, 2024').toISOString(),
+          });
       }
 
       // Check if we're navigating directly to an observation

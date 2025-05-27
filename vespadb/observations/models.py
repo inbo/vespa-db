@@ -421,6 +421,13 @@ class Observation(models.Model):
             models.Index(fields=['visible', 'observation_datetime']),
             gis_models.Index(fields=['location'], name='location_idx'),
             models.Index(fields=['municipality', 'visible']),
+            models.Index(fields=['province']),
+            models.Index(fields=['anb']),
+            models.Index(fields=['nest_type']),
+            models.Index(fields=['eradication_result']),
+            models.Index(fields=['reserved_by']),
+            models.Index(fields=['observation_datetime', 'visible']),
+            models.Index(fields=['eradication_date']),
         ]
 
 class Export(models.Model):

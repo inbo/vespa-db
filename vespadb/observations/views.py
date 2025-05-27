@@ -744,7 +744,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         """
         if err := self._validate_choice_fields(data_item):
             return {"error": f"Record {idx}: {err}"}
-        
+    
         # Check for valid identifier combinations
         has_wn_id_source = 'wn_id' in data_item and data_item['wn_id'] is not None and 'source' in data_item and data_item['source']
         has_source_id_source = 'source_id' in data_item and data_item['source_id'] is not None and 'source' in data_item and data_item['source']
@@ -824,6 +824,11 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                     if field == "observation_datetime":  # This is required
                         return {"error": f"Invalid datetime format for required field {field}: {data_item[field]}"}
                     data_item[field] = None
+
+        # Set visible default to True if not provided or null
+        if 'visible' not in data_item or data_item['visible'] is None:
+            data_item['visible'] = True
+            logger.info(f"Setting visible=True for record {idx} (was None or not provided)")
         
         try:
             long_val = float(data_item.pop('longitude'))
@@ -846,7 +851,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         except Exception as e:
             logger.error(f"Unexpected error in process_create_item for record {idx}: {str(e)}")
             return {"error": f"Unexpected error: {str(e)}"}
-    
+        
     def clean_data(self, data_dict: dict[str, Any]) -> dict[str, Any]:
         """Clean the incoming data and remove empty or None values."""
         logger.info("Original data item: %s", data_dict)

@@ -195,7 +195,7 @@ def cleanup_old_exports() -> None:
         logger.info(f"Cleaned up export {export.id}")
         
 @shared_task(
-    name="generate_hourly_export",
+    name='vespadb.observations.tasks.generate_export.generate_hourly_export',
     max_retries=3,
     default_retry_delay=60,
     soft_time_limit=1700,

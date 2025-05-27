@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 def generate_geojson_task(raw_params):
     # Compute the cache key from the raw parameters.
     cache_key = get_geojson_cache_key(raw_params)
+    logger.info(f"Using cache key: {cache_key}")
     # Make a copy for transforming parameters for filtering.
     query_params = raw_params.copy()
     if 'min_observation_datetime' in query_params:

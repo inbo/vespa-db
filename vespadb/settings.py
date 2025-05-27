@@ -122,6 +122,7 @@ CELERY_ACCEPT_CONTENT = ["application/json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "Europe/Brussels"
+MIN_OBSERVATION_DATETIME = "2024-04-01T00:00:00+02:00"
 CELERY_BEAT_SCHEDULE = {
     "fetch_and_update_observations": {
         "task": "vespadb.observations.tasks.observation_sync.fetch_and_update_observations",
@@ -136,7 +137,7 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': crontab(minute='*/13'),
         'args': ({
             'visible': 'true',
-            'min_observation_datetime': '2024-04-01T00:00:00+02:00'
+            'min_observation_datetime': '2024-04-01'
         },)
     },
     "generate-hourly-export": {

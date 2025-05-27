@@ -54,6 +54,7 @@ from vespadb.observations.models import Import
 from vespadb.observations.tasks.generate_import import process_import
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
+from vespadb.observations.constants import MIN_OBSERVATION_DATETIME
 
 from vespadb.observations.cache import invalidate_geojson_cache, invalidate_observation_cache
 from vespadb.observations.filters import ObservationFilter
@@ -67,7 +68,6 @@ from django_ratelimit.decorators import ratelimit
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
 from django.shortcuts import get_object_or_404
-from vespadb.observations.constants import MIN_OBSERVATION_DATETIME
 from rest_framework.pagination import CursorPagination
 from vespadb.observations.models import (
     NestHeightEnum, NestSizeEnum, NestLocationEnum, NestTypeEnum,
@@ -406,13 +406,14 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 
             if 'min_observation_datetime' not in query_params:
                 query_params['min_observation_datetime'] = MIN_OBSERVATION_DATETIME
-
+            
             cache_key = get_geojson_cache_key(query_params)
             cached_data = cache.get(cache_key)
             if cached_data:
                 logger.info(f"Returning cached GeoJSON data, found cache: {cache_key}")
                 return JsonResponse(cached_data, safe=False)
             
+            logger.info(f"Cache MISS for key: {cache_key}")
             # Rest of your view logic remains the same
             bbox = None
             if bbox_str:

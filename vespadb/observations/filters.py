@@ -62,6 +62,8 @@ class ObservationFilter(GeoFilterSet):
         query = Q()
         if "eradicated" in value:
             query |= Q(eradication_date__isnull=False)
+        if "visited" in value:
+            query |= Q(eradication_result__isnull=False) & ~Q(eradication_result='successful')
         if "reserved" in value:
             query |= Q(reserved_datetime__isnull=False)
         if "open" in value:

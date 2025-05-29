@@ -201,70 +201,106 @@ export const useVespaStore = defineStore('vespaStore', {
             }
         },
         async updateObservations() {
-            if (this.isFetchingGeoJson) return; // Prevent concurrent fetches
-            this.isFetchingGeoJson = true;
             try {
               await this.getObservationsGeoJson();
             } catch (error) {
               console.error('Error updating observations:', error);
-            } finally {
-              this.isFetchingGeoJson = false;
             }
         },      
         createCircleMarker(feature, latlng) {
-            const isSelected = feature.properties.id === this.selectedObservation?.id;
-            const edge = isSelected ? '#ea792a' : '#3c3c3c';
-          
+            const status = feature.properties.status;
+            const styles = this.getColorStylesByStatus(status);
+
             const opts = {
-              radius: 10 + (feature.properties.observations_count || 0) * 0.5,
-              fillColor: this.getColorByStatus(feature.properties.status),
-              color: edge,
-              weight: isSelected ? 4 : 1,
-              opacity: 1,
-              fillOpacity: 0.8,
-              className: `observation-marker${isSelected ? ' active-marker' : ''}`
+                radius: 8 + (feature.properties.observations_count || 0) * 0.5, // Adjusted radius slightly
+                fillColor: styles.fillColor,
+                color: styles.borderColor, // Base border color
+                weight: styles.baseWeight, // Base border weight
+                opacity: 1,
+                fillOpacity: styles.fillOpacity,
+                className: `observation-marker status-${status}` // Add status-specific class
             };
-          
+
             const marker = L.circleMarker(latlng, opts);
-            // stash the original edge color for easy resets later
-            marker.originalEdgeColor = opts.color;
-            marker.feature = feature;
+            
+            // Store original base style for deselection and status updates
+            marker.originalStyle = {
+                fillColor: styles.fillColor,
+                color: styles.borderColor,
+                weight: styles.baseWeight,
+                fillOpacity: styles.fillOpacity
+            };
+            marker.feature = feature; // Keep reference to feature for its properties
             return marker;
         },
+        refreshMarkerStyle(observationId) {
+            const marker = this.markerCache[observationId];
+            if (!marker || !marker.feature || !marker.feature.properties) return;
+        
+            let currentStatus = marker.feature.properties.status;
+        
+            // If this observation is the currently selected one, its details might be more up-to-date
+            if (this.selectedObservation && this.selectedObservation.id === observationId) {
+                const statusFromSelected = this.determineStatusFromObservationData(this.selectedObservation);
+                if (statusFromSelected !== currentStatus) {
+                    currentStatus = statusFromSelected;
+                    marker.feature.properties.status = currentStatus; // Update status on the marker's feature data
+                }
+            }
+        
+            const styles = this.getColorStylesByStatus(currentStatus);
+        
+            // Update originalStyle on the marker, in case the status changed
+            marker.originalStyle = {
+                fillColor: styles.fillColor,
+                color: styles.borderColor,
+                weight: styles.baseWeight,
+                fillOpacity: styles.fillOpacity
+            };
+        
+            let finalStyle = { ...marker.originalStyle }; // Start with base style
+        
+            const isSelected = this.selectedObservation && this.selectedObservation.id === observationId;
+        
+            if (isSelected) {
+                finalStyle.color = '#ea792a'; // Selection border color
+                finalStyle.weight = 4;         // Selection border weight
+                marker._path?.classList.add('active-marker');
+                if (marker.bringToFront) marker.bringToFront();
+            } else {
+                marker._path?.classList.remove('active-marker');
+            }
+        
+            marker.setStyle(finalStyle);
+        },
         async reserveObservation(observation) {
+            if (!this.user || typeof this.user.reservation_count === 'undefined') {
+                alert('Gebruikersinformatie niet geladen, kan niet reserveren.');
+                return;
+            }
             if (this.user.reservation_count < 50) {
-                const response = await ApiService.patch(`/observations/${observation.id}/`, {
-                    reserved_by: this.user.id
-                });
-                if (response.status === 200) {
-                    this.selectedObservation = { ...this.selectedObservation, ...response.data };
-                    this.updateMarkerColor(observation.id, '#ffc107', '#ea792a', 4);
-                    await this.authCheck();
-                } else {
-                    throw new Error('Failed to reserve the observation');
+                try {
+                    const response = await ApiService.patch(`/observations/${observation.id}/`, {
+                        reserved_by: this.user.id
+                    });
+                    if (response.status === 200) {
+                        this.selectedObservation = { ...this.selectedObservation, ...response.data };
+                        
+                        const marker = this.markerCache[observation.id];
+                        if (marker && marker.feature && marker.feature.properties) {
+                            marker.feature.properties.status = "reserved";
+                        }
+                        this.refreshMarkerStyle(observation.id);
+                        await this.authCheck();
+                    } else {
+                        throw new Error('Failed to reserve the observation');
+                    }
+                } catch (error) {
+                    console.error('Error reserving observation:', error);
+                    this.error = 'Kon de observatie niet reserveren.';
                 }
             } else {
                 alert('You have reached the maximum number of reservations.');
-            }
-        },
-        updateMarkerColor(observationId, fillColor, edgeColor = '#3c3c3c', weight = 4, className = '') {
-            if (!observationId || !this.markerCache) return;
-  
-            const marker = this.markerCache[observationId];
-            if (marker) {
-              marker.setStyle({
-                fillColor: fillColor,
-                color: edgeColor,
-                weight: weight
-              });
-              
-              if (marker._path) {
-                if (className) {
-                  marker._path.classList.add(className);
-                } else {
-                  marker._path.classList.remove('active-marker');
-                }
-              }
             }
         },
         async acceptTermsOfService() {
@@ -299,31 +335,40 @@ export const useVespaStore = defineStore('vespaStore', {
         },
         async cancelReservation(observation) {
             try {
-                // Only send the reserved_by field, not the entire observation
                 const response = await ApiService.patch(`/observations/${observation.id}/`, {
                     reserved_by: null
                 });
-                
                 if (response.status === 200) {
                     this.selectedObservation = { ...this.selectedObservation, ...response.data };
-                    this.updateMarkerColor(observation.id, '#212529', '#212529', 1);
+                    const marker = this.markerCache[observation.id];
+                    if (marker && marker.feature && marker.feature.properties) {
+                        // Determine new status (likely 'untreated' if no eradication_result)
+                        marker.feature.properties.status = this.determineStatusFromObservationData(response.data);
+                    }
+                    this.refreshMarkerStyle(observation.id);
                 } else {
                     throw new Error('Failed to cancel the reservation');
                 }
             } catch (error) {
-                console.error('Error canceling the reservation:', error);
+                console.error('Error canceling reservation:', error);
+                this.error = 'Kon de reservatie niet annuleren.';
             }
         },
         async fetchObservationDetails(observationId) {
+            this.loading = true;
             try {
-                const response = await ApiService.get(`/observations/${observationId}`);
+                const response = await ApiService.get(`/observations/${observationId}/`);
                 if (response.status === 200) {
                     this.selectedObservation = response.data;
+                    this.refreshMarkerStyle(observationId); 
                 } else {
                     throw new Error('Failed to fetch observation details');
                 }
             } catch (error) {
                 console.error('Error fetching observation details:', error);
+                this.error = "Het ophalen van observatiedetails is mislukt.";
+            } finally {
+                this.loading = false;
             }
         },
         formatToISO8601(datetime) {
@@ -352,10 +397,18 @@ export const useVespaStore = defineStore('vespaStore', {
                 
                 const response = await ApiService.patch(`/observations/${observation.id}/`, observationToSend);
                 if (response.status === 200) {
-                    this.selectedObservation = response.data;
-                    const colorByResult = this.getColorByStatus(response.data.eradication_result);
-                    this.updateMarkerColor(observation.id, colorByResult, '#ea792a', 4, 'active-marker');
-                    return response.data;
+                    this.selectedObservation = response.data; // Update selected observation with full data from response
+                    
+                const newStatus = this.determineStatusFromObservationData(response.data);
+                const markerToUpdate = this.markerCache[observation.id];
+
+                if (markerToUpdate) {
+                    if (markerToUpdate.feature && markerToUpdate.feature.properties) {
+                        markerToUpdate.feature.properties.status = newStatus;
+                    }
+                    this.refreshMarkerStyle(observation.id); // Correctly uses observation.id here
+                }
+                return response.data;
                 } else {
                     throw new Error('Network response was not ok');
                 }
@@ -699,23 +752,45 @@ export const useVespaStore = defineStore('vespaStore', {
                 this.lastAppliedFilters = currentFilters;
             }
         },
-        getColorByStatus(status) {
-            if (status === 'successful') {
-                return '#198754';
-            } else if (status === 'eradicated') {
-                return '#198754';
-            } else if (status === 'untreated') {
-                return '#198754';
-            } else if (status === 'unknown') {
-                return '#198754';
-            } else if (status === 'unsuccessful') {
-                return '#198754';
-            } else if (status === 'reserved') {
-                return '#ea792a';
-            } else if (status === 'untreatable') {
-                return '#198754';
+        resetFilters(options = {}) {
+            this.filters = {
+                min_observation_date: options.min_observation_date || '2024-04-01',
+                max_observation_date: null,
+                provinces: [],
+                municipalities: [],
+                nestType: null,
+                nestStatus: null,
+                anbAreasActief: null
+            };
+            this.getObservationsGeoJson();
+        },
+        determineStatusFromObservationData(observationData) {
+            if (!observationData) return "untreated";
+            if (observationData.eradication_result === 'successful') {
+                return "eradicated";
             }
-            return '#212529';
+            if (observationData.eradication_result !== null && typeof observationData.eradication_result !== 'undefined') {
+                return "visited";
+            }
+            if (observationData.reserved_by !== null && typeof observationData.reserved_by !== 'undefined') {
+                return "reserved";
+            }
+            return "untreated";
+        },
+        getColorStylesByStatus(status) {
+            switch (status) {
+                case 'eradicated': // Bestreden nest (Green fill)
+                    return { fillColor: '#198754', borderColor: '#145c3f', baseWeight: 1, fillOpacity: 0.8 }; // Darker green border
+                case 'visited':    // Bezocht nest (White fill, Green border)
+                    return { fillColor: '#FFFFFF', borderColor: '#198754', baseWeight: 2, fillOpacity: 0.9 }; // Green border, thicker
+                case 'reserved':   // Gereserveerd nest (Yellow fill)
+                    return { fillColor: '#ffc107', borderColor: '#cc9a05', baseWeight: 1, fillOpacity: 0.8 }; // Darker yellow border
+                case 'untreated':  // Gerapporteerd nest (Black/Dark fill)
+                    return { fillColor: '#212529', borderColor: '#000000', baseWeight: 1, fillOpacity: 0.8 }; // Black border
+                default:
+                    // console.warn(`Unknown status: ${status}, defaulting to untreated style.`);
+                    return { fillColor: '#212529', borderColor: '#000000', baseWeight: 1, fillOpacity: 0.8 };
+            }
         },
     },
 });

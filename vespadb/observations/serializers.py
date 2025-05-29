@@ -123,8 +123,10 @@ class ObservationSerializer(serializers.ModelSerializer):
 
     def get_nest_status(self, obj: Observation) -> str:  # Renamed method
         """Determine the status of the observation based on its properties."""
-        if obj.eradication_result:
+        if obj.eradication_result == 'successful':
             return "eradicated"
+        if obj.eradication_result is not None:
+            return "visited"
         if obj.reserved_by:
             return "reserved"
         return "untreated"

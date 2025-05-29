@@ -79,6 +79,10 @@
 .bg-eradicated {
     background-color: rgba(var(--v-theme-success));
 }
+.bg-visited { 
+    background-color: #FFFFFF;
+    border: 2px solid #198754;
+}
 
 .active-marker {
     stroke: #ea792a;

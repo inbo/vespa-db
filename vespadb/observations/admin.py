@@ -102,6 +102,39 @@ class ObservationAdminForm(forms.ModelForm):
             "eradication_date": forms.DateInput(attrs={"type": "date"}),
         }
 
+class VisibilityFilter(SimpleListFilter):
+    """Custom filter for observation visibility in the admin panel."""
+
+    title = _("Zichtbaarheid")
+    parameter_name = "visibility"
+
+    def lookups(self, request: HttpRequest, model_admin: Any) -> list[tuple[str, str]]:
+        """
+        Return a list of tuples for the different visibility options.
+
+        :param request: The HTTP request object.
+        :param model_admin: The current model admin instance.
+        :return: A list of tuples containing the visibility values and labels.
+        """
+        return [
+            ("visible", "Zichtbare nesten"),
+            ("not_visible", "Niet zichtbare nesten"),
+        ]
+
+    def queryset(self, request: HttpRequest, queryset: QuerySet) -> QuerySet | None:
+        """
+        Filter the queryset based on the selected visibility status.
+
+        :param request: The HTTP request object.
+        :param queryset: The current queryset.
+        :return: The filtered queryset based on the selected visibility, or the original queryset if no value is provided.
+        """
+        value = self.value()
+        if value == "visible":
+            return queryset.filter(visible=True)
+        elif value == "not_visible":
+            return queryset.filter(visible=False)
+        return queryset
 
 class ObservationAdmin(gis_admin.GISModelAdmin):
     """Admin class for Observation model."""
@@ -128,7 +161,9 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         "modified_datetime",
         "public_domain",
         "reserved_datetime",
+        "visible",
     )
+    
     list_filter = (
         "observation_datetime",
         "eradication_date",
@@ -144,7 +179,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         MunicipalityExcludeFilter,
         "municipality",
         "anb",
-        "visible",
+        VisibilityFilter,
         "reserved_by",
         "modified_datetime",
         "modified_by",

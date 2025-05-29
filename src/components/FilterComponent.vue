@@ -181,6 +181,19 @@
         </div>
       </div>
 
+      <!-- Reset Filters Button -->
+      <div class="row mt-3" v-if="hasActiveFilters">
+        <div class="col-12">
+          <button 
+            type="button" 
+            class="btn btn-outline-secondary btn-sm reset-filters-btn"
+            @click="resetAllFilters"
+          >
+            Verwijder alle filters
+          </button>
+        </div>
+      </div>
+
     </div>
   </div>
 </template>
@@ -238,6 +251,7 @@ export default {
     ]);
 
     const nestStatusOptions = computed(() => [
+      { title: "Bezocht nest", value: 'visited' },
       { title: 'Bestreden nest', value: 'eradicated' },
       { title: 'Gereserveerd nest', value: 'reserved' },
       { title: 'Gerapporteerd nest', value: 'open' },
@@ -247,6 +261,22 @@ export default {
       { name: 'Niet in ANB gebied', value: false },
       { name: 'Wel in ANB gebied', value: true },
     ]);
+
+    // Check if any filters are active (excluding the default min_observation_date of 2024-04-01)
+    const hasActiveFilters = computed(() => {
+      const filters = vespaStore.filters;
+      const defaultMinDate = '2024-04-01';
+      return (
+        (filters.provinces && filters.provinces.length > 0) ||
+        (filters.municipalities && filters.municipalities.length > 0) ||
+        (filters.nestType && filters.nestType.length > 0) ||
+        (filters.nestStatus && filters.nestStatus.length > 0) ||
+        (filters.anbAreasActief !== null && filters.anbAreasActief !== undefined) ||
+        (filters.max_observation_date && filters.max_observation_date !== null) ||
+        (filters.min_observation_date && filters.min_observation_date !== defaultMinDate)
+        // Note: We include min_observation_date if it differs from the default 2024-04-01
+      );
+    });
 
     const emitFilterUpdate = debounce(() => {
       vespaStore.applyFilters({
@@ -270,6 +300,26 @@ export default {
         // min_observation_date and max_observation_date are handled by DateFilter component
       });
     }, 300);
+
+    const resetAllFilters = () => {
+      // Reset local component state
+      selectedMunicipalities.value = [];
+      selectedProvinces.value = [];
+      selectedNestType.value = [];
+      selectedNestStatus.value = [];
+      anbAreasActief.value = null;
+      
+      // Set the standard min_observation_date to 2024-04-01
+      const standardMinDate = '2024-04-01';
+      
+      // Reset filters in store with the standard min_observation_date
+      vespaStore.resetFilters({
+        min_observation_date: standardMinDate
+      });
+      
+      // Refresh municipalities list since provinces were cleared
+      vespaStore.fetchMunicipalities();
+    };
 
     const fetchMunicipalitiesByProvinces = async () => {
       if (selectedProvinces.value.length > 0) {
@@ -356,7 +406,9 @@ export default {
       selectedNestType,
       selectedNestStatus,
       anbAreasActief,
+      hasActiveFilters,
       emitFilterUpdate,
+      resetAllFilters,
     };
   },
 };
@@ -403,6 +455,30 @@ export default {
   border-color: #007bff;
   outline: none;
   box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+/* Reset filters button styling */
+.reset-filters-btn {
+  background-color: transparent;
+  border: 1px solid #6c757d;
+  color: #6c757d;
+  font-size: 14px;
+  padding: 6px 12px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.reset-filters-btn:hover {
+  background-color: #6c757d;
+  color: #fff;
+  border-color: #6c757d;
+}
+
+.reset-filters-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 0.2rem rgba(108, 117, 125, 0.25);
 }
 
 /* Multiselect styling to match the observation details panel */

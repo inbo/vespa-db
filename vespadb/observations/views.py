@@ -400,51 +400,62 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             query_params = request.GET.copy()
             bbox_str = query_params.pop("bbox", None)
             
-            # Set default visible=true if not specified and not an admin
             if 'visible' not in query_params:
                 query_params['visible'] = 'true'
                 
             if 'min_observation_datetime' not in query_params:
-                query_params['min_observation_datetime'] = MIN_OBSERVATION_DATETIME
+                query_params['min_observation_datetime'] = MIN_OBSERVATION_DATETIME # Ensure MIN_OBSERVATION_DATETIME is defined
             
-            cache_key = get_geojson_cache_key(query_params)
+            cache_key = get_geojson_cache_key(query_params) # Ensure get_geojson_cache_key is defined
             cached_data = cache.get(cache_key)
             if cached_data:
-                logger.info(f"Returning cached GeoJSON data, found cache: {cache_key}")
+                logger.info(f"Returning cached GeoJSON data, found cache: {cache_key}") # Ensure logger and cache are imported and configured
                 return JsonResponse(cached_data, safe=False)
             
             logger.info(f"Cache MISS for key: {cache_key}")
-            # Rest of your view logic remains the same
             bbox = None
             if bbox_str:
                 bbox_coords = list(map(float, bbox_str.split(",")))
+                BBOX_LENGTH = 4 # Define or import BBOX_LENGTH
                 if len(bbox_coords) == BBOX_LENGTH:
                     xmin, ymin, xmax, ymax = bbox_coords
                     bbox_wkt = f"POLYGON(({xmin} {ymin}, {xmin} {ymax}, {xmax} {ymax}, {xmax} {ymin}, {xmin} {ymin}))"
-                    bbox = GEOSGeometry(bbox_wkt, srid=4326)
+                    bbox = GEOSGeometry(bbox_wkt, srid=4326) # Ensure GEOSGeometry is imported
                 else:
                     return HttpResponse("Invalid bbox format", status=400)
 
             queryset = self.filter_queryset(
                 self.get_queryset().select_related('municipality')
-            ).annotate(point=Transform("location", 4326))
+            ).annotate(point=Transform("location", 4326)) # Ensure Transform is imported
             if bbox:
                 queryset = queryset.filter(location__within=bbox)
 
             def generate_features(qs):
                 for obs in qs.iterator(chunk_size=1000):
+                    # Determine status based on the new rules
+                    current_status = "untreated"  # Default status
+                    if obs.eradication_result == 'successful':
+                        current_status = "eradicated"
+                    elif obs.eradication_result is not None: # eradication_result has a value but is not 'successful'
+                        current_status = "visited"
+                    elif obs.reserved_by is not None:
+                        current_status = "reserved"
+                    
                     yield {
                         "type": "Feature",
                         "properties": {
                             "id": obs.id,
-                            "status": "eradicated" if obs.eradication_result else "reserved" if obs.reserved_by else "default",
+                            "status": current_status, # Use the correctly determined status
+                            # Add other properties you need, like observations_count if used for radius
+                            # "observations_count": obs.observations_count or 0 
                         },
-                        "geometry": json.loads(obs.point.geojson) if obs.point else None,
+                        "geometry": json.loads(obs.point.geojson) if obs.point else None, # Ensure json is imported
                     }
 
             features = list(generate_features(queryset))
             geojson_response = {"type": "FeatureCollection", "features": features}
             logger.info(f"Generating GeoJSON in view with cache_key {cache_key}")
+            GEOJSON_REDIS_CACHE_EXPIRATION = 300 # Define or import
             cache.set(cache_key, geojson_response, GEOJSON_REDIS_CACHE_EXPIRATION)
             return JsonResponse(geojson_response, safe=False)
         except Exception as e:

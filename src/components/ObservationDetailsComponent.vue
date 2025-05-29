@@ -566,8 +566,10 @@ export default {
 
         const eradicationStatusText = computed(() => {
             const result = selectedObservation.value?.eradication_result;
-            if (result && result !== null) {
+            if (result === 'successful') {
                 return 'Bestreden';
+            } else if (result && result !== null) {
+                return 'Bezocht';
             } else {
                 return 'Niet bestreden';
             }
@@ -578,8 +580,10 @@ export default {
         });
         const eradicationStatusClass = computed(() => {
             const result = selectedObservation.value?.eradication_result;
-            if (result && result !== null) {
+            if (result === 'successful') {
                 return 'bg-success';
+            } else if (result && result !== null) {
+                return 'bg-info';
             } else {
                 return 'bg-danger';
             }

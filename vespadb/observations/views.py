@@ -401,7 +401,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             bbox_str = query_params.pop("bbox", None)
             
             # Set default visible=true if not specified and not an admin
-            if 'visible' not in query_params and (not request.user.is_authenticated or not request.user.is_superuser):
+            if 'visible' not in query_params:
                 query_params['visible'] = 'true'
                 
             if 'min_observation_datetime' not in query_params:

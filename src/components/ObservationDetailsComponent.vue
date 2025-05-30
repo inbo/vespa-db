@@ -411,8 +411,7 @@
 
             </div>
 
-            <p v-if="canViewRestrictedFields" class="mb-3 text-muted small" id="metadata">
-                Aangemaakt op <span class="created-datetime">{{ selectedObservation.created_datetime ?
+            <p class="mb-3 text-muted small" id="metadata"> Aangemaakt op <span class="created-datetime">{{ selectedObservation.created_datetime ?
                     formatDate(selectedObservation.created_datetime) : '' }}</span> door <span class="created-by">{{
                         selectedObservation.created_by_first_name || '' }}</span>, gewijzigd op <span
                     class="modified-datetime">{{

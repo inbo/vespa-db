@@ -54,6 +54,8 @@ public_fields = [
     "nest_status",
     "duplicate_nest",
     "other_species_nest",
+    "created_by_first_name",
+    "modified_by_first_name",
 ]
 
 # Logged-in users WITH an assigned municipality see additional fields:
@@ -79,8 +81,6 @@ logged_in_fields = public_fields + [
 admin_fields = logged_in_fields + [
     "created_by",
     "modified_by",
-    "created_by_first_name",
-    "modified_by_first_name",
     "wn_modified_datetime",
     "wn_created_datetime",
     "admin_notes",
@@ -97,7 +97,9 @@ class ObservationSerializer(serializers.ModelSerializer):
     municipality_name = serializers.CharField(source='municipality.name', read_only=True)
     nest_status = serializers.SerializerMethodField()
     location = GeometryField(required=False, allow_null=True)
-
+    created_by_first_name = serializers.SerializerMethodField()
+    modified_by_first_name = serializers.SerializerMethodField()
+    reserved_by_first_name = serializers.SerializerMethodField()
     class Meta:
         """Meta class for the ObservationSerializer."""
 
@@ -113,7 +115,8 @@ class ObservationSerializer(serializers.ModelSerializer):
             'eradication_aftercare', 'eradication_problems', 'eradication_notes',
             'observer_phone_number', 'observer_email', 'observer_name', 'public_domain',
             'created_by', 'modified_by', 'wn_modified_datetime', 'wn_created_datetime',
-            'admin_notes', 'observer_received_email', 'wn_admin_notes', "duplicate_nest", "other_species_nest"
+            'admin_notes', 'observer_received_email', 'wn_admin_notes', "duplicate_nest", "other_species_nest",             'created_by_first_name',    # <<< ADDED to Meta.fields
+            'modified_by_first_name','reserved_by_first_name',
         ]
 
         

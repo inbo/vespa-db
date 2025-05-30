@@ -445,9 +445,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                         "type": "Feature",
                         "properties": {
                             "id": obs.id,
-                            "status": current_status, # Use the correctly determined status
-                            # Add other properties you need, like observations_count if used for radius
-                            # "observations_count": obs.observations_count or 0 
+                            "status": current_status,
                         },
                         "geometry": json.loads(obs.point.geojson) if obs.point else None, # Ensure json is imported
                     }

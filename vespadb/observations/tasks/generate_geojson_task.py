@@ -27,18 +27,29 @@ def generate_geojson_task(raw_params):
         value = query_params['visible']
         if isinstance(value, str):
             query_params['visible'] = value.lower() == 'true'
+            
+    logger.info(f"Celery Task: Filtering queryset with params: {query_params}")
     queryset = Observation.objects.filter(**query_params).annotate(point=Transform("location", 4326))
-    features = [
-        {
+    features = []
+    for obs in queryset.iterator(chunk_size=1000):
+        current_status = "untreated"
+        if obs.eradication_result == 'successful':
+            current_status = "eradicated"
+        elif obs.eradication_result is not None:
+            current_status = "visited"
+        elif obs.reserved_by is not None:
+            current_status = "reserved"
+
+        features.append({
             "type": "Feature",
             "properties": {
                 "id": obs.id,
-                "status": "eradicated" if obs.eradication_result else "reserved" if obs.reserved_by else "default"
+                "status": current_status
             },
             "geometry": json.loads(obs.point.geojson) if obs.point else None,
-        }
-        for obs in queryset.iterator(chunk_size=1000)
-    ]
+        })
+
     result = {"type": "FeatureCollection", "features": features}
-    cache.set(cache_key, result, 900)  # Cache for 15 minutes
+    cache.set(cache_key, result, 900)  # Cache for 15 minutes (GEOJSON_REDIS_CACHE_EXPIRATION)
+    logger.info(f"Celery Task: GeoJSON generated and cached for key: {cache_key}")
     return result

@@ -460,22 +460,6 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             logger.exception("GeoJSON generation failed")
             return HttpResponse("Error generating GeoJSON", status=500)
             
-    @swagger_auto_schema(
-        operation_description="Bulk import observations from either JSON or CSV file.",
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            properties={
-                "file": openapi.Schema(type=openapi.TYPE_STRING, format="binary", description="CSV file"),
-                "data": openapi.Schema(
-                    type=openapi.TYPE_ARRAY,
-                    items=openapi.Schema(type=openapi.TYPE_OBJECT),
-                    description="JSON array of observation objects",
-                ),
-            },
-            required=["data"],
-        ),
-        responses={200: "Success", 400: "Bad Request", 415: "Unsupported Media Type"},
-    )
     @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
     @action(detail=False, methods=["post"], permission_classes=[IsAdminUser])
     @parser_classes([JSONParser, MultiPartParser, FormParser])
@@ -1260,28 +1244,6 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             logger.exception("Export failed")
             return JsonResponse({"error": str(e)}, status=500)
     
-    @swagger_auto_schema(
-        operation_description="Initiate an asynchronous bulk import of observations from a JSON or CSV file.",
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            properties={
-                "file": openapi.Schema(type=openapi.TYPE_FILE, description="JSON or CSV file containing observations"),
-            },
-            required=["file"],
-        ),
-        responses={
-            202: openapi.Schema(
-                type=openapi.TYPE_OBJECT,
-                properties={
-                    "import_id": openapi.Schema(type=openapi.TYPE_INTEGER, description="ID of the import job"),
-                    "task_id": openapi.Schema(type=openapi.TYPE_STRING, description="Celery task ID"),
-                    "message": openapi.Schema(type=openapi.TYPE_STRING, description="Status message"),
-                },
-            ),
-            400: "Bad Request",
-            415: "Unsupported Media Type",
-        },
-    )
     @action(detail=False, methods=["post"], permission_classes=[IsAdminUser], parser_classes=[MultiPartParser])
     def async_bulk_import(self, request: Request) -> Response:
         """Initiate an asynchronous bulk import of observations."""

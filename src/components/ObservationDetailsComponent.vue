@@ -582,7 +582,7 @@ export default {
             if (result === 'successful') {
                 return 'bg-success';
             } else if (result && result !== null) {
-                return 'bg-info';
+                return 'bg-visited';
             } else {
                 return 'bg-danger';
             }

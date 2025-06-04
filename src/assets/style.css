@@ -35,7 +35,21 @@
 }
 
 .filter-panel {
-    z-index: 1040;
+    z-index: 1060; /* Verhoogd van 1040 naar 1060 om boven andere elementen te komen */
+}
+
+/* Fix voor date picker popups binnen filter panel */
+.filter-panel .flatpickr-calendar,
+.filter-panel .dropdown-menu,
+.filter-panel .datepicker {
+    z-index: 1070 !important; /* Nog hoger dan het filter panel zelf */
+}
+
+/* Alternatieve fix voor Vue date pickers */
+.v-picker,
+.v-date-picker,
+.v-menu__content {
+    z-index: 1070 !important;
 }
 
 .navbar {
@@ -45,6 +59,19 @@
 .container-fluid {
     position: relative;
     /* Zorgt voor correcte relatieve positionering binnen de container */
+    /* Voeg overflow handling toe voor date picker popups */
+    overflow: visible;
+}
+
+/* Fix voor parent container cut-off van date pickers */
+.filter-panel {
+    overflow: visible; /* Verander van auto naar visible voor date pickers */
+}
+
+/* Maar behoud scrolling voor de content binnen het panel */
+.filter-panel .filter-content {
+    overflow-y: auto;
+    height: calc(100% - 2rem); /* Aanpassen op basis van padding */
 }
 
 .map-legend {
@@ -79,9 +106,19 @@
 .bg-eradicated {
     background-color: rgba(var(--v-theme-success));
 }
+
+/* Gefixt: "bezocht" status krijgt witte achtergrond met groene rand */
 .bg-visited { 
-    background-color: #FFFFFF;
-    border: 2px solid #198754;
+    background-color: #FFFFFF !important;
+    border: 2px solid #198754 !important;
+    color: #198754; /* Voeg tekstkleur toe voor betere leesbaarheid */
+}
+
+/* Voor badges met de "bezocht" status */
+.badge.bg-visited {
+    background-color: #FFFFFF !important;
+    border: 2px solid #198754 !important;
+    color: #198754 !important;
 }
 
 .active-marker {

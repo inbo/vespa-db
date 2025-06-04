@@ -1,3 +1,4 @@
+
 <template>
   <div class="d-flex flex-column vh-100">
     <NavbarComponent />
@@ -34,7 +35,12 @@
       </div>
       <div class="filter-panel"
         :class="{ 'd-none': !isFilterPaneOpen, 'd-block': isFilterPaneOpen, 'col-12': true, 'col-md-6': true, 'col-lg-4': true }">
-        <FilterComponent />
+        <div class="float-end mb-3">
+          <button type="button" class="btn-close" aria-label="Close" @click="toggleFilterPanel"></button>
+        </div>
+        <div class="filter-content">
+          <FilterComponent />
+        </div>
       </div>
       <div class="details-panel"
         :class="{ 'd-none': !isDetailsPaneOpen, 'd-block': isDetailsPaneOpen, 'col-12': true, 'col-md-6': true, 'col-lg-4': true }">

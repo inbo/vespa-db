@@ -1,4 +1,4 @@
-"""Admin configuration for vespadb users."""
+"""Admin configuration for vespadb users - Optimized for performance."""
 
 import logging
 from typing import Any, List, Optional, Set
@@ -59,12 +59,24 @@ class VespaUserChangeForm(UserChangeForm):
 
 
 class VespaUserAdmin(UserAdmin):
-    """Admin class for the VespaUser model."""
+    """Admin class for the VespaUser model - Optimized for performance."""
 
     form = VespaUserChangeForm
     filter_horizontal = ("municipalities", "groups", "user_permissions")
+    
+    # OPTIMIZED: Essential fields for list display
     list_display = ("username", "email", "first_name", "last_name", "is_staff", "user_type", "reservation_count")
-    list_filter = ("is_staff", "is_superuser", "user_type")
+    
+    # OPTIMIZED: Efficient filters
+    list_filter = ("is_staff", "is_superuser", "user_type", "is_active", "date_joined")
+    
+    # OPTIMIZED: Enable search for autocomplete functionality
+    search_fields = ('username', 'first_name', 'last_name', 'email')
+    
+    # OPTIMIZED: Add pagination for better performance with large user sets
+    list_per_page = 50
+    list_max_show_all = 200
+    
     fieldsets = UserAdmin.fieldsets + (
         (
             "Vespa",
@@ -78,6 +90,10 @@ class VespaUserAdmin(UserAdmin):
         ),
     )
     actions = ["assign_municipalities_action"]
+
+    def get_queryset(self, request):
+        """Optimize queryset with prefetch_related for many-to-many relationships."""
+        return super().get_queryset(request).prefetch_related('municipalities', 'groups')
 
     def get_urls(self) -> list[Any]:
         """Get custom admin URLs."""

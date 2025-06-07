@@ -137,7 +137,7 @@ class VisibilityFilter(SimpleListFilter):
         return queryset
 
 class ObservationAdmin(gis_admin.GISModelAdmin):
-    """Admin class for Observation model."""
+    """Admin class for Observation model - Optimized for performance."""
 
     form = ObservationAdminForm
 
@@ -145,10 +145,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         "id",
         "wn_id",
         "wn_validation_status",
-        "created_by",
         "observation_datetime",
-        "province",
-        "municipality",
         "nest_location",
         "nest_type",
         "nest_height",
@@ -156,41 +153,41 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         "eradication_date",
         "eradication_result",
         "eradicator_name",
-        "reserved_by",
-        "modified_by",
+        "display_municipality",
+        "display_province",
+        "display_created_by",
+        "display_reserved_by",
+        "display_modified_by",
         "modified_datetime",
-        "public_domain",
         "reserved_datetime",
         "visible",
+        "public_domain",
     )
-    
     list_filter = (
         "observation_datetime",
         "eradication_date",
-        "eradicator_name",
         NestStatusFilter,
         "nest_height",
         "nest_size",
-        "nest_location",
         "nest_type",
         "eradication_result",
         "public_domain",
-        ProvinceFilter,
-        MunicipalityExcludeFilter,
-        "municipality",
         "anb",
         VisibilityFilter,
+        ProvinceFilter,
+        "municipality",
+        ObserverReceivedEmailFilter,
+        MunicipalityExcludeFilter,
         "reserved_by",
-        "modified_datetime",
-        "modified_by",
         "created_by",
         "modified_by",
-        ObserverReceivedEmailFilter,
     )
-    search_fields = ("id", "wn_id", "eradicator_name", "observer_name")
+    
+    search_fields = ("id", "wn_id", "eradicator_name")
     filter_horizontal = ()
     ordering = ("-observation_datetime",)
-    raw_id_fields = ("municipality", "province")
+    
+    autocomplete_fields = ("municipality", "province", "reserved_by", "created_by", "modified_by")
     actions = ["send_email_to_observers", "mark_as_eradicated", "mark_as_not_visible"]
 
     readonly_fields = (
@@ -211,6 +208,56 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         "anb",
         "municipality",
     )
+
+    # OPTIMIZED: Add pagination and optimize queryset
+    list_per_page = 50
+    list_max_show_all = 100
+
+    def get_queryset(self, request):
+        """Optimize queryset with select_related to reduce database queries."""
+        return super().get_queryset(request).select_related(
+            'municipality', 
+            'province', 
+            'created_by', 
+            'modified_by', 
+            'reserved_by'
+        )
+
+    def display_municipality(self, obj):
+        """Display municipality name efficiently."""
+        return obj.municipality.name if obj.municipality else "-"
+    display_municipality.short_description = "Municipality"
+    display_municipality.admin_order_field = "municipality__name"
+
+    def display_province(self, obj):
+        """Display province name efficiently."""
+        return obj.province.name if obj.province else "-"
+    display_province.short_description = "Province"
+    display_province.admin_order_field = "province__name"
+
+    def display_created_by(self, obj):
+        """Display created by user efficiently."""
+        if obj.created_by:
+            return f"{obj.created_by.first_name} {obj.created_by.last_name}".strip() or obj.created_by.username
+        return "-"
+    display_created_by.short_description = "Created By"
+    display_created_by.admin_order_field = "created_by__username"
+
+    def display_reserved_by(self, obj):
+        """Display reserved by user efficiently."""
+        if obj.reserved_by:
+            return f"{obj.reserved_by.first_name} {obj.reserved_by.last_name}".strip() or obj.reserved_by.username
+        return "-"
+    display_reserved_by.short_description = "Reserved By"
+    display_reserved_by.admin_order_field = "reserved_by__username"
+
+    def display_modified_by(self, obj):
+        """Display modified by user efficiently."""
+        if obj.modified_by:
+            return f"{obj.modified_by.first_name} {obj.modified_by.last_name}".strip() or obj.modified_by.username
+        return "-"
+    display_modified_by.short_description = "Modified By"
+    display_modified_by.admin_order_field = "modified_by__username"
 
     def get_readonly_fields(self, request: HttpRequest, obj: Observation | None = None) -> list[str]:
         """."""
@@ -264,7 +311,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         custom_urls = [
             path("import-file/", self.admin_site.admin_view(self.import_file), name="import_file"),
             path("bulk-import/", self.admin_site.admin_view(self.bulk_import_view), name="bulk_import"),
-            path("send-email/", self.admin_site.admin_view(self.send_email_view), name="send-email"),  # Correcte URL naam
+            path("send-email/", self.admin_site.admin_view(self.send_email_view), name="send-email"),
         ]
         return custom_urls + urls
 
@@ -470,6 +517,7 @@ class ProvinceAdmin(admin.ModelAdmin):
 
     list_display = ("id", "name")
     search_fields = ("name",)
+    list_per_page = 25
 
 
 class MunicipalityAdmin(admin.ModelAdmin):
@@ -478,6 +526,8 @@ class MunicipalityAdmin(admin.ModelAdmin):
     list_display = ("id", "name", "province")
     list_filter = ("province",)
     search_fields = ("name",)
+    autocomplete_fields = ("province",)
+    list_per_page = 50
 
 @admin.register(Import)
 class ImportAdmin(admin.ModelAdmin):

@@ -428,6 +428,14 @@ class Observation(models.Model):
             models.Index(fields=['reserved_by']),
             models.Index(fields=['observation_datetime', 'visible']),
             models.Index(fields=['eradication_date']),
+            models.Index(fields=['-observation_datetime']),
+            models.Index(fields=['wn_id']),
+            models.Index(fields=['eradicator_name']),
+            models.Index(fields=['observer_name']),
+            models.Index(fields=['modified_datetime']),
+            models.Index(fields=['reserved_datetime']),
+            models.Index(fields=['created_by', 'observation_datetime']),
+            models.Index(fields=['municipality', 'observation_datetime']),
         ]
 
 class Export(models.Model):

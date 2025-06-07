@@ -196,13 +196,20 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         Admin users can see all observations. Authenticated users see their reservations and unreserved observations.
         Unauthenticated users see only unreserved observations.
         """
-        base_queryset = super().get_queryset().select_related('municipality', 'province')
+        base_queryset = super().get_queryset().select_related(
+            'municipality', 
+            'province',
+            'created_by',
+            'modified_by', 
+            'reserved_by'
+        )
     
         # Add default filter for visible observations
         visible_param = self.request.query_params.get("visible", "true")
         if visible_param.lower() != "all" and (not self.request.user.is_authenticated or not self.request.user.is_superuser):
             base_queryset = base_queryset.filter(visible=True)
         
+        # Optimize ordering with annotation
         order_params = self.request.query_params.get("ordering", "")
         if "municipality_name" in order_params:
             base_queryset = base_queryset.annotate(
@@ -212,6 +219,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                     output_field=CharField(),
                 )
             )
+        
         return base_queryset
     
     def perform_update(self, serializer: BaseSerializer) -> None:

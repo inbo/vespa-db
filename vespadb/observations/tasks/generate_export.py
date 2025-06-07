@@ -209,7 +209,7 @@ def generate_hourly_export() -> Dict[str, Any]:
     try:
         # Get all observations with optimized query
         queryset = (Observation.objects
-                   .all()
+                   .filter(visible=True)
                    .select_related("province", "municipality", "reserved_by")
                    .order_by("id"))
         

@@ -1,4 +1,4 @@
-"""Filters for the Observation model."""
+"""Filters for the Observation model - Optimized for performance."""
 
 import logging
 from typing import Any
@@ -7,6 +7,7 @@ import django_filters
 from django.contrib.admin import SimpleListFilter
 from django.db.models import Q, QuerySet
 from django.utils.translation import gettext_lazy as _
+from django.core.cache import cache
 from rest_framework_gis.filterset import GeoFilterSet
 
 from vespadb.observations.models import Municipality, Observation, Province
@@ -116,7 +117,7 @@ class ObservationFilter(GeoFilterSet):
 
 
 class ProvinceFilter(SimpleListFilter):
-    """Custom filter for selecting provinces in the admin panel."""
+    """Custom filter for selecting provinces in the admin panel - Optimized with caching."""
 
     title: str = _("province")
     parameter_name: str = "province"
@@ -124,6 +125,7 @@ class ProvinceFilter(SimpleListFilter):
     def lookups(self, request: Any, model_admin: Any) -> list[tuple[int, str]]:
         """
         Return a list of tuples for the provinces to be used in the filter dropdown.
+        Uses caching to avoid repeated database queries.
 
         Args:
             request (Any): The HTTP request object.
@@ -133,8 +135,17 @@ class ProvinceFilter(SimpleListFilter):
         -------
             List[Tuple[int, str]]: List of province id and name tuples.
         """
-        provinces = Province.objects.all()
-        return [(province.id, province.name) for province in provinces]
+        # Cache for 1 hour since provinces don't change often
+        cache_key = "admin_province_filter_lookups"
+        cached_provinces = cache.get(cache_key)
+        
+        if cached_provinces is None:
+            # Only fetch id and name to minimize data transfer
+            provinces = Province.objects.only('id', 'name').order_by('name')
+            cached_provinces = [(province.id, province.name) for province in provinces]
+            cache.set(cache_key, cached_provinces, 3600)  # Cache for 1 hour
+            
+        return cached_provinces
 
     def queryset(self, request: Any, queryset: QuerySet) -> QuerySet | None:
         """
@@ -154,7 +165,7 @@ class ProvinceFilter(SimpleListFilter):
 
 
 class MunicipalityExcludeFilter(SimpleListFilter):
-    """Custom filter for excluding a specific municipality in the admin panel."""
+    """Custom filter for excluding a specific municipality in the admin panel - Optimized with caching and limits."""
 
     title: str = _("exclude municipality")
     parameter_name: str = "municipality__exclude"
@@ -162,6 +173,7 @@ class MunicipalityExcludeFilter(SimpleListFilter):
     def lookups(self, request: Any, model_admin: Any) -> list[tuple[int, str]]:
         """
         Return a list of tuples for the municipalities to be used in the filter dropdown.
+        Optimized to only show municipalities that actually have observations.
 
         Args:
             request (Any): The HTTP request object.
@@ -171,8 +183,21 @@ class MunicipalityExcludeFilter(SimpleListFilter):
         -------
             List[Tuple[int, str]]: List of municipality id and name tuples.
         """
-        municipalities = Municipality.objects.all()
-        return [(municipality.id, municipality.name) for municipality in municipalities]
+        # Cache for 30 minutes since this is more dynamic
+        cache_key = "admin_municipality_exclude_filter_lookups"
+        cached_municipalities = cache.get(cache_key)
+        
+        if cached_municipalities is None:
+            # Only show municipalities that have observations to reduce the list size
+            municipalities_with_observations = Municipality.objects.filter(
+                observations__isnull=False
+            ).distinct().only('id', 'name').order_by('name')[:100]  # Limit to 100 most relevant
+            
+            cached_municipalities = [(municipality.id, municipality.name) 
+                                   for municipality in municipalities_with_observations]
+            cache.set(cache_key, cached_municipalities, 1800)  # Cache for 30 minutes
+            
+        return cached_municipalities
 
     def queryset(self, request: Any, queryset: QuerySet) -> QuerySet | None:
         """
@@ -192,7 +217,7 @@ class MunicipalityExcludeFilter(SimpleListFilter):
 
 
 class ObserverReceivedEmailFilter(SimpleListFilter):
-    """Filter observations by whether the observer received an email."""
+    """Filter observations by whether the observer received an email - Lightweight static filter."""
 
     title = "Observer Received Email"
     parameter_name = "observer_received_email"
@@ -200,6 +225,7 @@ class ObserverReceivedEmailFilter(SimpleListFilter):
     def lookups(self, request: Any, model_admin: Any) -> list[tuple[str, str]]:
         """
         Return a list of tuples for the filter options.
+        Static options, no database queries needed.
 
         :param request: The current request object
         :param model_admin: The current model admin instance

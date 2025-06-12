@@ -123,36 +123,36 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "Europe/Brussels"
 MIN_OBSERVATION_DATETIME = "2024-04-01T00:00:00+02:00"
-CELERY_BEAT_SCHEDULE = {
-    "fetch_and_update_observations": {
-        "task": "vespadb.observations.tasks.observation_sync.fetch_and_update_observations",
-        "schedule": crontab(hour=4, minute=0),
-    },
-    "remove_expired_reservations": {
-        "task": "vespadb.observations.tasks.reservation_cleanup.free_expired_reservations_and_audit_reservation_count",
-        "schedule": crontab(hour=5, minute=30),
-    },
-    'prewarm-geojson-cache': {
-        'task': "vespadb.observations.tasks.generate_geojson_task",
-        'schedule': crontab(minute='*/13'),
-        'args': ({
-            'visible': 'true',
-            'min_observation_datetime': '2024-04-01'
-        },)
-    },
-    "generate-hourly-export": {
-        "task": "vespadb.observations.tasks.generate_export.generate_hourly_export",
-        "schedule": crontab(minute=0, hour="*"),  # Run every hour at minute 0
-    },
-    "cleanup-old-exports": {
-        "task": "vespadb.observations.tasks.generate_export.cleanup_old_exports",
-        "schedule": crontab(minute=0, hour="*/6"),  # Run every 6 hours
-    },
-    "cleanup-old-imports": {
-        "task": "vespadb.observations.tasks.generate_import.cleanup_old_imports",
-        "schedule": crontab(minute=0, hour="*/6"),  # Every 6 hours
-    },
-}
+# CELERY_BEAT_SCHEDULE = {
+#     "fetch_and_update_observations": {
+#         "task": "vespadb.observations.tasks.observation_sync.fetch_and_update_observations",
+#         "schedule": crontab(hour=4, minute=0),
+#     },
+#     "remove_expired_reservations": {
+#         "task": "vespadb.observations.tasks.reservation_cleanup.free_expired_reservations_and_audit_reservation_count",
+#         "schedule": crontab(hour=5, minute=30),
+#     },
+#     'prewarm-geojson-cache': {
+#         'task': "vespadb.observations.tasks.generate_geojson_task",
+#         'schedule': crontab(minute='*/13'),
+#         'args': ({
+#             'visible': 'true',
+#             'min_observation_datetime': '2024-04-01'
+#         },)
+#     },
+#     "generate-hourly-export": {
+#         "task": "vespadb.observations.tasks.generate_export.generate_hourly_export",
+#         "schedule": crontab(minute=0, hour="*"),  # Run every hour at minute 0
+#     },
+#     "cleanup-old-exports": {
+#         "task": "vespadb.observations.tasks.generate_export.cleanup_old_exports",
+#         "schedule": crontab(minute=0, hour="*/6"),  # Run every 6 hours
+#     },
+#     "cleanup-old-imports": {
+#         "task": "vespadb.observations.tasks.generate_import.cleanup_old_imports",
+#         "schedule": crontab(minute=0, hour="*/6"),  # Every 6 hours
+#     },
+# }
 
 AUTH_USER_MODEL = "users.VespaUser"
 

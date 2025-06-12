@@ -1,16 +1,14 @@
 <template>
-  <div class="collapse d-block" id="filtersCollapse">
-    <div class="container-fluid mt-1">
-      <div class="row">
-        <div class="col-12">
+  <div class="filters-container">
+    <div class="container-fluid px-0">
+      <div class="row g-3">
+        <!-- <div class="col-12">
           <h3 class="filters-heading">Filters</h3>
-        </div>
-      </div>
+        </div> -->
 
-      <!-- Provinces Filter -->
-      <div class="row mb-2">
-        <label class="col-4 col-form-label">Provincie(s)</label>
-        <div class="col-8">
+        <!-- Provinces Filter -->
+        <div class="col-12">
+          <label class="form-label">Provincie(s)</label>
           <multiselect
             v-model="selectedProvinces"
             :options="provinceOptions"
@@ -44,12 +42,10 @@
             </template>
           </multiselect>
         </div>
-      </div>
 
-      <!-- Municipalities Filter -->
-      <div class="row mb-2">
-        <label class="col-4 col-form-label">Gemeente(s)</label>
-        <div class="col-8">
+        <!-- Municipalities Filter -->
+        <div class="col-12">
+          <label class="form-label">Gemeente(s)</label>
           <multiselect
             v-model="selectedMunicipalities"
             :options="municipalityOptions"
@@ -83,19 +79,15 @@
             </template>
           </multiselect>
         </div>
-      </div>
 
-      <!-- Date Filter -->
-      <div class="row mb-2">
+        <!-- Date Filter -->
         <div class="col-12">
           <DateFilter />
         </div>
-      </div>
 
-      <!-- Nest Type Filter -->
-      <div class="row mb-2">
-        <label class="col-4 col-form-label">Nest type</label>
-        <div class="col-8">
+        <!-- Nest Type Filter -->
+        <div class="col-12">
+          <label class="form-label">Nest type</label>
           <multiselect
             v-model="selectedNestType"
             :options="nestTypeOptions"
@@ -128,12 +120,10 @@
             </template>
           </multiselect>
         </div>
-      </div>
 
-      <!-- Nest Status Filter -->
-      <div class="row mb-2">
-        <label class="col-4 col-form-label">Nest status</label>
-        <div class="col-8">
+        <!-- Nest Status Filter -->
+        <div class="col-12">
+          <label class="form-label">Nest status</label>
           <multiselect
             v-model="selectedNestStatus"
             :options="nestStatusOptions"
@@ -166,12 +156,10 @@
             </template>
           </multiselect>
         </div>
-      </div>
 
-      <!-- ANB Areas Filter -->
-      <div class="row mb-2">
-        <label class="col-4 col-form-label">ANB</label>
-        <div class="col-8">
+        <!-- ANB Areas Filter -->
+        <div class="col-12">
+          <label class="form-label">ANB</label>
           <select v-model="anbAreasActief" class="form-select" @change="emitFilterUpdate">
             <option :value="null">Alle gebieden</option>
             <option v-for="option in anbAreaOptions" :key="option.value" :value="option.value">
@@ -179,21 +167,18 @@
             </option>
           </select>
         </div>
-      </div>
 
-      <!-- Reset Filters Button -->
-      <div class="row mt-3" v-if="hasActiveFilters">
-        <div class="col-12">
+        <!-- Reset Filters Button -->
+        <div class="col-12 mt-4" v-if="hasActiveFilters">
           <button 
             type="button" 
-            class="btn btn-outline-secondary btn-sm reset-filters-btn"
+            class="btn btn-outline-secondary w-100 reset-filters-btn"
             @click="resetAllFilters"
           >
             Verwijder alle filters
           </button>
         </div>
       </div>
-
     </div>
   </div>
 </template>
@@ -415,32 +400,35 @@ export default {
 </script>
 
 <style scoped>
+.filters-container {
+  background-color: #fff;
+  height: 100%;
+  overflow-y: auto;
+}
+
 .filters-heading {
-  font-size: 1.75rem;
+  font-size: 1.5rem;
   font-weight: 600;
   color: #333;
-  margin-bottom: 20px;
-  padding-bottom: 10px;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
   border-bottom: 1px solid #e9ecef;
 }
 
-/* Form styling to match observation details panel */
-.col-form-label {
-  font-size: 14px;
+/* Form styling */
+.form-label {
+  font-size: 0.875rem;
   font-weight: 500;
   color: #495057;
-  padding-top: calc(0.375rem + 1px);
-  padding-bottom: calc(0.375rem + 1px);
-  margin-bottom: 0;
-  line-height: 1.5;
+  margin-bottom: 0.25rem;
 }
 
 .form-select {
+  font-size: 0.875rem;
   background-color: #f8f9fa;
   border: 1px solid #ced4da;
   border-radius: 4px;
   padding: 0.375rem 2.25rem 0.375rem 0.75rem;
-  font-size: 14px;
   color: #495057;
   transition: all 0.2s ease;
 }
@@ -462,8 +450,8 @@ export default {
   background-color: transparent;
   border: 1px solid #6c757d;
   color: #6c757d;
-  font-size: 14px;
-  padding: 6px 12px;
+  font-size: 0.875rem;
+  padding: 0.5rem 1rem;
   border-radius: 4px;
   transition: all 0.2s ease;
   text-decoration: none;
@@ -481,13 +469,13 @@ export default {
   box-shadow: 0 0 0 0.2rem rgba(108, 117, 125, 0.25);
 }
 
-/* Multiselect styling to match the observation details panel */
+/* Multiselect styling */
 .multiselect {
+  font-size: 0.875rem;
   min-height: 40px;
   background-color: #f8f9fa;
   border: 1px solid #ced4da;
   border-radius: 4px;
-  font-size: 14px;
   transition: all 0.2s ease;
 }
 
@@ -513,13 +501,13 @@ export default {
   color: #6c757d;
   padding-top: 4px;
   margin-bottom: 0;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 :deep(.multiselect__input) {
   background-color: transparent;
   border: none;
-  font-size: 14px;
+  font-size: 0.875rem;
   padding: 0;
   margin: 0;
 }
@@ -552,7 +540,7 @@ export default {
 
 :deep(.multiselect__option) {
   padding: 8px 12px;
-  font-size: 14px;
+  font-size: 0.875rem;
   color: #495057;
   background-color: #fff;
   transition: background-color 0.2s ease;
@@ -581,7 +569,7 @@ export default {
   border-radius: 4px;
   padding: 2px 8px;
   margin: 2px 4px 2px 0;
-  font-size: 12px;
+  font-size: 0.8rem;
   display: inline-flex;
   align-items: center;
   line-height: 1.2;
@@ -615,16 +603,12 @@ export default {
 /* Responsive styling */
 @media (min-width: 768px) {
   .container-fluid {
-    padding: 0 24px;
-  }
-  
-  #filtersCollapse {
-    background-color: transparent;
+    padding: 0 1rem;
   }
 }
 
 /* Filter panel class compatibility */
-:deep(.filter-panel) {
+.filter-panel {
   background-color: #fff;
   height: 100%;
   overflow-y: auto;

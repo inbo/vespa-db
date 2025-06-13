@@ -314,15 +314,23 @@ export default {
       }
     };
 
-    watch(selectedProvinces, fetchMunicipalitiesByProvinces, { deep: true });
-
     watch(
-      [selectedMunicipalities, selectedProvinces, selectedNestType, selectedNestStatus, anbAreasActief],
+      [selectedMunicipalities, selectedNestType, selectedNestStatus, anbAreasActief],
       () => {
         emitFilterUpdate();
       },
       { deep: true }
     );
+
+    watch(selectedProvinces, (newProvinces, oldProvinces) => {
+      if (JSON.stringify(newProvinces) === JSON.stringify(oldProvinces)) {
+        return;
+      }
+      selectedMunicipalities.value = [];
+      fetchMunicipalitiesByProvinces();
+      emitFilterUpdate();
+    }, { deep: true });
+
 
     // Watch store filters for changes from other components
     watch(
@@ -348,7 +356,7 @@ export default {
             nestStatusOptions.value.find(s => s.value === value)
           ).filter(Boolean);
           
-          anbAreasActief.value = newFilters.anbAreasActief || null;
+          anbAreasActief.value = newFilters.anbAreasActief ?? null;
         }
       },
       { immediate: true, deep: true }

@@ -1,426 +1,429 @@
 <template>
-    <div v-if="selectedObservation">
-        <div class="float-end">
-            <button type="button" class="btn-close" aria-label="Close" @click="closeDetails"></button>
-        </div>
-        <div class="container mt-2">
-            <text class="text-muted text-uppercase small">
-                Melding <span id="identifier">{{ selectedObservation.id }}</span>
-                <template v-if="sourceUrl">
-                    (<a :href="sourceUrl" target="_blank">{{ selectedObservation.source }}</a>)
-                </template>
-                <template v-else>
-                    {{ selectedObservation.source }}
-                </template>
-            </text>
-            <h3 class="mt-3 mb-3">
-                <span id="observation-datetime">{{ selectedObservation.observation_datetime ?
-                    formatDate(selectedObservation.observation_datetime) : '' }}</span>,
-                <span id="municipality-name">{{ selectedObservation.municipality_name || '' }}</span>
-            </h3>
-            <div class="d-flex justify-content-between mb-3" id="reservation">
-                <button v-if="canReserve && isAuthorizedToReserve && !selectedObservation.reserved_by"
-                    class="btn btn-sm btn-outline-primary" @click="reserveObservation">
-                    Reserveren
-                </button>
-                <span v-if="selectedObservation.reserved_by" class="badge bg-warning">Gereserveerd door {{
-                    selectedObservation.reserved_by_first_name }} (nog {{ reservationStatus }})</span>
-                <button v-if="(isUserReserver || canEditAdminFields) && selectedObservation.reserved_by"
-                    class="btn btn-sm btn-outline-danger" @click="cancelReservation">Reservatie annuleren</button>
-            </div>
+    <div v-if="selectedObservation" class="details-panel-wrapper">
+        <button type="button" class="btn-close details-close-btn" aria-label="Close" @click="closeDetails"></button>
+        
+        <div class="details-content">
+            <div class="container-fluid pt-2">
+                <p class="text-muted text-uppercase small mb-2">
+                    Melding <span id="identifier">{{ selectedObservation.id }}</span>
+                    <template v-if="sourceUrl">
+                        (<a :href="sourceUrl" target="_blank">{{ selectedObservation.source }}</a>)
+                    </template>
+                    <template v-else>
+                        ({{ selectedObservation.source }})
+                    </template>
+                </p>
+                <h3 class="mt-1 mb-3">
+                    <span id="observation-datetime">{{ selectedObservation.observation_datetime ?
+                        formatDate(selectedObservation.observation_datetime) : '' }}</span>,
+                    <span id="municipality-name">{{ selectedObservation.municipality_name || '' }}</span>
+                </h3>
+                <div class="d-flex justify-content-between mb-3" id="reservation">
+                    <button v-if="canReserve && isAuthorizedToReserve && !selectedObservation.reserved_by"
+                        class="btn btn-sm btn-outline-primary" @click="reserveObservation">
+                        Reserveren
+                    </button>
+                    <span v-if="selectedObservation.reserved_by" class="badge bg-warning">Gereserveerd door {{
+                        selectedObservation.reserved_by_first_name }} (nog {{ reservationStatus }})</span>
+                    <button v-if="(isUserReserver || canEditAdminFields) && selectedObservation.reserved_by"
+                        class="btn btn-sm btn-outline-danger" @click="cancelReservation">Reservatie annuleren</button>
+                </div>
 
-            <div v-if="canViewRestrictedFields" class="mb-3" id="edit">
-                <button class="btn btn-sm btn-outline-success" @click="confirmUpdate">Wijzigingen opslaan</button>
-            </div>
-            <div v-if="successMessage" class="alert alert-success alert-dismissible fade show" role="alert">
-                {{ successMessage }}
-            </div>
-            <div v-if="errorMessage" class="alert alert-danger alert-dismissible fade show" role="alert">
-                {{ errorMessage }}
-            </div>
+                <div v-if="canViewRestrictedFields" class="mb-3" id="edit">
+                    <button class="btn btn-sm btn-outline-success" @click="confirmUpdate">Wijzigingen opslaan</button>
+                </div>
+                <div v-if="successMessage" class="alert alert-success alert-dismissible fade show" role="alert">
+                    {{ successMessage }}
+                </div>
+                <div v-if="errorMessage" class="alert alert-danger alert-dismissible fade show" role="alert">
+                    {{ errorMessage }}
+                </div>
 
-            <div class="accordion accordion-flush mb-3" id="sections">
-                <section class="accordion-item">
-                    <h4 class="accordion-header" id="eradication-header">
-                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
-                            data-bs-target="#eradication" aria-expanded="false" aria-controls="eradication">
-                            <strong>Bestrijding</strong>
-                            <span :class="['badge ms-2', eradicationStatusClass]">{{ eradicationStatusText }}</span>
-                        </button>
-                    </h4>
-                    <div id="eradication" class="accordion-collapse collapse" aria-labelledby="eradication-header"
-                        data-bs-parent="#sections">
-                        <div class="accordion-body">
-                            <div class="row mb-2">
-                                <label class="col-4 col-form-label">Resultaat</label>
-                                <div class="col-8">
-                                    <select v-if="selectedObservation.eradication_result !== undefined"
-                                        v-model="editableObservation.eradication_result" class="form-select"
-                                        :class="{ 'is-invalid': eradicationResultError }" :disabled="!canEdit">
-                                        <option :value="null">Geen</option>
-                                        <option v-for="(label, value) in eradicationResultEnum" :key="value"
-                                            :value="value">
-                                            {{ label }}
-                                        </option>
-                                    </select>
-                                    <div v-if="eradicationResultError" class="invalid-feedback">
-                                        {{ eradicationResultError }}
+                <div class="accordion accordion-flush mb-3" id="sections">
+                    <section class="accordion-item">
+                        <h4 class="accordion-header" id="eradication-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#eradication" aria-expanded="false" aria-controls="eradication">
+                                <strong>Bestrijding</strong>
+                                <span :class="['badge ms-2', eradicationStatusClass]">{{ eradicationStatusText }}</span>
+                            </button>
+                        </h4>
+                        <div id="eradication" class="accordion-collapse collapse" aria-labelledby="eradication-header"
+                            data-bs-parent="#sections">
+                            <div class="accordion-body">
+                                <div class="row mb-2">
+                                    <label class="col-4 col-form-label">Resultaat</label>
+                                    <div class="col-8">
+                                        <select v-if="selectedObservation.eradication_result !== undefined"
+                                            v-model="editableObservation.eradication_result" class="form-select"
+                                            :class="{ 'is-invalid': eradicationResultError }" :disabled="!canEdit">
+                                            <option :value="null">Geen</option>
+                                            <option v-for="(label, value) in eradicationResultEnum" :key="value"
+                                                :value="value">
+                                                {{ label }}
+                                            </option>
+                                        </select>
+                                        <div v-if="eradicationResultError" class="invalid-feedback">
+                                            {{ eradicationResultError }}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                            <div class="row mb-2">
-                                <label class="col-4 col-form-label">Datum</label>
-                                <div class="col-8">
-                                    <input v-if="selectedObservation.eradication_date !== undefined"
-                                        v-model="editableObservation.eradication_date" type="date" class="form-control"
-                                        :readonly="!canEdit" :class="{ 'form-control-plaintext': !canEdit }" />
+                                <div class="row mb-2">
+                                    <label class="col-4 col-form-label">Datum</label>
+                                    <div class="col-8">
+                                        <input v-if="selectedObservation.eradication_date !== undefined"
+                                            v-model="editableObservation.eradication_date" type="date" class="form-control"
+                                            :readonly="!canEdit" :class="{ 'form-control-plaintext': !canEdit }" />
+                                    </div>
                                 </div>
-                            </div>
-                            <div v-if="canViewRestrictedFields" class="row mb-2">
-                                <label class="col-4 col-form-label">Uitvoerder</label>
-                                <div class="col-8">
-                                    <input v-if="selectedObservation.eradicator_name !== undefined"
-                                        v-model="editableObservation.eradicator_name" type="text"
-                                        placeholder="bv. Rato VZW" class="form-control" :readonly="!canEdit"
-                                        :class="{ 'form-control-plaintext': !canEdit }" />
+                                <div v-if="canViewRestrictedFields" class="row mb-2">
+                                    <label class="col-4 col-form-label">Uitvoerder</label>
+                                    <div class="col-8">
+                                        <input v-if="selectedObservation.eradicator_name !== undefined"
+                                            v-model="editableObservation.eradicator_name" type="text"
+                                            placeholder="bv. Rato VZW" class="form-control" :readonly="!canEdit"
+                                            :class="{ 'form-control-plaintext': !canEdit }" />
+                                    </div>
                                 </div>
-                            </div>
-                            <div v-if="canViewRestrictedFields" class="row mb-2">
-                                <label class="col-4 col-form-label">Duur</label>
-                                <div class="col-8">
-                                    <input v-if="selectedObservation.eradication_duration !== undefined"
-                                        v-model="editableObservation.eradication_duration" type="text"
-                                        class="form-control" :readonly="!canEdit" placeholder="bv. 30 (min)"
-                                        :class="{ 'form-control-plaintext': !canEdit }" />
+                                <div v-if="canViewRestrictedFields" class="row mb-2">
+                                    <label class="col-4 col-form-label">Duur</label>
+                                    <div class="col-8">
+                                        <input v-if="selectedObservation.eradication_duration !== undefined"
+                                            v-model="editableObservation.eradication_duration" type="text"
+                                            class="form-control" :readonly="!canEdit" placeholder="bv. 30 (min)"
+                                            :class="{ 'form-control-plaintext': !canEdit }" />
+                                    </div>
                                 </div>
-                            </div>
-                            <div v-if="canViewRestrictedFields" class="row mb-2">
-                                <label class="col-4 col-form-label">Personeel</label>
-                                <div class="col-8">
-                                    <input v-if="selectedObservation.eradication_persons !== undefined"
-                                        v-model="editableObservation.eradication_persons" type="number"
-                                        class="form-control" :readonly="!canEdit" placeholder="bv. 2 (personen)"
-                                        :class="{ 'form-control-plaintext': !canEdit }" />
+                                <div v-if="canViewRestrictedFields" class="row mb-2">
+                                    <label class="col-4 col-form-label">Personeel</label>
+                                    <div class="col-8">
+                                        <input v-if="selectedObservation.eradication_persons !== undefined"
+                                            v-model="editableObservation.eradication_persons" type="number"
+                                            class="form-control" :readonly="!canEdit" placeholder="bv. 2 (personen)"
+                                            :class="{ 'form-control-plaintext': !canEdit }" />
+                                    </div>
                                 </div>
-                            </div>
-                            <div v-if="canViewRestrictedFields" class="row mb-2">
-                                <label class="col-4 col-form-label">Methode</label>
-                                <div class="col-8">
-                                    <select v-if="selectedObservation.eradication_method !== undefined"
-                                        v-model="editableObservation.eradication_method" class="form-select"
-                                        :disabled="!canEdit">
-                                        <option :value="null">Geen</option>
-                                        <option v-for="(label, value) in eradicationMethodEnum" :key="value"
-                                            :value="value">{{ label
-                                            }}</option>
-                                    </select>
+                                <div v-if="canViewRestrictedFields" class="row mb-2">
+                                    <label class="col-4 col-form-label">Methode</label>
+                                    <div class="col-8">
+                                        <select v-if="selectedObservation.eradication_method !== undefined"
+                                            v-model="editableObservation.eradication_method" class="form-select"
+                                            :disabled="!canEdit">
+                                            <option :value="null">Geen</option>
+                                            <option v-for="(label, value) in eradicationMethodEnum" :key="value"
+                                                :value="value">{{ label
+                                                }}</option>
+                                        </select>
+                                    </div>
                                 </div>
-                            </div>
-                            <div v-if="canViewRestrictedFields" class="row mb-2">
-                                <label class="col-4 col-form-label">Product</label>
-                                <div class="col-8">
-                                    <select v-if="selectedObservation.eradication_product !== undefined"
-                                        v-model="editableObservation.eradication_product" class="form-select"
-                                        :disabled="!canEdit">
-                                        <option :value="null">Geen</option>
-                                        <option v-for="(label, value) in eradicationProductEnum" :key="value"
-                                            :value="value">{{
-                                                label }}</option>
-                                    </select>
+                                <div v-if="canViewRestrictedFields" class="row mb-2">
+                                    <label class="col-4 col-form-label">Product</label>
+                                    <div class="col-8">
+                                        <select v-if="selectedObservation.eradication_product !== undefined"
+                                            v-model="editableObservation.eradication_product" class="form-select"
+                                            :disabled="!canEdit">
+                                            <option :value="null">Geen</option>
+                                            <option v-for="(label, value) in eradicationProductEnum" :key="value"
+                                                :value="value">{{
+                                                    label }}</option>
+                                        </select>
+                                    </div>
                                 </div>
-                            </div>
-                            <div v-if="canViewRestrictedFields" class="row mb-2">
-                                <label class="col-4 col-form-label">Nazorg</label>
-                                <div class="col-8">
-                                    <select v-if="selectedObservation.eradication_aftercare !== undefined"
-                                        v-model="editableObservation.eradication_aftercare" class="form-select"
-                                        :disabled="!canEdit">
-                                        <option :value="null">Geen</option>
-                                        <option v-for="(label, value) in eradicationAfterCareEnum" :key="value"
-                                            :value="value">{{
-                                                label }}</option>
-                                    </select>
+                                <div v-if="canViewRestrictedFields" class="row mb-2">
+                                    <label class="col-4 col-form-label">Nazorg</label>
+                                    <div class="col-8">
+                                        <select v-if="selectedObservation.eradication_aftercare !== undefined"
+                                            v-model="editableObservation.eradication_aftercare" class="form-select"
+                                            :disabled="!canEdit">
+                                            <option :value="null">Geen</option>
+                                            <option v-for="(label, value) in eradicationAfterCareEnum" :key="value"
+                                                :value="value">{{
+                                                    label }}</option>
+                                        </select>
+                                    </div>
                                 </div>
-                            </div>
-                            <div v-if="canViewRestrictedFields" class="row mb-2">
-                                <label class="col-4 col-form-label">Problemen</label>
-                                <div class="col-8">
-                                    <select v-if="selectedObservation.eradication_problems !== undefined"
-                                        v-model="editableObservation.eradication_problems" class="form-select"
-                                        :disabled="!canEdit">
-                                        <option :value="null">Geen</option>
-                                        <option v-for="(label, value) in eradicationProblemsEnum" :key="value"
-                                            :value="value">{{
-                                                label }}</option>
-                                    </select>
+                                <div v-if="canViewRestrictedFields" class="row mb-2">
+                                    <label class="col-4 col-form-label">Problemen</label>
+                                    <div class="col-8">
+                                        <select v-if="selectedObservation.eradication_problems !== undefined"
+                                            v-model="editableObservation.eradication_problems" class="form-select"
+                                            :disabled="!canEdit">
+                                            <option :value="null">Geen</option>
+                                            <option v-for="(label, value) in eradicationProblemsEnum" :key="value"
+                                                :value="value">{{
+                                                    label }}</option>
+                                        </select>
+                                    </div>
                                 </div>
-                            </div>
-                            <div v-if="canViewRestrictedFields" class="row mb-2">
-                                <label class="col-4 col-form-label">Opmerkingen</label>
-                                <div class="col-8">
-                                    <textarea v-if="selectedObservation.eradication_notes !== undefined"
-                                        v-model="editableObservation.eradication_notes" rows="2" class="form-control"
-                                        :readonly="!canEdit" :class="{ 'form-control-plaintext': !canEdit }"></textarea>
+                                <div v-if="canViewRestrictedFields" class="row mb-2">
+                                    <label class="col-4 col-form-label">Opmerkingen</label>
+                                    <div class="col-8">
+                                        <textarea v-if="selectedObservation.eradication_notes !== undefined"
+                                            v-model="editableObservation.eradication_notes" rows="2" class="form-control"
+                                            :readonly="!canEdit" :class="{ 'form-control-plaintext': !canEdit }"></textarea>
+                                    </div>
                                 </div>
-                            </div>
-                            <div v-if="canViewRestrictedFields" class="row mb-2">
-                                <label class="col-4 col-form-label">Extra info</label>
-                                <div class="col-8">
-                                    <multiselect
-                                        v-model="selectedExtras"
-                                        :options="availableExtrasOptions"
-                                        :multiple="true"
-                                        track-by="value"
-                                        label="label"
-                                        placeholder="Selecteer opties"
-                                        :close-on-select="false"
-                                        :searchable="false"
-                                        :disabled="!canEdit"
-                                        :select-label="''"
-                                        :deselect-label="''"
-                                        :selected-label="''"
-                                    >
-                                        <template #option="{ option }">
-                                            <div class="multiselect-option" :class="{ 'is-selected': selectedExtras.some(extra => extra.value === option.value) }">
-                                                <span class="option-label">{{ option.label }}</span>
-                                            </div>
-                                        </template>
-                                        <template #tag="{ option, remove }">
-                                            <span class="multiselect-tag">
-                                                {{ option.label }}
-                                                <button 
-                                                    type="button" 
-                                                    class="remove-tag" 
-                                                    @click="remove(option)"
-                                                    aria-label="Remove option"
-                                                >×</button>
-                                            </span>
-                                        </template>
-                                    </multiselect>
+                                <div v-if="canViewRestrictedFields" class="row mb-2">
+                                    <label class="col-4 col-form-label">Extra info</label>
+                                    <div class="col-8">
+                                        <multiselect
+                                            v-model="selectedExtras"
+                                            :options="availableExtrasOptions"
+                                            :multiple="true"
+                                            track-by="value"
+                                            label="label"
+                                            placeholder="Selecteer opties"
+                                            :close-on-select="false"
+                                            :searchable="false"
+                                            :disabled="!canEdit"
+                                            :select-label="''"
+                                            :deselect-label="''"
+                                            :selected-label="''"
+                                        >
+                                            <template #option="{ option }">
+                                                <div class="multiselect-option" :class="{ 'is-selected': selectedExtras.some(extra => extra.value === option.value) }">
+                                                    <span class="option-label">{{ option.label }}</span>
+                                                </div>
+                                            </template>
+                                            <template #tag="{ option, remove }">
+                                                <span class="multiselect-tag">
+                                                    {{ option.label }}
+                                                    <button 
+                                                        type="button" 
+                                                        class="remove-tag" 
+                                                        @click="remove(option)"
+                                                        aria-label="Remove option"
+                                                    >×</button>
+                                                </span>
+                                            </template>
+                                        </multiselect>
+                                    </div>
                                 </div>
-                            </div>
-                            <div v-if="canViewRestrictedFields" class="row mb-2">
-                                <div class="col-8 offset-4">
-                                    <div class="form-check form-switch">
-                                        <input v-if="selectedObservation.public_domain !== undefined"
-                                            v-model="editableObservation.public_domain" class="form-check-input"
-                                            type="checkbox" id="public-domain" :disabled="!canViewRestrictedFields" />
-                                        <label class="form-check-label" for="public-domain">Nest op publiek
-                                            terrein</label>
+                                <div v-if="canViewRestrictedFields" class="row mb-2">
+                                    <div class="col-8 offset-4">
+                                        <div class="form-check form-switch">
+                                            <input v-if="selectedObservation.public_domain !== undefined"
+                                                v-model="editableObservation.public_domain" class="form-check-input"
+                                                type="checkbox" id="public-domain" :disabled="!canViewRestrictedFields" />
+                                            <label class="form-check-label" for="public-domain">Nest op publiek
+                                                terrein</label>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </section>
-                <section class="accordion-item">
-                    <h4 class="accordion-header" id="nest-header">
-                        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#nest"
-                            aria-expanded="true" aria-controls="nest">
-                            <strong>Nest info</strong>
-                        </button>
-                    </h4>
-                    <div id="nest" class="accordion-collapse collapse show" aria-labelledby="nest-header"
-                        data-bs-parent="#sections">
-                        <div class="accordion-body">
-                            <div v-if="selectedObservation.images && selectedObservation.images.length > 0"
-                                id="carousel-12040" class="carousel carousel-dark slide carousel-fade mb-2"
-                                data-bs-ride="carousel" data-bs-keyboard="false" data-bs-interval="500">
-                                <div class="carousel-indicators">
-                                    <button v-for="(image, index) in selectedObservation.images" :key="index"
-                                        type="button" :data-bs-target="'#carousel-12040'" :data-bs-slide-to="index"
-                                        :class="{ active: index === 0 }"
-                                        :aria-current="index === 0 ? 'true' : undefined"
-                                        :aria-label="'Foto ' + (index + 1)"></button>
-                                </div>
-                                <div class="carousel-inner">
-                                    <div class="carousel-item d-flex w-100 justify-content-center bg-light"
-                                        v-for="(image, index) in selectedObservation.images" :key="index"
-                                        :class="{ active: index === 0 }">
-                                        <img style="max-height: 200px;" :src="image">
+                    </section>
+                    <section class="accordion-item">
+                        <h4 class="accordion-header" id="nest-header">
+                            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#nest"
+                                aria-expanded="true" aria-controls="nest">
+                                <strong>Nest info</strong>
+                            </button>
+                        </h4>
+                        <div id="nest" class="accordion-collapse collapse show" aria-labelledby="nest-header"
+                            data-bs-parent="#sections">
+                            <div class="accordion-body">
+                                <div v-if="selectedObservation.images && selectedObservation.images.length > 0"
+                                    :id="'carousel-' + selectedObservation.id" class="carousel carousel-dark slide carousel-fade mb-2"
+                                    data-bs-ride="carousel" data-bs-keyboard="false" data-bs-interval="500">
+                                    <div class="carousel-indicators" v-if="selectedObservation.images.length > 1">
+                                        <button v-for="(image, index) in selectedObservation.images" :key="index"
+                                            type="button" :data-bs-target="'#carousel-' + selectedObservation.id" :data-bs-slide-to="index"
+                                            :class="{ active: index === 0 }"
+                                            :aria-current="index === 0 ? 'true' : undefined"
+                                            :aria-label="'Foto ' + (index + 1)"></button>
                                     </div>
+                                    <div class="carousel-inner">
+                                        <div class="carousel-item d-flex w-100 justify-content-center bg-light"
+                                            v-for="(image, index) in selectedObservation.images" :key="index"
+                                            :class="{ active: index === 0 }">
+                                            <img class="carousel-image" :src="image">
+                                        </div>
+                                    </div>
+                                    <button v-if="selectedObservation.images.length > 1" class="carousel-control-prev" type="button" :data-bs-target="'#carousel-' + selectedObservation.id"
+                                        data-bs-slide="prev">
+                                        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                                        <span class="visually-hidden">Vorige</span>
+                                    </button>
+                                    <button v-if="selectedObservation.images.length > 1" class="carousel-control-next" type="button" :data-bs-target="'#carousel-' + selectedObservation.id"
+                                        data-bs-slide="next">
+                                        <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                                        <span class="visually-hidden">Volgende</span>
+                                    </button>
                                 </div>
-                                <button class="carousel-control-prev" type="button" data-bs-target="#carousel-12040"
-                                    data-bs-slide="prev">
-                                    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                                    <span class="visually-hidden">Vorige</span>
-                                </button>
-                                <button class="carousel-control-next" type="button" data-bs-target="#carousel-12040"
-                                    data-bs-slide="next">
-                                    <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                                    <span class="visually-hidden">Volgende</span>
-                                </button>
-                            </div>
-                            <div class="row mb-2">
-                                <label class="col-4 col-form-label">Type</label>
-                                <div class="col-8">
-                                    <p class="form-control-plaintext">
-                                        {{ selectedObservation.nest_type ? nestTypeEnum[selectedObservation.nest_type] :
-                                            'Geen' }}
-                                    </p>
-                                </div>
-                            </div>
-                            <div class="row mb-2">
-                                <label class="col-4 col-form-label">Locatie</label>
-                                <div class="col-8">
-                                    <p class="form-control-plaintext">
-                                        {{ selectedObservation.nest_location ?
-                                            nestLocationEnum[selectedObservation.nest_location] :
-                                            'Geen' }}
-                                    </p>
-                                </div>
-                            </div>
-                            <div class="row mb-2">
-                                <label class="col-4 col-form-label">Grootte</label>
-                                <div class="col-8">
-                                    <p class="form-control-plaintext">
-                                        {{ selectedObservation.nest_size ? nestSizeEnum[selectedObservation.nest_size] :
-                                            'Geen' }}
-                                    </p>
-                                </div>
-                            </div>
-                            <div class="row mb-2">
-                                <label class="col-4 col-form-label">Hoogte</label>
-                                <div class="col-8">
-                                    <p class="form-control-plaintext">
-                                        {{ selectedObservation.nest_height ?
-                                            nestHeightEnum[selectedObservation.nest_height] :
-                                            'Geen' }}
-                                    </p>
-                                </div>
-                            </div>
-                            <div class="row mb-2">
-                                <label class="col-4 col-form-label">Bron</label>
-                                <div class="col-8">
-                                    <p class="form-control-plaintext">
-                                    <template v-if="sourceUrl">
-                                        <a :href="sourceUrl" target="_blank">{{ selectedObservation.source }}</a>
-                                    </template>
-                                    <template v-else>
-                                        {{ selectedObservation.source }}
-                                    </template>
-                                    </p>
-                                </div>
-                            </div>
-                            <div>
                                 <div class="row mb-2">
-                                    <label class="col-4 col-form-label">Validatie</label>
+                                    <label class="col-4 col-form-label">Type</label>
                                     <div class="col-8">
                                         <p class="form-control-plaintext">
-                                            {{ validationStatusEnum[selectedObservation.wn_validation_status] || "Geen" }}
+                                            {{ selectedObservation.nest_type ? nestTypeEnum[selectedObservation.nest_type] :
+                                                'Geen' }}
                                         </p>
+                                    </div>
+                                </div>
+                                <div class="row mb-2">
+                                    <label class="col-4 col-form-label">Locatie</label>
+                                    <div class="col-8">
+                                        <p class="form-control-plaintext">
+                                            {{ selectedObservation.nest_location ?
+                                                nestLocationEnum[selectedObservation.nest_location] :
+                                                'Geen' }}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="row mb-2">
+                                    <label class="col-4 col-form-label">Grootte</label>
+                                    <div class="col-8">
+                                        <p class="form-control-plaintext">
+                                            {{ selectedObservation.nest_size ? nestSizeEnum[selectedObservation.nest_size] :
+                                                'Geen' }}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="row mb-2">
+                                    <label class="col-4 col-form-label">Hoogte</label>
+                                    <div class="col-8">
+                                        <p class="form-control-plaintext">
+                                            {{ selectedObservation.nest_height ?
+                                                nestHeightEnum[selectedObservation.nest_height] :
+                                                'Geen' }}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="row mb-2">
+                                    <label class="col-4 col-form-label">Bron</label>
+                                    <div class="col-8">
+                                        <p class="form-control-plaintext">
+                                        <template v-if="sourceUrl">
+                                            <a :href="sourceUrl" target="_blank">{{ selectedObservation.source }}</a>
+                                        </template>
+                                        <template v-else>
+                                            {{ selectedObservation.source }}
+                                        </template>
+                                        </p>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="row mb-2">
+                                        <label class="col-4 col-form-label">Validatie</label>
+                                        <div class="col-8">
+                                            <p class="form-control-plaintext">
+                                                {{ validationStatusEnum[selectedObservation.wn_validation_status] || "Geen" }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div class="row mb-2">
+                                        <label class="col-4 col-form-label">Cluster ID</label>
+                                        <div class="col-8">
+                                            <p class="form-control-plaintext">{{ selectedObservation.wn_cluster_id }}</p>
+                                        </div>
+                                    </div>
+                                    <div class="row mb-2">
+                                        <label class="col-4 col-form-label">Opmerking</label>
+                                        <div class="col-8">
+                                            <p class="form-control-plaintext">{{ selectedObservation.notes }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="accordion-item" v-if="canViewRestrictedFields">
+                        <h4 class="accordion-header" id="contact-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#contact" aria-expanded="false" aria-controls="contact">
+                                <strong>Contact info</strong>
+                            </button>
+                        </h4>
+                        <div id="contact" class="accordion-collapse collapse" aria-labelledby="contact-header"
+                            data-bs-parent="#sections">
+                            <div class="accordion-body">
+                                <div class="row mb-2">
+                                    <label class="col-4 col-form-label">Melder</label>
+                                    <div class="col-8">
+                                        <p class="form-control-plaintext">{{ selectedObservation.observer_name }}</p>
+                                    </div>
+                                </div>
+                                <div class="row mb-2">
+                                    <label class="col-4 col-form-label">E-mail</label>
+                                    <div class="col-8">
+                                        <p class="form-control-plaintext">{{ selectedObservation.observer_email }}</p>
+                                    </div>
+                                </div>
+                                <div class="row mb-2">
+                                    <label class="col-4 col-form-label">Telefoon</label>
+                                    <div class="col-8">
+                                        <p class="form-control-plaintext">{{ selectedObservation.observer_phone_number }}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                    <section class="accordion-item" v-if="canEditAdminFields">
+                        <h4 class="accordion-header" id="admin-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#admin" aria-expanded="false" aria-controls="admin">
+                                <strong>Admin sectie</strong>
+                            </button>
+                        </h4>
+                        <div id="admin" class="accordion-collapse collapse" aria-labelledby="admin-header"
+                            data-bs-parent="#sections">
+                            <div class="accordion-body">
+                                <div class="row mb-2">
+                                    <div class="col-8 offset-4">
+                                        <div class="form-check form-switch">
+                                            <input v-if="selectedObservation.visible !== undefined"
+                                                v-model="editableObservation.visible" class="form-check-input"
+                                                type="checkbox" id="visible" :disabled="!canEdit" />
+                                            <label class="form-check-label" for="visible">Nest tonen</label>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="row mb-2">
                                     <label class="col-4 col-form-label">Cluster ID</label>
                                     <div class="col-8">
-                                        <p class="form-control-plaintext">{{ selectedObservation.wn_cluster_id }}</p>
+                                        <input v-model="editableObservation.wn_cluster_id" type="text" class="form-control" readonly />
                                     </div>
                                 </div>
                                 <div class="row mb-2">
-                                    <label class="col-4 col-form-label">Opmerking</label>
+                                    <label class="col-4 col-form-label">Melder kreeg e-mail</label>
                                     <div class="col-8">
-                                        <p class="form-control-plaintext">{{ selectedObservation.notes }}</p>
+                                        <select v-if="selectedObservation.observer_received_email !== undefined"
+                                            v-model="editableObservation.observer_received_email" class="form-select"
+                                            disabled>
+                                            <option :value="true">Melder kreeg e-mail</option>
+                                            <option :value="false">Melder kreeg geen e-mail</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="row mb-2">
+                                    <label class="col-4 col-form-label">Opmerkingen</label>
+                                    <div class="col-8">
+                                        <textarea v-if="selectedObservation.admin_notes !== undefined"
+                                            v-model="editableObservation.admin_notes" rows="2" class="form-control"
+                                            :readonly="!canEdit" :class="{ 'form-control-plaintext': !canEdit }"></textarea>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </section>
+                    </section>
 
-                <section class="accordion-item" v-if="canViewRestrictedFields">
-                    <h4 class="accordion-header" id="contact-header">
-                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
-                            data-bs-target="#contact" aria-expanded="false" aria-controls="contact">
-                            <strong>Contact info</strong>
-                        </button>
-                    </h4>
-                    <div id="contact" class="accordion-collapse collapse" aria-labelledby="contact-header"
-                        data-bs-parent="#sections">
-                        <div class="accordion-body">
-                            <div class="row mb-2">
-                                <label class="col-4 col-form-label">Melder</label>
-                                <div class="col-8">
-                                    <p class="form-control-plaintext">{{ selectedObservation.observer_name }}</p>
-                                </div>
-                            </div>
-                            <div class="row mb-2">
-                                <label class="col-4 col-form-label">E-mail</label>
-                                <div class="col-8">
-                                    <p class="form-control-plaintext">{{ selectedObservation.observer_email }}</p>
-                                </div>
-                            </div>
-                            <div class="row mb-2">
-                                <label class="col-4 col-form-label">Telefoon</label>
-                                <div class="col-8">
-                                    <p class="form-control-plaintext">{{ selectedObservation.observer_phone_number }}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-                <section class="accordion-item" v-if="canEditAdminFields">
-                    <h4 class="accordion-header" id="admin-header">
-                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
-                            data-bs-target="#admin" aria-expanded="false" aria-controls="admin">
-                            <strong>Admin sectie</strong>
-                        </button>
-                    </h4>
-                    <div id="admin" class="accordion-collapse collapse" aria-labelledby="admin-header"
-                        data-bs-parent="#sections">
-                        <div class="accordion-body">
-                            <div class="row mb-2">
-                                <div class="col-8 offset-4">
-                                    <div class="form-check form-switch">
-                                        <input v-if="selectedObservation.visible !== undefined"
-                                            v-model="editableObservation.visible" class="form-check-input"
-                                            type="checkbox" id="visible" :disabled="!canEdit" />
-                                        <label class="form-check-label" for="visible">Nest tonen</label>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="row mb-2">
-                                <label class="col-4 col-form-label">Cluster ID</label>
-                                <div class="col-8">
-                                    <input v-model="editableObservation.wn_cluster_id" type="text" class="form-control" readonly />
-                                </div>
-                            </div>
-                            <div class="row mb-2">
-                                <label class="col-4 col-form-label">Melder kreeg e-mail</label>
-                                <div class="col-8">
-                                    <select v-if="selectedObservation.observer_received_email !== undefined"
-                                        v-model="editableObservation.observer_received_email" class="form-select"
-                                        disabled>
-                                        <option :value="true">Melder kreeg e-mail</option>
-                                        <option :value="false">Melder kreeg geen e-mail</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="row mb-2">
-                                <label class="col-4 col-form-label">Opmerkingen</label>
-                                <div class="col-8">
-                                    <textarea v-if="selectedObservation.admin_notes !== undefined"
-                                        v-model="editableObservation.admin_notes" rows="2" class="form-control"
-                                        :readonly="!canEdit" :class="{ 'form-control-plaintext': !canEdit }"></textarea>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
+                </div>
 
+                <p class="mb-3 text-muted small" id="metadata"> Aangemaakt op <span class="created-datetime">{{ selectedObservation.created_datetime ?
+                        formatDate(selectedObservation.created_datetime) : '' }}</span> door <span class="created-by">{{
+                            selectedObservation.created_by_first_name || '' }}</span>, gewijzigd op <span
+                        class="modified-datetime">{{
+                            selectedObservation.modified_datetime ?
+                                formatDate(selectedObservation.modified_datetime) : '' }}</span> door <span class="modified-by">{{
+                            selectedObservation.modified_by_first_name || '' }}</span>.
+                </p>
             </div>
-
-            <p v-if="canViewRestrictedFields" class="mb-3 text-muted small" id="metadata">
-                Aangemaakt op <span class="created-datetime">{{ selectedObservation.created_datetime ?
-                    formatDate(selectedObservation.created_datetime) : '' }}</span> door <span class="created-by">{{
-                        selectedObservation.created_by_first_name || '' }}</span>, gewijzigd op <span
-                    class="modified-datetime">{{
-                        selectedObservation.modified_datetime ?
-                            formatDate(selectedObservation.modified_datetime) : '' }}</span> door <span class="modified-by">{{
-                        selectedObservation.modified_by_first_name || '' }}</span>.
-            </p>
         </div>
+    </div>
+    <div v-else class="text-center p-5">
+        <p>Selecteer een observatie op de kaart.</p>
     </div>
 </template>
 
@@ -512,6 +515,7 @@ export default {
         };
 
         const eradicationProductEnum = {
+            "spray_spuitbus": "Spray of spuitbus",
             "permas_d": "Permas-D",
             "vloeibare_stikstof": "Vloeibare stikstof",
             "ficam_d": "Ficam D",
@@ -566,8 +570,10 @@ export default {
 
         const eradicationStatusText = computed(() => {
             const result = selectedObservation.value?.eradication_result;
-            if (result && result !== null) {
+            if (result === 'successful') {
                 return 'Bestreden';
+            } else if (result && result !== null) {
+                return 'Bezocht';
             } else {
                 return 'Niet bestreden';
             }
@@ -578,8 +584,10 @@ export default {
         });
         const eradicationStatusClass = computed(() => {
             const result = selectedObservation.value?.eradication_result;
-            if (result && result !== null) {
+            if (result === 'successful') {
                 return 'bg-success';
+            } else if (result && result !== null) {
+                return 'bg-visited';
             } else {
                 return 'bg-danger';
             }
@@ -952,3 +960,40 @@ export default {
     }
 };
 </script>
+
+<style scoped>
+.details-panel-wrapper {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+.details-content {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 1rem;
+    -webkit-overflow-scrolling: touch;
+}
+
+.details-close-btn {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    z-index: 10;
+}
+
+.carousel-image {
+    max-height: 300px;
+    object-fit: contain;
+}
+
+.form-control-plaintext {
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.accordion-body {
+    padding: 1rem 0.5rem;
+}
+</style>

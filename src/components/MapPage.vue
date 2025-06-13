@@ -1,42 +1,53 @@
 <template>
-  <div class="d-flex flex-column vh-100">
+  <div class="d-flex flex-column vh-100 app-container">
     <NavbarComponent />
-    <div class="flex-grow-1 position-relative">
+    <div class="flex-grow-1 position-relative map-wrapper">
+      <div id="map" class="h-100"></div>
+
       <div class="search-bar">
         <input v-model="searchQuery" @keyup.enter="searchAddress" placeholder="Zoek een adres..." />
-        <button @click="searchAddress">
+        <button @click="searchAddress" aria-label="Search Address">
           <i class="fas fa-search"></i>
         </button>
       </div>
-      <button class="btn-filter-toggle" @click="toggleFilterPanel">
-        <i class="fas fa-sliders-h"></i> Filters
-      </button>
-      <div id="map" class="h-100"></div>
+
       <div class="loading-screen" v-if="isMapLoading">
         Observaties laden...
       </div>
       <div class="loading-screen" v-if="isExporting">
         Exporteren...
       </div>
+
       <div class="map-legend" v-if="map && !isMapLoading">
-        <div>
-          <span class="legend-icon bg-reported"></span> Gerapporteerd nest
+        <div><span class="legend-icon bg-reported"></span> Gerapporteerd nest</div>
+        <div><span class="legend-icon bg-reserved"></span> Gereserveerd nest</div>
+        <div><span class="legend-icon bg-eradicated"></span> Bestreden nest</div>
+        <div><span class="legend-icon bg-visited"></span> Bezocht nest</div>
+      </div>
+
+      <button class="btn-fab btn-filter-toggle" @click="toggleFilterPanel" aria-label="Toggle Filters">
+        <i class="fas fa-sliders-h"></i>
+      </button>
+
+      <div class="panel-overlay" 
+           :class="{ 'is-active': isFilterPaneOpen || isDetailsPaneOpen }" 
+           @click="closePanels">
+      </div>
+
+      <div class="side-panel filter-panel" :class="{ 'is-open': isFilterPaneOpen }">
+        <div class="panel-header">
+            <h3 class="panel-title">Filters</h3>
+            <button type="button" class="btn-close" aria-label="Close" @click="toggleFilterPanel"></button>
         </div>
-        <div>
-          <span class="legend-icon bg-reserved"></span> Gereserveerd nest
-        </div>
-        <div>
-          <span class="legend-icon bg-eradicated"></span> Bestreden nest
+        <div class="panel-content">
+          <FilterComponent />
         </div>
       </div>
-      <div class="filter-panel"
-        :class="{ 'd-none': !isFilterPaneOpen, 'd-block': isFilterPaneOpen, 'col-12': true, 'col-md-6': true, 'col-lg-4': true }">
-        <FilterComponent />
+
+      <div class="side-panel details-panel" :class="{ 'is-open': isDetailsPaneOpen }">
+        <ObservationDetailsComponent @updateMarkerColor="updateMarkerColor" @close-panel="toggleDetailsPane" />
       </div>
-      <div class="details-panel"
-        :class="{ 'd-none': !isDetailsPaneOpen, 'd-block': isDetailsPaneOpen, 'col-12': true, 'col-md-6': true, 'col-lg-4': true }">
-        <ObservationDetailsComponent @updateMarkerColor="updateMarkerColor" />
-      </div>
+
       <div v-if="formattedError" class="alert alert-danger position-absolute top-0 start-50 translate-middle-x mt-2">
         {{ formattedError }}
       </div>
@@ -45,6 +56,7 @@
 </template>
 
 <script>
+import L from 'leaflet';
 import { useVespaStore } from '@/stores/vespaStore';
 import { nextTick } from 'vue';
 import 'leaflet.markercluster';
@@ -70,29 +82,25 @@ export default {
     const selectedObservation = computed(() => vespaStore.selectedObservation);
     const isEditing = computed(() => vespaStore.isEditing);
     const map = ref(null);
-    const isLoggedIn = computed(() => vespaStore.isLoggedIn);
     const isDetailsPaneOpen = computed(() => vespaStore.isDetailsPaneOpen);
     const isFilterPaneOpen = ref(false);
     const error = computed(() => vespaStore.error);
-    const loadingObservations = computed(() => vespaStore.loadingObservations);
     const isMapLoading = ref(true);
-    const filtersUpdated = ref(false);
-    const isFetchingGeoJson = ref(false); // Flag to prevent multiple calls
+    const isFetchingGeoJson = ref(false);
+
     const searchAddress = async () => {
       if (searchQuery.value) {
         try {
           const result = await vespaStore.searchAddress(searchQuery.value);
           if (result) {
             map.value.setView([result.lat, result.lon], 16);
-          } else {
-            // Handle case when address is not found
-
           }
         } catch (error) {
           console.error('Error searching address:', error);
         }
       }
     };
+
     const formattedError = computed(() => {
       if (!error.value) return null;
       if (error.value.includes("Failed to fetch observation details")) {
@@ -101,27 +109,28 @@ export default {
       return error.value;
     });
 
-    const startEdit = () => {
-      isEditing.value = true;
-    };
-
-    const confirmUpdate = () => {
-      isEditing.value = false;
-    };
-
-    const cancelEdit = () => {
-      isEditing.value = false;
-    };
-
     const toggleDetailsPane = () => {
       vespaStore.isDetailsPaneOpen = !vespaStore.isDetailsPaneOpen;
       if (!vespaStore.isDetailsPaneOpen) {
+        if(selectedObservation.value) {
+           vespaStore.refreshMarkerStyle(selectedObservation.value.id);
+        }
+        vespaStore.selectedObservation = null;
         router.push({ path: '/' });
       }
     };
 
     const toggleFilterPanel = () => {
       isFilterPaneOpen.value = !isFilterPaneOpen.value;
+    };
+    
+    const closePanels = () => {
+        if (isFilterPaneOpen.value) {
+            toggleFilterPanel();
+        }
+        if (isDetailsPaneOpen.value) {
+            toggleDetailsPane();
+        }
     };
 
     const openObservationDetails = async (properties) => {
@@ -131,6 +140,9 @@ export default {
           return;
         }
         vespaStore.isDetailsPaneOpen = true;
+        if (window.innerWidth < 768 && isFilterPaneOpen.value) {
+            isFilterPaneOpen.value = false;
+        }
         router.push({ path: `/observation/${properties.id}` });
       } catch (error) {
         console.error("Failed to fetch observation details:", error);
@@ -146,266 +158,176 @@ export default {
     }
 
     const updateMarkers = debounce(async () => {
-      if (isFetchingGeoJson.value) return;
+        if (isFetchingGeoJson.value) return;
+        isFetchingGeoJson.value = true;
+        try {
+            await vespaStore.updateObservations();
 
-      isFetchingGeoJson.value = true;
+            const observations = vespaStore.observations;
+            const existingMarkerIds = new Set(Object.keys(vespaStore.markerCache));
+            const newMarkerIds = new Set(observations.map(obs => obs.properties.id.toString()));
 
-      try {
-        await vespaStore.updateObservations();
+            existingMarkerIds.forEach((id) => {
+                if (!newMarkerIds.has(id)) {
+                    const marker = vespaStore.markerCache[id];
+                    if (marker) {
+                        vespaStore.markerClusterGroup.removeLayer(marker);
+                        delete vespaStore.markerCache[id];
+                    }
+                }
+            });
 
-        const observations = vespaStore.observations;
-        const existingMarkerIds = new Set(Object.keys(vespaStore.markerCache));
-        const newMarkerIds = new Set(observations.map(obs => obs.properties.id.toString()));
+            const newMarkers = [];
+            observations.forEach((feature) => {
+                const id = feature.properties.id.toString();
+                if (!vespaStore.markerCache[id]) {
+                    const marker = vespaStore.createCircleMarker(
+                        feature,
+                        L.latLng(feature.geometry.coordinates[1], feature.geometry.coordinates[0])
+                    );
 
-        // 1. Remove old markers
-        existingMarkerIds.forEach((id) => {
-          if (!newMarkerIds.has(id)) {
-            const marker = vespaStore.markerCache[id];
-            if (marker) {
-              vespaStore.markerClusterGroup.removeLayer(marker);
-              delete vespaStore.markerCache[id];
+                    marker.on('click', () => {
+                        openObservationDetails(feature.properties);
+                    });
+                    
+                    vespaStore.markerCache[id] = marker;
+                    newMarkers.push(marker);
+                } else {
+                    const existingMarker = vespaStore.markerCache[id];
+                    if (JSON.stringify(existingMarker.feature.properties) !== JSON.stringify(feature.properties)) {
+                         existingMarker.feature = feature;
+                         vespaStore.refreshMarkerStyle(id);
+                    }
+                }
+            });
+
+            if (newMarkers.length > 0) {
+                vespaStore.markerClusterGroup.addLayers(newMarkers);
             }
-          }
-        });
+            
+            if (selectedObservation.value) {
+                vespaStore.refreshMarkerStyle(selectedObservation.value.id);
+            }
 
-        // 2. Create new markers
-        const newMarkers = [];
-
-        observations.forEach((feature) => {
-          const id = feature.properties.id.toString();
-          if (!vespaStore.markerCache[id]) {
-            const marker = vespaStore.createCircleMarker(
-              feature,
-              L.latLng(feature.geometry.coordinates[1], feature.geometry.coordinates[0])
-            );
-
-            // your existing click handler
-            marker.on('click', () => {
-              openObservationDetails(feature.properties);
-              marker.setStyle({
-                fillColor: marker.options.fillColor,
-                color: '#ea792a',
-                weight: 4,
-              });
-            });
-
-            vespaStore.markerCache[id] = marker;
-            newMarkers.push(marker);
-          }
-        });
-
-        // 3. Add ALL markers at once
-        if (newMarkers.length > 0) {
-          vespaStore.markerClusterGroup.addLayers(newMarkers);
+        } catch (error) {
+            console.error('Error updating markers:', error);
+            vespaStore.error = "Fout bij het bijwerken van de kaartobservaties.";
+        } finally {
+            isFetchingGeoJson.value = false;
+            isMapLoading.value = false;
         }
-
-        filtersUpdated.value = false;
-
-        // ighlight selected marker if needed
-        if (selectedObservation.value) {
-          const selectedMarker = vespaStore.markerCache[selectedObservation.value.id];
-          if (selectedMarker) {
-            selectedMarker.setStyle({
-              fillColor: selectedMarker.options.fillColor,
-              color: '#ea792a',
-              weight: 4,
-            });
-          }
-        }
-      } catch (error) {
-        console.error('Error updating markers:', error);
-      } finally {
-        isFetchingGeoJson.value = false;
-        isMapLoading.value = false;
-      }
     }, 600);
 
-
-    watch(selectedObservation, async (newObs, oldObs) => {
-      if (newObs && oldObs && newObs.id !== oldObs.id) {
-        // 1) Reset the old marker’s border
-        const oldMarker = vespaStore.markerCache[oldObs.id];
-        if (oldMarker) {
-          // grab the original edge color
-          const originalEdge = oldMarker.originalEdgeColor || oldMarker.options.color;
-          oldMarker.setStyle({
-            fillColor: oldMarker.options.fillColor,
-            color: originalEdge,
-            weight: 1
-          });
-          oldMarker._path?.classList.remove('active-marker');
+    watch(selectedObservation, (newObs, oldObs) => {
+        if (oldObs && (!newObs || newObs.id !== oldObs.id)) {
+            vespaStore.refreshMarkerStyle(oldObs.id);
         }
-
-        // 2) Highlight the new one (after Vue has applied the DOM update)
-        await nextTick();
-        const newMarker = vespaStore.markerCache[newObs.id];
-        if (newMarker) {
-          newMarker.setStyle({
-            fillColor: newMarker.options.fillColor,
-            color: '#ea792a',
-            weight: 4
-          });
-          newMarker._path?.classList.add('active-marker');
+        if (newObs) {
+            nextTick(() => {
+                vespaStore.refreshMarkerStyle(newObs.id);
+            });
         }
-      }
-    });
-    const clearAndUpdateMarkers = () => {
-      if (vespaStore.markerClusterGroup) {
-        vespaStore.markerClusterGroup.clearLayers();
-      }
-      vespaStore.observations = [];
-      updateMarkers();
+    }, { deep: true });
+
+    const updateMarkerColor = (observationId) => {
+        if (observationId) {
+          vespaStore.refreshMarkerStyle(observationId);
+        }
     };
 
-    const updateMarkerColor = (observationId, fillColor, edgeColor, weight) => {
-      vespaStore.updateMarkerColor(observationId, fillColor, edgeColor, weight);
-    };
-
-    watch(
-      () => vespaStore.filters,
-      (newFilters) => {
-        filtersUpdated.value = true;
+    watch(() => vespaStore.filters, () => {
         updateMarkers();
-      },
-      { deep: true }
-    );
+    }, { deep: true });
 
-    watch(
-      () => router.currentRoute.value,
-      (newRoute, oldRoute) => {
+    watch(() => router.currentRoute.value, (newRoute, oldRoute) => {
         if (newRoute.path !== oldRoute.path && !newRoute.path.includes('/observation/')) {
-          vespaStore.isDetailsPaneOpen = false;
+          if(vespaStore.isDetailsPaneOpen) {
+            vespaStore.isDetailsPaneOpen = false;
+          }
         }
-      }
-    );
+    });
 
     onMounted(async () => {
-      // Initialize marker cache if it doesn't exist
       if (!vespaStore.markerCache) {
         vespaStore.markerCache = {};
       }
 
-      // Create the map immediately
       map.value = L.map('map', {
         center: [50.8503, 4.3517],
         zoom: 9,
         maxZoom: 19,
+        zoomControl: false, 
         renderer: L.svg(),
-        layers: [
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: 'Map data © OpenStreetMap contributors',
-            maxZoom: 19,
-          }),
-        ],
       });
+      
+      L.control.zoom({ position: 'topleft' }).addTo(map.value);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19,
+      }).addTo(map.value);
+
       vespaStore.map = map.value;
 
-      // Set up clustering
       vespaStore.markerClusterGroup = L.markerClusterGroup({
         spiderfyOnMaxZoom: false,
         showCoverageOnHover: true,
         zoomToBoundsOnClick: true,
         disableClusteringAtZoom: 16,
-        iconCreateFunction: (cluster) => {
-          return L.divIcon({
-            html: `<div style="background-color: rgba(var(--bs-dark-rgb)); color: white;"><span>${cluster.getChildCount()}</span></div>`,
-            className: 'marker-cluster',
-            iconSize: L.point(40, 40),
-          });
-        },
-        polygonOptions: {
-          color: '#ea792a',
-          weight: 2,
-          opacity: 0.5,
-          fillOpacity: 0.2,
-          fillColor: '#ea792a',
-        },
-        spiderLegPolylineOptions: {
-          color: '#ea792a',
-          weight: 1.5,
-          opacity: 0.8,
-        },
+        iconCreateFunction: (cluster) => L.divIcon({
+          html: `<div class="cluster-icon"><span>${cluster.getChildCount()}</span></div>`,
+          className: 'marker-cluster',
+          iconSize: L.point(40, 40),
+        }),
       });
-      if (!map.value.hasLayer(vespaStore.markerClusterGroup)) {
-        map.value.addLayer(vespaStore.markerClusterGroup);
-      }
 
-      // Fetch app data in background
+      map.value.addLayer(vespaStore.markerClusterGroup);
+
       await vespaStore.initializeApp();
-
-      // Apply default date filter if not logged in
-      if (!vespaStore.filters.min_observation_date && !vespaStore.isLoggedIn) {
-        vespaStore.applyFilters({
-          min_observation_date: new Date('April 1, 2024').toISOString(),
-        });
+      
+      if (!vespaStore.filters.min_observation_date) {
+          vespaStore.applyFilters({
+              min_observation_date: new Date('2024-04-01T00:00:00.000Z').toISOString(),
+          });
       }
-
-      // Check if we're navigating directly to an observation
-      const observationId = router.currentRoute.value.params.id;
-      if (observationId) {
+      
+      const observationIdParam = router.currentRoute.value.params.id;
+      if (observationIdParam) {
+        isMapLoading.value = true;
+        await updateMarkers();
         try {
-          // First load the markers
-          await updateMarkers();
-
-          // Then fetch the selected observation details
-          await vespaStore.fetchObservationDetails(observationId);
-
-          // Open details panel and center map on the observation if it exists
-          if (vespaStore.selectedObservation) {
-            vespaStore.isDetailsPaneOpen = true;
-
-            // Parse location
-            let latitude = 50.8503;
-            let longitude = 4.3517;
-            const location = vespaStore.selectedObservation.location;
-            if (location) {
-              if (typeof location === 'string' && location.includes('POINT')) {
-                const coords = location
-                  .slice(location.indexOf('(') + 1, location.indexOf(')'))
-                  .split(' ');
-                [longitude, latitude] = coords.map(parseFloat);
-              } else if (location.coordinates) {
-                [longitude, latitude] = location.coordinates;
-              }
+            await vespaStore.fetchObservationDetails(observationIdParam);
+            if (vespaStore.selectedObservation) {
+                vespaStore.isDetailsPaneOpen = true;
+                const obsLocation = vespaStore.selectedObservation.location;
+                if (obsLocation?.coordinates) {
+                    map.value.setView([obsLocation.coordinates[1], obsLocation.coordinates[0]], 16);
+                }
+            } else {
+                 router.push({ path: '/' });
             }
-
-            // Center and zoom the map
-            map.value.setView([latitude, longitude], 16);
-
-            // Highlight the marker if it exists
-            if (vespaStore.markerCache[observationId]) {
-              console.log("bf3")
-              vespaStore.updateMarkerColor(
-                observationId,
-                vespaStore.markerCache[observationId].options.fillColor,
-                '#ea792a',
-                4,
-                'active-marker'
-              );
-            }
-          }
         } catch (error) {
-          console.error("Failed to load observation details:", error);
+            console.error("Failed to load observation for direct navigation:", error);
+            vespaStore.error = "Kon de geselecteerde observatie niet laden.";
+            router.push({ path: '/' });
+        } finally {
+             isMapLoading.value = false;
         }
       } else {
         updateMarkers();
       }
     });
-
+    
     return {
       isDetailsPaneOpen,
       isFilterPaneOpen,
       toggleDetailsPane,
       toggleFilterPanel,
+      closePanels,
       selectedObservation,
       isEditing,
       map,
-      isLoggedIn,
-      startEdit,
-      confirmUpdate,
-      cancelEdit,
       formattedError,
-      loadingObservations,
       isMapLoading,
       updateMarkerColor,
       searchQuery,

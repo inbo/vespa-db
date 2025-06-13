@@ -4,6 +4,7 @@ import json
 import logging
 from typing import Any
 
+from django.utils import timezone
 from django import forms
 from django.contrib import admin, messages
 from django.contrib.admin import SimpleListFilter
@@ -20,6 +21,12 @@ from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from rest_framework.test import APIRequestFactory
 from django.conf import settings
+from django.contrib import admin
+from django.shortcuts import render
+from django.urls import path
+from vespadb.observations.models import Import
+from django.urls import reverse
+from django.utils.html import format_html
 
 from vespadb.observations.filters import MunicipalityExcludeFilter, ObserverReceivedEmailFilter, ProvinceFilter
 from vespadb.observations.forms import SendEmailForm
@@ -95,9 +102,42 @@ class ObservationAdminForm(forms.ModelForm):
             "eradication_date": forms.DateInput(attrs={"type": "date"}),
         }
 
+class VisibilityFilter(SimpleListFilter):
+    """Custom filter for observation visibility in the admin panel."""
+
+    title = _("Zichtbaarheid")
+    parameter_name = "visibility"
+
+    def lookups(self, request: HttpRequest, model_admin: Any) -> list[tuple[str, str]]:
+        """
+        Return a list of tuples for the different visibility options.
+
+        :param request: The HTTP request object.
+        :param model_admin: The current model admin instance.
+        :return: A list of tuples containing the visibility values and labels.
+        """
+        return [
+            ("visible", "Zichtbare nesten"),
+            ("not_visible", "Niet zichtbare nesten"),
+        ]
+
+    def queryset(self, request: HttpRequest, queryset: QuerySet) -> QuerySet | None:
+        """
+        Filter the queryset based on the selected visibility status.
+
+        :param request: The HTTP request object.
+        :param queryset: The current queryset.
+        :return: The filtered queryset based on the selected visibility, or the original queryset if no value is provided.
+        """
+        value = self.value()
+        if value == "visible":
+            return queryset.filter(visible=True)
+        elif value == "not_visible":
+            return queryset.filter(visible=False)
+        return queryset
 
 class ObservationAdmin(gis_admin.GISModelAdmin):
-    """Admin class for Observation model."""
+    """Admin class for Observation model - Optimized for performance."""
 
     form = ObservationAdminForm
 
@@ -105,10 +145,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         "id",
         "wn_id",
         "wn_validation_status",
-        "created_by",
         "observation_datetime",
-        "province",
-        "municipality",
         "nest_location",
         "nest_type",
         "nest_height",
@@ -116,38 +153,41 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         "eradication_date",
         "eradication_result",
         "eradicator_name",
-        "reserved_by",
-        "modified_by",
+        "display_municipality",
+        "display_province",
+        "display_created_by",
+        "display_reserved_by",
+        "display_modified_by",
         "modified_datetime",
-        "public_domain",
         "reserved_datetime",
+        "visible",
+        "public_domain",
     )
     list_filter = (
         "observation_datetime",
         "eradication_date",
-        "eradicator_name",
         NestStatusFilter,
         "nest_height",
         "nest_size",
-        "nest_location",
         "nest_type",
         "eradication_result",
         "public_domain",
-        ProvinceFilter,
-        MunicipalityExcludeFilter,
-        "municipality",
         "anb",
+        VisibilityFilter,
+        ProvinceFilter,
+        "municipality",
+        ObserverReceivedEmailFilter,
+        MunicipalityExcludeFilter,
         "reserved_by",
-        "modified_datetime",
-        "modified_by",
         "created_by",
         "modified_by",
-        ObserverReceivedEmailFilter,
     )
-    search_fields = ("id", "wn_id", "eradicator_name", "observer_name")
+    
+    search_fields = ("id", "wn_id", "eradicator_name")
     filter_horizontal = ()
     ordering = ("-observation_datetime",)
-    raw_id_fields = ("municipality", "province")
+    
+    autocomplete_fields = ("municipality", "province", "reserved_by", "created_by", "modified_by")
     actions = ["send_email_to_observers", "mark_as_eradicated", "mark_as_not_visible"]
 
     readonly_fields = (
@@ -168,6 +208,56 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         "anb",
         "municipality",
     )
+
+    # OPTIMIZED: Add pagination and optimize queryset
+    list_per_page = 50
+    list_max_show_all = 100
+
+    def get_queryset(self, request):
+        """Optimize queryset with select_related to reduce database queries."""
+        return super().get_queryset(request).select_related(
+            'municipality', 
+            'province', 
+            'created_by', 
+            'modified_by', 
+            'reserved_by'
+        )
+
+    def display_municipality(self, obj):
+        """Display municipality name efficiently."""
+        return obj.municipality.name if obj.municipality else "-"
+    display_municipality.short_description = "Municipality"
+    display_municipality.admin_order_field = "municipality__name"
+
+    def display_province(self, obj):
+        """Display province name efficiently."""
+        return obj.province.name if obj.province else "-"
+    display_province.short_description = "Province"
+    display_province.admin_order_field = "province__name"
+
+    def display_created_by(self, obj):
+        """Display created by user efficiently."""
+        if obj.created_by:
+            return f"{obj.created_by.first_name} {obj.created_by.last_name}".strip() or obj.created_by.username
+        return "-"
+    display_created_by.short_description = "Created By"
+    display_created_by.admin_order_field = "created_by__username"
+
+    def display_reserved_by(self, obj):
+        """Display reserved by user efficiently."""
+        if obj.reserved_by:
+            return f"{obj.reserved_by.first_name} {obj.reserved_by.last_name}".strip() or obj.reserved_by.username
+        return "-"
+    display_reserved_by.short_description = "Reserved By"
+    display_reserved_by.admin_order_field = "reserved_by__username"
+
+    def display_modified_by(self, obj):
+        """Display modified by user efficiently."""
+        if obj.modified_by:
+            return f"{obj.modified_by.first_name} {obj.modified_by.last_name}".strip() or obj.modified_by.username
+        return "-"
+    display_modified_by.short_description = "Modified By"
+    display_modified_by.admin_order_field = "modified_by__username"
 
     def get_readonly_fields(self, request: HttpRequest, obj: Observation | None = None) -> list[str]:
         """."""
@@ -221,7 +311,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         custom_urls = [
             path("import-file/", self.admin_site.admin_view(self.import_file), name="import_file"),
             path("bulk-import/", self.admin_site.admin_view(self.bulk_import_view), name="bulk_import"),
-            path("send-email/", self.admin_site.admin_view(self.send_email_view), name="send-email"),  # Correcte URL naam
+            path("send-email/", self.admin_site.admin_view(self.send_email_view), name="send-email"),
         ]
         return custom_urls + urls
 
@@ -237,28 +327,48 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
             if form.is_valid():
                 file = form.cleaned_data["file"]
                 file_name = file.name
+                if Import.objects.filter(file_path__endswith=file_name, created_at__gte=timezone.now() - timezone.timedelta(hours=1)).exists():
+                    self.message_user(request, f"File {file_name} was recently imported. Are you sure you want to import it again?", level="warning")
 
-                if file_name.endswith(".json"):
-                    try:
-                        data = json.load(file)
-                        if not isinstance(data, list):
-                            raise TypeError("Invalid JSON format. Expected a list of objects.")
-                        request.data = {"data": data}
-                        request.content_type = "application/json"
-                    except json.JSONDecodeError as e:
-                        self.message_user(request, f"JSON decode error: {e}", level="error")
-                        return redirect("admin:observations_observation_changelist")
-                    except ValueError as e:
-                        self.message_user(request, str(e), level="error")
-                        return redirect("admin:observations_observation_changelist")
-                elif file_name.endswith(".csv"):
-                    request.data = {"file": file}
-                    request.content_type = "multipart/form-data"
-                else:
+                if not (file_name.endswith(".json") or file_name.endswith(".csv")):
                     self.message_user(request, "Unsupported file format.", level="error")
                     return redirect("admin:observations_observation_changelist")
 
-                return self.bulk_import_view(request)
+                if Import.objects.filter(file_path__endswith=file_name, created_at__gte=timezone.now() - timezone.timedelta(hours=1)).exists():
+                    self.message_user(request, f"File {file_name} was recently imported. Are you sure you want to import it again?", level="warning")
+
+                try:
+                    factory = APIRequestFactory()
+                    api_request = factory.post(
+                        "/observations/async_bulk_import/",
+                        data={"file": file},
+                        format="multipart",
+                    )
+                    api_request.user = get_import_user(UserType.IMPORT)
+                    viewset = ObservationsViewSet.as_view({"post": "async_bulk_import"})
+                    response = viewset(api_request)
+
+                    if response.status_code == 202:
+                        data = response.data
+                        import_id = data["import_id"]
+                        detail_url = reverse("admin:observations_import_change", args=[import_id])
+                        status_url = reverse("admin:import_status")
+                        self.message_user(
+                            request,
+                            format_html(
+                                'Import job initiated. Import ID: <a href="{}">{}</a>. '
+                                'Check <a href="{}">status page</a> for progress.',
+                                detail_url, import_id, status_url
+                            ),
+                            level="success",
+                        )
+                    else:
+                        self.message_user(request, f"Failed to initiate import: {response.data}", level="error")
+                except Exception as e:
+                    self.message_user(request, f"Error initiating import: {str(e)}", level="error")
+                    logger.exception(f"Import error: {str(e)}")
+
+                return redirect("admin:observations_observation_changelist")
         else:
             form = FileImportForm()
         return render(request, "admin/file_form.html", {"form": form})
@@ -381,8 +491,12 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         -------
         - None
         """
-        count = queryset.update(eradication_date=now())
-        self.message_user(request, f"{count} observations marked as eradicated.", messages.SUCCESS)
+        from vespadb.observations.models import EradicationResultEnum
+        count = queryset.update(
+            eradication_date=now(),
+            eradication_result=EradicationResultEnum.SUCCESSFUL
+        )
+        self.message_user(request, f"{count} observaties gemarkeerd als bestreden (succesvol).", messages.SUCCESS)
 
     @admin.action(description="Markeer observatie(s) als niet zichtbaar")
     def mark_as_not_visible(self, request: HttpRequest, queryset: Any) -> None:
@@ -407,6 +521,7 @@ class ProvinceAdmin(admin.ModelAdmin):
 
     list_display = ("id", "name")
     search_fields = ("name",)
+    list_per_page = 25
 
 
 class MunicipalityAdmin(admin.ModelAdmin):
@@ -415,8 +530,70 @@ class MunicipalityAdmin(admin.ModelAdmin):
     list_display = ("id", "name", "province")
     list_filter = ("province",)
     search_fields = ("name",)
+    autocomplete_fields = ("province",)
+    list_per_page = 50
 
+@admin.register(Import)
+class ImportAdmin(admin.ModelAdmin):
+    list_display = [
+        "id",
+        "status",
+        "progress",
+        "created_at",
+        "completed_at",
+        "user",
+        "created_count",
+        "updated_count",
+        "error_message_summary",
+    ]
+    list_filter = ["status", "created_at"]
+    search_fields = ["id", "error_message"]
+    readonly_fields = [
+        "id",
+        "file_path",
+        "status",
+        "progress",
+        "created_at",
+        "completed_at",
+        "user",
+        "error_message",
+        "task_id",
+        "created_ids",
+        "updated_ids",
+    ]
 
+    def created_count(self, obj):
+        """Display the number of created observations."""
+        return len(obj.created_ids)
+    created_count.short_description = "Created Observations"
+
+    def updated_count(self, obj):
+        """Display the number of updated observations."""
+        return len(obj.updated_ids)
+    updated_count.short_description = "Updated Observations"
+
+    def error_message_summary(self, obj):
+        """Display a truncated error message in the list view."""
+        return obj.error_message[:100] + "..." if obj.error_message and len(obj.error_message) > 100 else obj.error_message
+    error_message_summary.short_description = "Error Message"
+
+    def get_urls(self):
+        """Add a custom URL for the import status page."""
+        urls = super().get_urls()
+        custom_urls = [
+            path("status/", self.admin_site.admin_view(self.import_status_view), name="import_status"),
+        ]
+        return custom_urls + urls
+
+    def import_status_view(self, request):
+        """Display a custom page with recent import statuses."""
+        imports = Import.objects.all().order_by("-created_at")[:10]
+        context = {
+            "imports": imports,
+            "title": "Recent Imports",
+        }
+        return render(request, "admin/import_status.html", context)
+    
 admin.site.register(Observation, ObservationAdmin)
 admin.site.register(Province, ProvinceAdmin)
 admin.site.register(Municipality, MunicipalityAdmin)

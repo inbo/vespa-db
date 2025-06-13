@@ -78,14 +78,15 @@ export const useVespaStore = defineStore('vespaStore', {
         },
         async getObservationsGeoJson() {
             const currentFilters = JSON.stringify(this.filters);
-
         
             // Check if data needs to be reloaded
             if (this.observations.length > 0 && currentFilters === this.lastAppliedFilters) return;
         
             this.loadingObservations = true;
             let filterQuery = this.createFilterQuery();
-            if (!this.filters.min_observation_date && !this.isLoggedIn) {
+            
+            // ALWAYS apply min date filter - regardless of login status
+            if (!this.filters.min_observation_date) {
                 const defaultMinDate = this.formatDateWithoutTime(new Date('April 1, 2024').toISOString());
                 filterQuery += (filterQuery ? '&' : '') + `min_observation_datetime=${defaultMinDate}`;
             }
@@ -130,7 +131,7 @@ export const useVespaStore = defineStore('vespaStore', {
         
             if (this.filters.min_observation_date) {
                 params['min_observation_datetime'] = this.formatDateWithoutTime(this.filters.min_observation_date);
-            } else if (!this.isLoggedIn) {
+            } else {
                 params['min_observation_datetime'] = this.formatDateWithoutTime(new Date('April 1, 2024').toISOString());
             }
         
@@ -200,70 +201,106 @@ export const useVespaStore = defineStore('vespaStore', {
             }
         },
         async updateObservations() {
-            if (this.isFetchingGeoJson) return; // Prevent concurrent fetches
-            this.isFetchingGeoJson = true;
             try {
               await this.getObservationsGeoJson();
             } catch (error) {
               console.error('Error updating observations:', error);
-            } finally {
-              this.isFetchingGeoJson = false;
             }
         },      
         createCircleMarker(feature, latlng) {
-            const isSelected = feature.properties.id === this.selectedObservation?.id;
-            const edge = isSelected ? '#ea792a' : '#3c3c3c';
-          
+            const status = feature.properties.status;
+            const styles = this.getColorStylesByStatus(status);
+
             const opts = {
-              radius: 10 + (feature.properties.observations_count || 0) * 0.5,
-              fillColor: this.getColorByStatus(feature.properties.status),
-              color: edge,
-              weight: isSelected ? 4 : 1,
-              opacity: 1,
-              fillOpacity: 0.8,
-              className: `observation-marker${isSelected ? ' active-marker' : ''}`
+                radius: 8 + (feature.properties.observations_count || 0) * 0.5, // Adjusted radius slightly
+                fillColor: styles.fillColor,
+                color: styles.borderColor, // Base border color
+                weight: styles.baseWeight, // Base border weight
+                opacity: 1,
+                fillOpacity: styles.fillOpacity,
+                className: `observation-marker status-${status}` // Add status-specific class
             };
-          
+
             const marker = L.circleMarker(latlng, opts);
-            // stash the original edge color for easy resets later
-            marker.originalEdgeColor = opts.color;
-            marker.feature = feature;
+            
+            // Store original base style for deselection and status updates
+            marker.originalStyle = {
+                fillColor: styles.fillColor,
+                color: styles.borderColor,
+                weight: styles.baseWeight,
+                fillOpacity: styles.fillOpacity
+            };
+            marker.feature = feature; // Keep reference to feature for its properties
             return marker;
         },
+        refreshMarkerStyle(observationId) {
+            const marker = this.markerCache[observationId];
+            if (!marker || !marker.feature || !marker.feature.properties) return;
+        
+            let currentStatus = marker.feature.properties.status;
+        
+            // If this observation is the currently selected one, its details might be more up-to-date
+            if (this.selectedObservation && this.selectedObservation.id === observationId) {
+                const statusFromSelected = this.determineStatusFromObservationData(this.selectedObservation);
+                if (statusFromSelected !== currentStatus) {
+                    currentStatus = statusFromSelected;
+                    marker.feature.properties.status = currentStatus; // Update status on the marker's feature data
+                }
+            }
+        
+            const styles = this.getColorStylesByStatus(currentStatus);
+        
+            // Update originalStyle on the marker, in case the status changed
+            marker.originalStyle = {
+                fillColor: styles.fillColor,
+                color: styles.borderColor,
+                weight: styles.baseWeight,
+                fillOpacity: styles.fillOpacity
+            };
+        
+            let finalStyle = { ...marker.originalStyle }; // Start with base style
+        
+            const isSelected = this.selectedObservation && this.selectedObservation.id === observationId;
+        
+            if (isSelected) {
+                finalStyle.color = '#ea792a'; // Selection border color
+                finalStyle.weight = 4;         // Selection border weight
+                marker._path?.classList.add('active-marker');
+                if (marker.bringToFront) marker.bringToFront();
+            } else {
+                marker._path?.classList.remove('active-marker');
+            }
+        
+            marker.setStyle(finalStyle);
+        },
         async reserveObservation(observation) {
+            if (!this.user || typeof this.user.reservation_count === 'undefined') {
+                alert('Gebruikersinformatie niet geladen, kan niet reserveren.');
+                return;
+            }
             if (this.user.reservation_count < 50) {
-                const response = await ApiService.patch(`/observations/${observation.id}/`, {
-                    reserved_by: this.user.id
-                });
-                if (response.status === 200) {
-                    this.selectedObservation = { ...this.selectedObservation, ...response.data };
-                    this.updateMarkerColor(observation.id, '#ffc107', '#ea792a', 4);
-                    await this.authCheck();
-                } else {
-                    throw new Error('Failed to reserve the observation');
+                try {
+                    const response = await ApiService.patch(`/observations/${observation.id}/`, {
+                        reserved_by: this.user.id
+                    });
+                    if (response.status === 200) {
+                        this.selectedObservation = { ...this.selectedObservation, ...response.data };
+                        
+                        const marker = this.markerCache[observation.id];
+                        if (marker && marker.feature && marker.feature.properties) {
+                            marker.feature.properties.status = "reserved";
+                        }
+                        this.refreshMarkerStyle(observation.id);
+                        await this.authCheck();
+                    } else {
+                        throw new Error('Failed to reserve the observation');
+                    }
+                } catch (error) {
+                    console.error('Error reserving observation:', error);
+                    this.error = 'Kon de observatie niet reserveren.';
                 }
             } else {
                 alert('You have reached the maximum number of reservations.');
-            }
-        },
-        updateMarkerColor(observationId, fillColor, edgeColor = '#3c3c3c', weight = 4, className = '') {
-            if (!observationId || !this.markerCache) return;
-  
-            const marker = this.markerCache[observationId];
-            if (marker) {
-              marker.setStyle({
-                fillColor: fillColor,
-                color: edgeColor,
-                weight: weight
-              });
-              
-              if (marker._path) {
-                if (className) {
-                  marker._path.classList.add(className);
-                } else {
-                  marker._path.classList.remove('active-marker');
-                }
-              }
             }
         },
         async acceptTermsOfService() {
@@ -298,31 +335,40 @@ export const useVespaStore = defineStore('vespaStore', {
         },
         async cancelReservation(observation) {
             try {
-                // Only send the reserved_by field, not the entire observation
                 const response = await ApiService.patch(`/observations/${observation.id}/`, {
                     reserved_by: null
                 });
-                
                 if (response.status === 200) {
                     this.selectedObservation = { ...this.selectedObservation, ...response.data };
-                    this.updateMarkerColor(observation.id, '#212529', '#212529', 1);
+                    const marker = this.markerCache[observation.id];
+                    if (marker && marker.feature && marker.feature.properties) {
+                        // Determine new status (likely 'untreated' if no eradication_result)
+                        marker.feature.properties.status = this.determineStatusFromObservationData(response.data);
+                    }
+                    this.refreshMarkerStyle(observation.id);
                 } else {
                     throw new Error('Failed to cancel the reservation');
                 }
             } catch (error) {
-                console.error('Error canceling the reservation:', error);
+                console.error('Error canceling reservation:', error);
+                this.error = 'Kon de reservatie niet annuleren.';
             }
         },
         async fetchObservationDetails(observationId) {
+            this.loading = true;
             try {
-                const response = await ApiService.get(`/observations/${observationId}`);
+                const response = await ApiService.get(`/observations/${observationId}/`);
                 if (response.status === 200) {
                     this.selectedObservation = response.data;
+                    this.refreshMarkerStyle(observationId); 
                 } else {
                     throw new Error('Failed to fetch observation details');
                 }
             } catch (error) {
                 console.error('Error fetching observation details:', error);
+                this.error = "Het ophalen van observatiedetails is mislukt.";
+            } finally {
+                this.loading = false;
             }
         },
         formatToISO8601(datetime) {
@@ -351,10 +397,18 @@ export const useVespaStore = defineStore('vespaStore', {
                 
                 const response = await ApiService.patch(`/observations/${observation.id}/`, observationToSend);
                 if (response.status === 200) {
-                    this.selectedObservation = response.data;
-                    const colorByResult = this.getColorByStatus(response.data.eradication_result);
-                    this.updateMarkerColor(observation.id, colorByResult, '#ea792a', 4, 'active-marker');
-                    return response.data;
+                    this.selectedObservation = response.data; // Update selected observation with full data from response
+                    
+                const newStatus = this.determineStatusFromObservationData(response.data);
+                const markerToUpdate = this.markerCache[observation.id];
+
+                if (markerToUpdate) {
+                    if (markerToUpdate.feature && markerToUpdate.feature.properties) {
+                        markerToUpdate.feature.properties.status = newStatus;
+                    }
+                    this.refreshMarkerStyle(observation.id); // Correctly uses observation.id here
+                }
+                return response.data;
                 } else {
                     throw new Error('Network response was not ok');
                 }
@@ -396,61 +450,181 @@ export const useVespaStore = defineStore('vespaStore', {
         async exportData(format) {
             try {
                 this.isExporting = true;
-
-                // Get the current filter query
-                const filterQuery = this.createFilterQuery();
-
-                // Make the export request
-                const response = await ApiService.get(
-                    `/observations/export_direct?${filterQuery}`,
-                    {
-                        responseType: 'blob',
-                        timeout: 300000, // 5 minute timeout
-                        headers: {
-                            'Accept': 'text/csv',
+        
+                const response = await ApiService.get('/observations/export/');
+                const exportData = response.data;
+                const { export_id, status } = exportData;
+        
+                // Handle immediate success (pre-generated file available)
+                if (status === 'completed') {
+                    await this.downloadFileFromApi(`/observations/download_export/?export_id=${export_id}`);
+                    return;
+                }
+        
+                // Handle generation in progress (202 status with generating status)
+                if (status === 'generating') {
+                    // Show user-friendly message about generation
+                    this.modalTitle = 'Export Being Prepared';
+                    this.modalMessage = `${exportData.message || 'Your export is being generated.'} Estimated wait time: ${exportData.estimated_wait_time || '5-10 minutes'}`;
+                    this.isModalVisible = true;
+                    
+                    // Start polling with longer intervals for generation
+                    await this.pollForGeneratedExport(export_id);
+                    return;
+                }
+        
+                // Handle other statuses
+                if (status === 'pending') {
+                    await this.pollForExportCompletion(export_id);
+                    return;
+                }
+        
+                // If we get here, something unexpected happened
+                throw new Error(exportData.error || 'Unexpected export status');
+        
+            } catch (error) {
+                console.error('Export error:', error);
+                
+                // Handle HTTP errors specifically
+                if (error.response) {
+                    const statusCode = error.response.status;
+                    const errorData = error.response.data;
+                    
+                    if (statusCode === 202 && errorData.status === 'generating') {
+                        // Handle 202 response (generation triggered)
+                        this.modalTitle = 'Export Being Prepared';
+                        this.modalMessage = `${errorData.message || 'Your export is being generated.'} Estimated wait time: ${errorData.estimated_wait_time || '5-10 minutes'}`;
+                        this.isModalVisible = true;
+                        
+                        try {
+                            await this.pollForGeneratedExport(errorData.export_id);
+                            return;
+                        } catch (pollError) {
+                            this.modalTitle = 'Export Error';
+                            this.modalMessage = pollError.message || 'Failed to generate export';
+                            this.isModalVisible = true;
+                            return;
                         }
                     }
-                );
-
-                // Create and trigger download
-                const blob = new Blob([response.data], { type: 'text/csv' });
-                const url = window.URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.setAttribute(
-                    'download',
-                    `observations_export_${new Date().getTime()}.csv`
-                );
-
-                // Trigger download
-                document.body.appendChild(link);
-                link.click();
-
-                // Cleanup
-                document.body.removeChild(link);
-                window.URL.revokeObjectURL(url);
-                this.isExporting = false;
-
-            } catch (error) {
-                this.isExporting = false;
-                console.error('Error exporting data:', error);
-
-                // Handle specific error cases
-                let errorMessage = 'Export failed. Please try again.';
-
-                if (error.response) {
-                    if (error.response.status === 400) {
-                        errorMessage = error.response.data.error || 'Invalid export request';
-                    } else if (error.response.status === 403) {
-                        errorMessage = 'You do not have permission to export data';
-                    } else if (error.response.status === 504) {
-                        errorMessage = 'Export timed out. Please try with fewer filters';
-                    }
+                    
+                    // Handle other HTTP errors
+                    this.modalTitle = 'Export Error';
+                    this.modalMessage = errorData.error || errorData.message || 'Export request failed';
+                    this.isModalVisible = true;
+                } else {
+                    // Handle network or other errors
+                    this.modalTitle = 'Export Error';
+                    this.modalMessage = error.message || 'An unexpected error occurred';
+                    this.isModalVisible = true;
                 }
-
-                throw new Error(errorMessage);
+            } finally {
+                this.isExporting = false;
             }
         },
+        async downloadFileFromApi(url) {
+            try {
+                console.log('Downloading file from:', url);
+                
+                const response = await ApiService.get(url, {
+                    responseType: 'blob',
+                });
+        
+                const downloadUrl = window.URL.createObjectURL(new Blob([response.data]));
+                const link = document.createElement('a');
+                link.href = downloadUrl;
+                
+                let filename = 'observations_export.csv';
+                const disposition = response.headers['content-disposition'];
+                if (disposition && disposition.indexOf('filename=') !== -1) {
+                    filename = disposition.split('filename=')[1].replace(/"/g, '');
+                }
+                
+                link.setAttribute('download', filename);
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                window.URL.revokeObjectURL(downloadUrl);
+            } catch (error) {
+                console.error('Error downloading file:', error);
+                throw new Error('Failed to download file: ' + error.message);
+            }
+        },
+        async pollForGeneratedExport(exportId) {
+            let completed = false;
+            let attempts = 0;
+            const maxAttempts = 40; // Poll for up to 20 minutes (30s intervals)
+        
+            while (!completed && attempts < maxAttempts) {
+                await new Promise(resolve => setTimeout(resolve, 30000)); // Wait 30 seconds for generation
+                attempts++;
+        
+                try {
+                    const statusResponse = await ApiService.get(`/observations/export_status/?export_id=${exportId}`);
+                    const statusData = statusResponse.data;
+        
+                    if (statusData.status === 'completed') {
+                        // Hide the waiting modal and start download
+                        this.isModalVisible = false;
+                        await this.downloadFileFromApi(`/observations/download_export/?export_id=${exportId}`);
+                        completed = true;
+                        break;
+                    } else if (statusData.status === 'failed') {
+                        throw new Error(statusData.error || 'Export generation failed');
+                    } else if (statusData.status === 'pending') {
+                        // Update modal with current status
+                        if (statusData.message) {
+                            this.modalMessage = `${statusData.message} (${attempts}/${maxAttempts} checks)`;
+                        }
+                        console.log(`Export generation in progress... (attempt ${attempts}/${maxAttempts})`);
+                    }
+        
+                } catch (pollError) {
+                    console.warn('Error checking export status:', pollError);
+                    // Continue polling despite error, but throw after max attempts
+                    if (attempts >= maxAttempts) {
+                        throw new Error('Export generation timed out. Please try again later.');
+                    }
+                }
+            }
+        
+            if (!completed) {
+                throw new Error('Export generation timed out. Please try again later.');
+            }
+        },
+        
+        async pollForExportCompletion(exportId) {
+            // Original polling logic for regular exports (shorter intervals)
+            let completed = false;
+            let attempts = 0;
+        
+            while (!completed && attempts < 60) {
+                await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second intervals
+                attempts++;
+        
+                try {
+                    const statusResponse = await ApiService.get(`/observations/export_status/?export_id=${exportId}`);
+                    const statusData = statusResponse.data;
+        
+                    if (statusData.status === 'completed') {
+                        await this.downloadFileFromApi(`/observations/download_export/?export_id=${exportId}`);
+                        completed = true;
+                        break;
+                    } else if (statusData.status === 'failed') {
+                        throw new Error(statusData.error || 'Export failed');
+                    }
+        
+                    if (statusData.progress) {
+                        console.log(`Export progress: ${statusData.progress}%`);
+                    }
+                } catch (pollError) {
+                    console.warn('Error checking export status:', pollError);
+                }
+            }
+        
+            if (!completed) {
+                throw new Error('Export timed out. Please try again later.');
+            }
+        },     
         async fetchMunicipalitiesByProvinces(provinceIds) {
             try {
                 const response = await ApiService.get(`/municipalities/by_provinces/?province_ids=${provinceIds.join(',')}`);
@@ -578,23 +752,45 @@ export const useVespaStore = defineStore('vespaStore', {
                 this.lastAppliedFilters = currentFilters;
             }
         },
-        getColorByStatus(status) {
-            if (status === 'successful') {
-                return '#198754';
-            } else if (status === 'eradicated') {
-                return '#198754';
-            } else if (status === 'untreated') {
-                return '#198754';
-            } else if (status === 'unknown') {
-                return '#198754';
-            } else if (status === 'unsuccessful') {
-                return '#198754';
-            } else if (status === 'reserved') {
-                return '#ea792a';
-            } else if (status === 'untreatable') {
-                return '#198754';
+        resetFilters(options = {}) {
+            this.filters = {
+                min_observation_date: options.min_observation_date || '2024-04-01',
+                max_observation_date: null,
+                provinces: [],
+                municipalities: [],
+                nestType: null,
+                nestStatus: null,
+                anbAreasActief: null
+            };
+            this.getObservationsGeoJson();
+        },
+        determineStatusFromObservationData(observationData) {
+            if (!observationData) return "untreated";
+            if (observationData.eradication_result === 'successful') {
+                return "eradicated";
             }
-            return '#212529';
+            if (observationData.eradication_result !== null && typeof observationData.eradication_result !== 'undefined') {
+                return "visited";
+            }
+            if (observationData.reserved_by !== null && typeof observationData.reserved_by !== 'undefined') {
+                return "reserved";
+            }
+            return "untreated";
+        },
+        getColorStylesByStatus(status) {
+            switch (status) {
+                case 'eradicated': // Bestreden nest (Green fill)
+                    return { fillColor: '#198754', borderColor: '#145c3f', baseWeight: 1, fillOpacity: 0.8 }; // Darker green border
+                case 'visited':    // Bezocht nest (White fill, Green border)
+                    return { fillColor: '#FFFFFF', borderColor: '#198754', baseWeight: 2, fillOpacity: 0.9 }; // Green border, thicker
+                case 'reserved':   // Gereserveerd nest (Yellow fill)
+                    return { fillColor: '#ffc107', borderColor: '#cc9a05', baseWeight: 1, fillOpacity: 0.8 }; // Darker yellow border
+                case 'untreated':  // Gerapporteerd nest (Black/Dark fill)
+                    return { fillColor: '#212529', borderColor: '#000000', baseWeight: 1, fillOpacity: 0.8 }; // Black border
+                default:
+                    // console.warn(`Unknown status: ${status}, defaulting to untreated style.`);
+                    return { fillColor: '#212529', borderColor: '#000000', baseWeight: 1, fillOpacity: 0.8 };
+            }
         },
     },
 });

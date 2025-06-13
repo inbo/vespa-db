@@ -4,21 +4,18 @@ import csv
 import datetime
 import io
 import json
-import time
 import logging
 import csv
 import json
 from typing import TYPE_CHECKING, Any, Union, List
 from django.http import HttpResponseNotFound
 import os
-from typing import Iterator, Set
 from django.db.models.query import QuerySet
-from django.db.models import Model
 from csv import writer as _writer
 from django.db.models.query import QuerySet
 from django.contrib.gis.geos import Point
 from dateutil import parser
-
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.gis.db.models.functions import Transform
 from django.contrib.gis.geos import GEOSGeometry
@@ -51,13 +48,19 @@ from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_gis.filters import DistanceToPointFilter
+from rest_framework.parsers import MultiPartParser
+from django.core.files.storage import default_storage
+from vespadb.observations.models import Import
+from vespadb.observations.tasks.generate_import import process_import
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
+from vespadb.observations.constants import MIN_OBSERVATION_DATETIME
 
 from vespadb.observations.cache import invalidate_geojson_cache, invalidate_observation_cache
 from vespadb.observations.filters import ObservationFilter
 from vespadb.observations.helpers import parse_and_convert_to_cet
 from vespadb.observations.models import Municipality, Observation, Province, Export
-from vespadb.observations.tasks.export_utils import generate_rows
-from vespadb.observations.tasks.generate_export import generate_export
+from vespadb.observations.tasks.generate_export import generate_rows
 from vespadb.observations.serializers import ObservationSerializer, MunicipalitySerializer, ProvinceSerializer
 from vespadb.observations.utils import check_if_point_in_anb_area, get_municipality_from_coordinates, get_geojson_cache_key
 from django.utils.decorators import method_decorator
@@ -65,7 +68,6 @@ from django_ratelimit.decorators import ratelimit
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
 from django.shortcuts import get_object_or_404
-from vespadb.observations.constants import MIN_OBSERVATION_DATETIME
 from rest_framework.pagination import CursorPagination
 from vespadb.observations.models import (
     NestHeightEnum, NestSizeEnum, NestLocationEnum, NestTypeEnum,
@@ -170,16 +172,22 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         -------
             List[BasePermission]: A list of permission instances that should be applied to the action.
         """
+        permission_classes = [AllowAny()]
+    
         if self.action in {"create", "update", "partial_update"}:
-            if  self.request.user.is_superuser:
+            if self.request.user.is_superuser:
                 permission_classes = [IsAdminUser()]
             elif self.request.user.is_authenticated and self.request.user.get_permission_level() == "logged_in_with_municipality":
                 permission_classes = [IsAuthenticated()]
         elif self.action == "destroy":
             permission_classes = [IsAdminUser()]
+        elif self.action in {"debug_s3_files", "debug_exports"}:
+            permission_classes = [IsAdminUser()]
         else:
             permission_classes = [AllowAny()]
+            
         return permission_classes
+
 
     def get_queryset(self) -> QuerySet:
         """
@@ -188,13 +196,20 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         Admin users can see all observations. Authenticated users see their reservations and unreserved observations.
         Unauthenticated users see only unreserved observations.
         """
-        base_queryset = super().get_queryset().select_related('municipality', 'province')
+        base_queryset = super().get_queryset().select_related(
+            'municipality', 
+            'province',
+            'created_by',
+            'modified_by', 
+            'reserved_by'
+        )
     
         # Add default filter for visible observations
         visible_param = self.request.query_params.get("visible", "true")
         if visible_param.lower() != "all" and (not self.request.user.is_authenticated or not self.request.user.is_superuser):
             base_queryset = base_queryset.filter(visible=True)
         
+        # Optimize ordering with annotation
         order_params = self.request.query_params.get("ordering", "")
         if "municipality_name" in order_params:
             base_queryset = base_queryset.annotate(
@@ -204,6 +219,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                     output_field=CharField(),
                 )
             )
+        
         return base_queryset
     
     def perform_update(self, serializer: BaseSerializer) -> None:
@@ -392,72 +408,66 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             query_params = request.GET.copy()
             bbox_str = query_params.pop("bbox", None)
             
-            # Set default visible=true if not specified and not an admin
-            if 'visible' not in query_params and (not request.user.is_authenticated or not request.user.is_superuser):
+            if 'visible' not in query_params:
                 query_params['visible'] = 'true'
                 
             if 'min_observation_datetime' not in query_params:
-                query_params['min_observation_datetime'] = MIN_OBSERVATION_DATETIME
-
-            cache_key = get_geojson_cache_key(query_params)
+                query_params['min_observation_datetime'] = MIN_OBSERVATION_DATETIME # Ensure MIN_OBSERVATION_DATETIME is defined
+            
+            cache_key = get_geojson_cache_key(query_params) # Ensure get_geojson_cache_key is defined
             cached_data = cache.get(cache_key)
             if cached_data:
-                logger.info(f"Returning cached GeoJSON data, found cache: {cache_key}")
+                logger.info(f"Returning cached GeoJSON data, found cache: {cache_key}") # Ensure logger and cache are imported and configured
                 return JsonResponse(cached_data, safe=False)
             
-            # Rest of your view logic remains the same
+            logger.info(f"Cache MISS for key: {cache_key}")
             bbox = None
             if bbox_str:
                 bbox_coords = list(map(float, bbox_str.split(",")))
+                BBOX_LENGTH = 4 # Define or import BBOX_LENGTH
                 if len(bbox_coords) == BBOX_LENGTH:
                     xmin, ymin, xmax, ymax = bbox_coords
                     bbox_wkt = f"POLYGON(({xmin} {ymin}, {xmin} {ymax}, {xmax} {ymax}, {xmax} {ymin}, {xmin} {ymin}))"
-                    bbox = GEOSGeometry(bbox_wkt, srid=4326)
+                    bbox = GEOSGeometry(bbox_wkt, srid=4326) # Ensure GEOSGeometry is imported
                 else:
                     return HttpResponse("Invalid bbox format", status=400)
 
             queryset = self.filter_queryset(
                 self.get_queryset().select_related('municipality')
-            ).annotate(point=Transform("location", 4326))
+            ).annotate(point=Transform("location", 4326)) # Ensure Transform is imported
             if bbox:
                 queryset = queryset.filter(location__within=bbox)
 
             def generate_features(qs):
                 for obs in qs.iterator(chunk_size=1000):
+                    # Determine status based on the new rules
+                    current_status = "untreated"  # Default status
+                    if obs.eradication_result == 'successful':
+                        current_status = "eradicated"
+                    elif obs.eradication_result is not None: # eradication_result has a value but is not 'successful'
+                        current_status = "visited"
+                    elif obs.reserved_by is not None:
+                        current_status = "reserved"
+                    
                     yield {
                         "type": "Feature",
                         "properties": {
                             "id": obs.id,
-                            "status": "eradicated" if obs.eradication_result else "reserved" if obs.reserved_by else "default",
+                            "status": current_status,
                         },
-                        "geometry": json.loads(obs.point.geojson) if obs.point else None,
+                        "geometry": json.loads(obs.point.geojson) if obs.point else None, # Ensure json is imported
                     }
 
             features = list(generate_features(queryset))
             geojson_response = {"type": "FeatureCollection", "features": features}
             logger.info(f"Generating GeoJSON in view with cache_key {cache_key}")
+            GEOJSON_REDIS_CACHE_EXPIRATION = 300 # Define or import
             cache.set(cache_key, geojson_response, GEOJSON_REDIS_CACHE_EXPIRATION)
             return JsonResponse(geojson_response, safe=False)
         except Exception as e:
             logger.exception("GeoJSON generation failed")
             return HttpResponse("Error generating GeoJSON", status=500)
             
-    @swagger_auto_schema(
-        operation_description="Bulk import observations from either JSON or CSV file.",
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            properties={
-                "file": openapi.Schema(type=openapi.TYPE_STRING, format="binary", description="CSV file"),
-                "data": openapi.Schema(
-                    type=openapi.TYPE_ARRAY,
-                    items=openapi.Schema(type=openapi.TYPE_OBJECT),
-                    description="JSON array of observation objects",
-                ),
-            },
-            required=["data"],
-        ),
-        responses={200: "Success", 400: "Bad Request", 415: "Unsupported Media Type"},
-    )
     @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
     @action(detail=False, methods=["post"], permission_classes=[IsAdminUser])
     @parser_classes([JSONParser, MultiPartParser, FormParser])
@@ -657,29 +667,29 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         """
         Process a single record as an update.
         
-        In update mode, we only require an "id" plus any fields that should be updated.
-        For example, if only eradication_result is provided, observation_datetime is not mandatory.
+        When an ID is provided:
+        - If ID exists in database: update
+        - If ID doesn't exist in database: error (never create)
         """
         if err := self._validate_choice_fields(data_item):
             return {"error": f"Record {idx}: {err}"}
         
         observation_id = data_item.get("id")
         try:
-            # First attempt to find by exact ID
+            # Find by exact ID
             existing_obj = Observation.objects.get(id=observation_id)
             logger.info(f"Found existing observation #{observation_id} for update")
         except Observation.DoesNotExist:
-            logger.warning(f"Observation with id {observation_id} not found, falling back to create for record {idx}")
-            return self.process_create_item(data_item, idx, current_time)
+            # Return error instead of falling back to create
+            logger.error(f"Observation with id {observation_id} not found for record {idx}")
+            return {"error": f"Record {idx}: Observation with ID {observation_id} not found. Cannot create with a specific ID."}
         
-        # Get the import user
+        # Rest of the update logic remains the same
         import_user = get_import_user(UserType.IMPORT)
-        
-        # Set the update audit fields
         data_item['modified_by'] = import_user
         data_item['modified_datetime'] = current_time
-
-        # Remove created_by and created_datetime to prevent modification
+        
+        # Remove created fields to prevent modification
         data_item.pop('created_by', None)
         data_item.pop('created_datetime', None)
 
@@ -727,20 +737,45 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         """
         Process a single record as a new observation.
         
-        In create mode, observation_datetime, latitude and longitude are required.
+        When no ID is provided:
+        - If wn_id/source OR source_id/source combination provided:
+        - If combination exists: error
+        - If combination doesn't exist: create
+        - If neither combination provided: error
         """
         if err := self._validate_choice_fields(data_item):
             return {"error": f"Record {idx}: {err}"}
+    
+        # Check for valid identifier combinations
+        has_wn_id_source = 'wn_id' in data_item and data_item['wn_id'] is not None and 'source' in data_item and data_item['source']
+        has_source_id_source = 'source_id' in data_item and data_item['source_id'] is not None and 'source' in data_item and data_item['source']
         
-        # Check if ID is specified
-        observation_id = data_item.get("id")
+        if not (has_wn_id_source or has_source_id_source):
+            return {"error": f"Record {idx}: Either wn_id/source or source_id/source combination is required for import"}
         
+        # Check if combination already exists
+        existing_observation = None
+        if has_wn_id_source:
+            try:
+                existing_observation = Observation.objects.get(wn_id=data_item['wn_id'], source=data_item['source'])
+                return {"error": f"Record {idx}: Observation with wn_id={data_item['wn_id']} and source='{data_item['source']}' already exists"}
+            except Observation.DoesNotExist:
+                pass
+        
+        if has_source_id_source:
+            try:
+                existing_observation = Observation.objects.get(source_id=data_item['source_id'], source=data_item['source'])
+                return {"error": f"Record {idx}: Observation with source_id={data_item['source_id']} and source='{data_item['source']}' already exists"}
+            except Observation.DoesNotExist:
+                pass
+        
+        # Continue with standard validation
         # Ensure required fields for a new record are present
         required_fields = ["observation_datetime", "longitude", "latitude"]
         missing_fields = [field for field in required_fields if not data_item.get(field)]
         if missing_fields:
-            return {"error": f"Missing required fields for new record: {', '.join(missing_fields)}"}
-        
+            return {"error": f"Record {idx}: Missing required fields for new record: {', '.join(missing_fields)}"}
+                
         # Get the import user
         import_user = get_import_user(UserType.IMPORT)
         
@@ -790,6 +825,11 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                     if field == "observation_datetime":  # This is required
                         return {"error": f"Invalid datetime format for required field {field}: {data_item[field]}"}
                     data_item[field] = None
+
+        # Set visible default to True if not provided or null
+        if 'visible' not in data_item or data_item['visible'] is None:
+            data_item['visible'] = True
+            logger.info(f"Setting visible=True for record {idx} (was None or not provided)")
         
         try:
             long_val = float(data_item.pop('longitude'))
@@ -812,7 +852,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         except Exception as e:
             logger.error(f"Unexpected error in process_create_item for record {idx}: {str(e)}")
             return {"error": f"Unexpected error: {str(e)}"}
-    
+        
     def clean_data(self, data_dict: dict[str, Any]) -> dict[str, Any]:
         """Clean the incoming data and remove empty or None values."""
         logger.info("Original data item: %s", data_dict)
@@ -911,54 +951,116 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
             
+
     @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
     @action(detail=False, methods=["get"], permission_classes=[AllowAny])
     def export(self, request: HttpRequest) -> JsonResponse:
-        """Initiate the export of observations and trigger a Celery task."""
-        # Initialize the filterset
-        filterset = self.filterset_class(data=request.GET, queryset=self.get_queryset())
-
-        # Validate the filterset
-        if not filterset.is_valid():
-            return JsonResponse({"error": filterset.errors}, status=400)
-
-        # Get the filtered queryset count first
-        filtered_count = filterset.qs.count()
-        if filtered_count > 10000:
+        """Export observations using pre-generated S3 files only."""
+        # Try to get the latest hourly export from S3
+        from vespadb.observations.tasks.generate_export import get_latest_hourly_export, generate_hourly_export
+        latest_file = get_latest_hourly_export()
+        
+        if latest_file:
+            logger.info(f"Using pre-generated hourly export: {latest_file}")
+            # Create an Export record for tracking
+            export = Export.objects.create(
+                user=request.user if request.user.is_authenticated else None,
+                file_path=latest_file,
+                status='completed',
+                completed_at=timezone.now(),
+                progress=100,
+            )
+            
             return JsonResponse({
-                "error": f"Export too large. Found {filtered_count} records, maximum allowed is 10,000"
-            }, status=400)
-
-        # Prepare the filter parameters - only include valid filters
-        filters = {}
-        for key, value in request.GET.items():
-            if key in filterset.filters and value:
-                filters[key] = value
-
-        # Create an Export record
+                'export_id': export.id,
+                'status': 'completed',
+                'total_records': 'all',
+                'pre_generated': True
+            })
+        
+        # No pre-generated file exists, trigger generation
+        logger.info("No pre-generated export found, triggering hourly export generation")
+        
+        # Trigger the hourly export task
+        task = generate_hourly_export.delay()
+        
+        # Create an Export record to track this request
         export = Export.objects.create(
             user=request.user if request.user.is_authenticated else None,
-            filters=filters,
             status='pending',
+            task_id=task.id,
         )
-
-        # Trigger the Celery task
-        task = generate_export.delay(
-            export.id,
-            filters,
-            user_id=request.user.id if request.user.is_authenticated else None
-        )
-
-        # Update the Export record with the task ID
-        export.task_id = task.id
-        export.save()
-
-        return JsonResponse({
-            'export_id': export.id,
-            'task_id': task.id,
-            'total_records': filtered_count
-        })
         
+        return JsonResponse({
+            "error": "No export file is currently available. We're generating a new one now.",
+            "message": "Please try again in a few minutes. The export is being prepared.",
+            "export_id": export.id,
+            "task_id": task.id,
+            "estimated_wait_time": "5-10 minutes",
+            "status": "generating"
+        }, status=202) 
+    
+    @action(detail=False, methods=["get"])
+    def download_export(self, request: HttpRequest) -> Union[StreamingHttpResponse, HttpResponse]:
+        """Stream the export directly to the user from S3."""
+        export_id = request.GET.get('export_id')
+        if not export_id:
+            return HttpResponseBadRequest("Export ID is required")
+
+        try:
+            export = Export.objects.get(id=export_id)
+            logger.info(f"Found export {export_id}: status={export.status}, file_path={export.file_path}")
+            
+            if export.status != 'completed':
+                return HttpResponseBadRequest("Export is not ready")
+
+            if not export.file_path:
+                return HttpResponseBadRequest("Export file path not found")
+
+            # Check if file exists in S3
+            if not default_storage.exists(export.file_path):
+                logger.error(f"File does not exist in S3: {export.file_path}")
+                return HttpResponseNotFound("Export file not found in storage")
+
+            # Stream the file from S3
+            try:
+                # Open file in binary mode for proper streaming
+                file_obj = default_storage.open(export.file_path, 'rb')
+                
+                # Create streaming response with proper content type
+                response = StreamingHttpResponse(
+                    streaming_content=file_obj,
+                    content_type='application/octet-stream'
+                )
+                
+                # Extract filename from file_path or create a default one
+                filename = export.file_path.split('/')[-1]
+                if not filename.endswith('.csv'):
+                    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+                    filename = f'observations_export_{timestamp}.csv'
+                
+                response['Content-Disposition'] = f'attachment; filename="{filename}"'
+                response['Content-Type'] = 'text/csv'
+                
+                # Add CORS headers if needed
+                response["Access-Control-Allow-Origin"] = request.META.get('HTTP_ORIGIN', '*')
+                response["Access-Control-Allow-Credentials"] = "true"
+                response["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+                response["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+                
+                logger.info(f"Successfully streaming export {export_id} from {export.file_path}")
+                return response
+                
+            except Exception as e:
+                logger.error(f"Error opening file from S3: {str(e)}")
+                return HttpResponseServerError("Error accessing export file")
+
+        except Export.DoesNotExist:
+            logger.error(f"Export {export_id} not found")
+            return HttpResponseNotFound("Export not found")
+        except Exception as e:
+            logger.exception(f"Error in download_export: {str(e)}")
+            return HttpResponseServerError("Error processing download request")
     @swagger_auto_schema(
         operation_description="Check the status of an export.",
         manual_parameters=[
@@ -978,6 +1080,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                     'progress': openapi.Schema(type=openapi.TYPE_INTEGER),
                     'error': openapi.Schema(type=openapi.TYPE_STRING, nullable=True),
                     'download_url': openapi.Schema(type=openapi.TYPE_STRING, nullable=True),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING, nullable=True),
                 },
             ),
             400: "Bad Request",
@@ -991,62 +1094,102 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         if not export_id:
             logger.error("Export ID not provided")
             return JsonResponse({"error": "Export ID is required"}, status=400)
-        
+
         try:
             export = get_object_or_404(Export, id=export_id)
         except Exception as e:
             logger.exception(f"Export ID {export_id} not found or invalid: {str(e)}")
             return JsonResponse({"error": f"Export ID {export_id} not found"}, status=404)
-        
+
         if export.status == 'completed':
             download_url = request.build_absolute_uri(f'/observations/download_export/?export_id={export_id}')
             return JsonResponse({
                 'status': 'completed',
-                'download_url': download_url
+                'download_url': download_url,
+                'message': 'Export is ready for download'
             })
-
-        return JsonResponse({
-            'status': export.status,
-            'progress': export.progress,
-            'error': export.error_message
-        })
-
+        elif export.status == 'pending':
+            return JsonResponse({
+                'status': 'pending',
+                'progress': export.progress,
+                'message': 'Export is being generated. Please wait...',
+                'estimated_wait_time': '5-10 minutes'
+            })
+        elif export.status == 'failed':
+            return JsonResponse({
+                'status': 'failed',
+                'error': export.error_message or 'Export generation failed',
+                'message': 'Export failed. Please try again later.'
+            })
+        else:
+            return JsonResponse({
+                'status': export.status,
+                'progress': export.progress,
+                'error': export.error_message
+            })
     @action(detail=False, methods=["get"])
-    def download_export(self, request: HttpRequest) -> Union[StreamingHttpResponse, HttpResponse]:
-        """Stream the export directly to the user."""
+    def debug_export(self, request: HttpRequest) -> JsonResponse:
+        """Debug endpoint to check specific export."""
         export_id = request.GET.get('export_id')
         if not export_id:
-            return HttpResponseBadRequest("Export ID is required")
-
+            return JsonResponse({"error": "export_id is required"}, status=400)
+        
         try:
             export = Export.objects.get(id=export_id)
-            if export.status != 'completed':
-                return HttpResponseBadRequest("Export is not ready")
-
-            # Get the data iterator from cache
-            cache_key = f'export_{export_id}_data'
-            rows = cache.get(cache_key)
-            if not rows:
-                return HttpResponseNotFound("Export data not found or expired")
-
-            # Create the streaming response
-            pseudo_buffer = Echo()
-            writer = csv.writer(pseudo_buffer)
-            response = StreamingHttpResponse(
-                (writer.writerow(row) for row in rows),
-                content_type='text/csv'
-            )
             
-            timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-            response['Content-Disposition'] = f'attachment; filename="observations_export_{timestamp}.csv"'
-            return response
-
+            debug_info = {
+                "export_record": {
+                    "id": export.id,
+                    "status": export.status,
+                    "file_path": export.file_path,
+                    "created_at": export.created_at.isoformat() if export.created_at else None,
+                    "completed_at": export.completed_at.isoformat() if export.completed_at else None,
+                    "progress": export.progress,
+                    "error_message": export.error_message,
+                    "task_id": export.task_id,
+                }
+            }
+            
+            # Check S3 file
+            if export.file_path:
+                try:
+                    debug_info["s3_file"] = {
+                        "exists": default_storage.exists(export.file_path),
+                        "path": export.file_path,
+                    }
+                    
+                    if debug_info["s3_file"]["exists"]:
+                        try:
+                            file_obj = default_storage.open(export.file_path)
+                            debug_info["s3_file"]["size"] = file_obj.size
+                            debug_info["s3_file"]["readable"] = True
+                            file_obj.close()
+                        except Exception as e:
+                            debug_info["s3_file"]["readable"] = False
+                            debug_info["s3_file"]["read_error"] = str(e)
+                            
+                except Exception as e:
+                    debug_info["s3_file"] = {
+                        "error": str(e)
+                    }
+            else:
+                debug_info["s3_file"] = {"error": "No file path in export record"}
+            
+            # Check cache (legacy)
+            cache_key = f'export_{export_id}_data'
+            cached_data = cache.get(cache_key)
+            debug_info["cache"] = {
+                "key": cache_key,
+                "has_data": cached_data is not None,
+                "data_type": type(cached_data).__name__ if cached_data else None,
+            }
+            
+            return JsonResponse(debug_info)
+            
         except Export.DoesNotExist:
-            return HttpResponseNotFound("Export not found")
+            return JsonResponse({"error": f"Export {export_id} not found"}, status=404)
         except Exception as e:
-            logger.error(f"Error streaming export: {str(e)}")
-            return HttpResponseServerError("Error generating export")
-
+            return JsonResponse({"error": f"Debug failed: {str(e)}"}, status=500)
     @method_decorator(csrf_exempt)
     @action(detail=False, methods=['get'], permission_classes=[AllowAny])
     def export_direct(self, request: HttpRequest) -> Union[StreamingHttpResponse, JsonResponse]:
@@ -1108,6 +1251,97 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         except Exception as e:
             logger.exception("Export failed")
             return JsonResponse({"error": str(e)}, status=500)
+    
+    @action(detail=False, methods=["post"], permission_classes=[IsAdminUser], parser_classes=[MultiPartParser])
+    def async_bulk_import(self, request: Request) -> Response:
+        """Initiate an asynchronous bulk import of observations."""
+        logger.info("Async bulk import request received.")
+
+        file = request.FILES.get("file")
+        if not file:
+            logger.error("No file provided.")
+            return Response({"error": "File is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not (file.name.endswith(".json") or file.name.endswith(".csv")):
+            logger.error("Unsupported file format.")
+            return Response({"error": "Unsupported file format. Only JSON or CSV allowed."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Save file to S3 under VESPADB/IMPORT/
+        file_path = f"VESPADB/IMPORT/{file.name}"
+        try:
+            file_path = default_storage.save(file_path, file)
+            logger.info(f"File saved to S3 at: {file_path}")
+        except Exception as e:
+            logger.exception("Failed to save file to S3")
+            return Response({"error": f"Failed to save file: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        logger.info("File saved successfully, creating import record.")
+        # Create Import record
+        import_record = Import.objects.create(
+            user=request.user if request.user.is_authenticated else None,
+            file_path=file_path,
+            status="pending",
+        )
+
+        # Trigger Celery task
+        logger.info("triggering Celery task for import processing.")
+        task = process_import.delay(import_record.id)
+        import_record.task_id = task.id
+        import_record.save()
+
+        return Response(
+            {
+                "import_id": import_record.id,
+                "task_id": task.id,
+                "message": "Import job initiated. Check status for progress.",
+            },
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+    @swagger_auto_schema(
+        operation_description="Check the status of an import job.",
+        manual_parameters=[
+            openapi.Parameter(
+                "import_id",
+                openapi.IN_QUERY,
+                description="The ID of the import to check the status of.",
+                type=openapi.TYPE_INTEGER,
+                required=True,
+            )
+        ],
+        responses={
+            200: openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    "status": openapi.Schema(type=openapi.TYPE_STRING),
+                    "progress": openapi.Schema(type=openapi.TYPE_INTEGER),
+                    "error": openapi.Schema(type=openapi.TYPE_STRING, nullable=True),
+                    "created_ids": openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Schema(type=openapi.TYPE_INTEGER)),
+                    "updated_ids": openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Schema(type=openapi.TYPE_INTEGER)),
+                },
+            ),
+            400: "Bad Request",
+            404: "Import not found",
+        },
+    )
+    @action(detail=False, methods=["get"], permission_classes=[IsAdminUser])
+    def import_status(self, request: HttpRequest) -> JsonResponse:
+        """Check the status of an import job."""
+        import_id = request.query_params.get("import_id")
+        if not import_id:
+            return Response({"error": "import_id is required"}, status=400)
+        try:
+            import_record = Import.objects.get(id=import_id)
+            return Response({
+                "id": import_record.id,
+                "status": import_record.status,
+                "progress": import_record.progress,
+                "error_message": import_record.error_message,
+                "created_ids": import_record.created_ids,
+                "updated_ids": import_record.updated_ids,
+            })
+        except Import.DoesNotExist:
+            return Response({"error": "Import not found"}, status=404)
         
 @require_GET
 def search_address(request: Request) -> JsonResponse:
@@ -1152,6 +1386,51 @@ def search_address(request: Request) -> JsonResponse:
     except (ValueError, TypeError) as e:
         return JsonResponse({"error": f"Unexpected error: {e!s}"}, status=500)
 
+@action(detail=False, methods=["get"], permission_classes=[IsAdminUser])  
+def debug_exports(self, request: HttpRequest) -> JsonResponse:
+    """Debug endpoint to check Export records."""
+    try:
+        from vespadb.observations.models import Export
+        
+        # Get recent export records
+        recent_exports = Export.objects.all().order_by('-created_at')[:10]
+        
+        export_data = []
+        for export in recent_exports:
+            export_info = {
+                "id": export.id,
+                "status": export.status,
+                "file_path": export.file_path,
+                "created_at": export.created_at.isoformat() if export.created_at else None,
+                "completed_at": export.completed_at.isoformat() if export.completed_at else None,
+                "progress": export.progress,
+                "error_message": export.error_message,
+            }
+            
+            # Check if file exists in S3
+            if export.file_path:
+                try:
+                    export_info["file_exists_in_s3"] = default_storage.exists(export.file_path)
+                    if export_info["file_exists_in_s3"]:
+                        file_obj = default_storage.open(export.file_path)
+                        export_info["file_size"] = file_obj.size
+                        file_obj.close()
+                except Exception as e:
+                    export_info["file_check_error"] = str(e)
+            
+            export_data.append(export_info)
+        
+        return JsonResponse({
+            "total_exports": Export.objects.count(),
+            "recent_exports": export_data,
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            "error": "Debug exports failed",
+            "details": str(e)
+        })
+
 
 class MunicipalityViewSet(ReadOnlyModelViewSet):
     """ViewSet for the Municipality model."""
@@ -1179,7 +1458,8 @@ class MunicipalityViewSet(ReadOnlyModelViewSet):
     @action(detail=False, methods=["get"])
     def by_provinces(self, request: Request) -> Response:
         """Return municipalities filtered by province IDs."""
-        cache_key = "vespadb::municipalities_by_province::list"
+        province_ids = request.query_params.get("province_ids")
+        cache_key = f"vespadb::municipalities_by_province::{province_ids}"
         cached_data = cache.get(cache_key)
         if cached_data:
             return Response(cached_data)

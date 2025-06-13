@@ -1,12 +1,11 @@
 <template>
   <nav class="navbar navbar-expand-lg navbar-light bg-light">
     <div class="container-fluid">
-      <a class="navbar-brand d-flex align-items-center" href="/">
+      <a class="navbar-brand d-flex align-items-center" href="https://vespawatch.be">
         <img class="me-3" src="../assets/logo.png" alt="Vespa-Watch">
         Vespa-Watch
       </a>
       <div class="d-flex align-items-center">
-        <!-- Export Toggle (Hidden on Medium Devices and below) -->
         <div class="btn-group me-2 d-none d-md-inline-flex">
           <button type="button" class="btn btn-outline-dark dropdown-toggle" data-bs-toggle="dropdown"
             aria-expanded="false">
@@ -25,7 +24,6 @@
           </ul>
         </div>
 
-        <!-- User Login/Logout -->
         <span v-if="isLoggedIn && !loadingAuth" class="navbar-text">
           <div class="btn-group">
             <button type="button" class="btn btn-outline-dark dropdown-toggle" data-bs-toggle="dropdown"
@@ -40,8 +38,7 @@
         </span>
         <router-link v-if="!isLoggedIn && !loadingAuth" to="/login" class="btn btn-outline-dark"
           active-class="active">Inloggen</router-link>
-        <span v-if="loadingAuth" class="navbar-text">Loading...</span> <!-- Placeholder while loading -->
-      </div>
+        <span v-if="loadingAuth" class="navbar-text">Loading...</span> </div>
     </div>
   </nav>
   
@@ -144,17 +141,17 @@ export default {
 .notification-banner {
   background-color: #fff3cd;
   border-bottom: 1px solid #ffeeba;
-  padding: 0.75rem 0;
+  padding: 0.5rem 0; /* Smaller padding for mobile */
   position: relative;
   z-index: 1050;
 }
 
 .notification-text {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.75rem; /* Smaller font size for mobile */
   color: #856404;
   text-align: center;
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
 .notification-link {
@@ -165,5 +162,15 @@ export default {
 
 .notification-link:hover {
   color: #533f03;
+}
+
+@media (min-width: 768px) {
+  .notification-banner {
+    padding: 0.75rem 0;
+  }
+
+  .notification-text {
+    font-size: 0.9rem;
+  }
 }
 </style>

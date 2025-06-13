@@ -124,6 +124,7 @@ class EradicationProblemsEnum(models.TextChoices):
 class EradicationProductEnum(models.TextChoices):
     """Enum for the product used for the eradication."""
 
+    SPRAY_SPUITBUS = "spray_spuitbus", _("Spray of spuitbus")
     PERMAS_D = "permas_d", _("Permas-D")
     LIQUID_NITROGEN = "vloeibare_stikstof", _("Vloeibare stikstof")
     FICAM_D = "ficam_d", _("Ficam D")
@@ -421,15 +422,29 @@ class Observation(models.Model):
             models.Index(fields=['visible', 'observation_datetime']),
             gis_models.Index(fields=['location'], name='location_idx'),
             models.Index(fields=['municipality', 'visible']),
+            models.Index(fields=['province']),
+            models.Index(fields=['anb']),
+            models.Index(fields=['nest_type']),
+            models.Index(fields=['eradication_result']),
+            models.Index(fields=['reserved_by']),
+            models.Index(fields=['observation_datetime', 'visible']),
+            models.Index(fields=['eradication_date']),
+            models.Index(fields=['-observation_datetime']),
+            models.Index(fields=['wn_id']),
+            models.Index(fields=['eradicator_name']),
+            models.Index(fields=['observer_name']),
+            models.Index(fields=['modified_datetime']),
+            models.Index(fields=['reserved_datetime']),
+            models.Index(fields=['created_by', 'observation_datetime']),
+            models.Index(fields=['municipality', 'observation_datetime']),
         ]
 
 class Export(models.Model):
-    """Model for tracking observation exports."""
     STATUS_CHOICES = (
-        ('pending', 'Pending'),
-        ('processing', 'Processing'),
-        ('completed', 'Completed'),
-        ('failed', 'Failed'),
+        ("pending", "Pending"),
+        ("processing", "Processing"),
+        ("completed", "Completed"),
+        ("failed", "Failed"),
     )
 
     id = models.AutoField(primary_key=True)
@@ -438,13 +453,44 @@ class Export(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        help_text="User who requested the export",
+        help_text="User who initiated the export",
     )
-    filters = models.JSONField(default=dict, help_text="Filters applied to the export")
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', help_text="Status of the export")
-    progress = models.IntegerField(default=0, help_text="Progress percentage of the export")
-    file_path = models.CharField(max_length=255, blank=True, null=True, help_text="Path to the exported file")
-    created_at = models.DateTimeField(auto_now_add=True, help_text="Datetime when the export was created")
-    completed_at = models.DateTimeField(blank=True, null=True, help_text="Datetime when the export was completed")
-    error_message = models.TextField(blank=True, null=True, help_text="Error message if the export failed")
-    task_id = models.CharField(max_length=255, blank=True, null=True, help_text="Celery task ID for the export")
+    file_path = models.CharField(max_length=255)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    progress = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    error_message = models.TextField(null=True, blank=True)
+    task_id = models.CharField(max_length=255, null=True, blank=True)
+
+    def __str__(self):
+        return f"Export {self.id} - {self.status}"
+
+class Import(models.Model):
+    STATUS_CHOICES = (
+        ("pending", "Pending"),
+        ("processing", "Processing"),
+        ("completed", "Completed"),
+        ("failed", "Failed"),
+    )
+
+    id = models.AutoField(primary_key=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="User who initiated the import",
+    )
+    file_path = models.CharField(max_length=255, null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending", help_text="Status of the import")
+    progress = models.IntegerField(default=0, help_text="Progress percentage of the import")
+    created_at = models.DateTimeField(auto_now_add=True, help_text="Datetime when the import was created")
+    completed_at = models.DateTimeField(blank=True, null=True, help_text="Datetime when the import was completed")
+    error_message = models.TextField(blank=True, null=True, help_text="Error message if the import failed")
+    task_id = models.CharField(max_length=255, blank=True, null=True, help_text="Celery task ID for the import")
+    created_ids = models.JSONField(default=list, help_text="IDs of created observations")
+    updated_ids = models.JSONField(default=list, help_text="IDs of updated observations")
+
+    def __str__(self):
+        return f"Import {self.id} - {self.status}"

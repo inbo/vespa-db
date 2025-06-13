@@ -491,8 +491,12 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         -------
         - None
         """
-        count = queryset.update(eradication_date=now())
-        self.message_user(request, f"{count} observations marked as eradicated.", messages.SUCCESS)
+        from vespadb.observations.models import EradicationResultEnum
+        count = queryset.update(
+            eradication_date=now(),
+            eradication_result=EradicationResultEnum.SUCCESSFUL
+        )
+        self.message_user(request, f"{count} observaties gemarkeerd als bestreden (succesvol).", messages.SUCCESS)
 
     @admin.action(description="Markeer observatie(s) als niet zichtbaar")
     def mark_as_not_visible(self, request: HttpRequest, queryset: Any) -> None:

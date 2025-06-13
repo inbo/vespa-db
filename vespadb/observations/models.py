@@ -124,6 +124,7 @@ class EradicationProblemsEnum(models.TextChoices):
 class EradicationProductEnum(models.TextChoices):
     """Enum for the product used for the eradication."""
 
+    SPRAY_SPUITBUS = "spray_spuitbus", _("Spray of spuitbus")
     PERMAS_D = "permas_d", _("Permas-D")
     LIQUID_NITROGEN = "vloeibare_stikstof", _("Vloeibare stikstof")
     FICAM_D = "ficam_d", _("Ficam D")

@@ -515,6 +515,7 @@ export default {
         };
 
         const eradicationProductEnum = {
+            "spray_spuitbus": "Spray of spuitbus",
             "permas_d": "Permas-D",
             "vloeibare_stikstof": "Vloeibare stikstof",
             "ficam_d": "Ficam D",

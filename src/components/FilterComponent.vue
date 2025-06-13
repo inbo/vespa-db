@@ -1,7 +1,7 @@
 <template>
   <div class="filters-container">
     <div class="container-fluid px-0">
-      <div class="row g-3">
+      <div class="row g-3 mx-0">
         <!-- <div class="col-12">
           <h3 class="filters-heading">Filters</h3>
         </div> -->

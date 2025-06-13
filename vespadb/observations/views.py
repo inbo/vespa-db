@@ -1458,7 +1458,8 @@ class MunicipalityViewSet(ReadOnlyModelViewSet):
     @action(detail=False, methods=["get"])
     def by_provinces(self, request: Request) -> Response:
         """Return municipalities filtered by province IDs."""
-        cache_key = "vespadb::municipalities_by_province::list"
+        province_ids = request.query_params.get("province_ids")
+        cache_key = f"vespadb::municipalities_by_province::{province_ids}"
         cached_data = cache.get(cache_key)
         if cached_data:
             return Response(cached_data)

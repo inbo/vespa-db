@@ -5,7 +5,6 @@ const ModalMessage = defineAsyncComponent(() => import('@/components/ModalMessag
 const ChangePasswordPage = () => import('../components/ChangePasswordPage.vue');
 const Login = () => import('../components/LoginPage.vue');
 const MapPage = () => import('../components/MapPage.vue');
-const TableViewPage = () => import('../components/TableViewPage.vue');
 
 const routes = [
   {
@@ -15,11 +14,7 @@ const routes = [
   },
   {
     path: '/map',
-    name: 'map',
-    component: MapPage,
-    meta: { 
-      activeView: 'map' 
-    }
+    redirect: '/'
   },
   {
     path: '/observation/:id',
@@ -57,4 +52,5 @@ router.beforeEach(async (to, from, next) => {
     next();
   }
 });
+
 export default router;

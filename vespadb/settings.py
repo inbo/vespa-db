@@ -15,6 +15,7 @@ from pathlib import Path
 
 from celery.schedules import crontab
 from dotenv import load_dotenv
+from vespadb.observations.cache_configs import PREWARM_CONFIGS
 
 load_dotenv()
 secrets = {
@@ -122,6 +123,14 @@ CELERY_ACCEPT_CONTENT = ["application/json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "Europe/Brussels"
+MIN_OBSERVATION_DATETIME = "2024-04-01T00:00:00+02:00"
+prewarm_schedule = {
+    f"prewarm-geojson-{config['name']}": {
+        'task': 'vespadb.observations.tasks.generate_geojson_task',
+        'schedule': config['schedule'],
+        'args': (config['params'],)
+    } for config in PREWARM_CONFIGS
+}
 CELERY_BEAT_SCHEDULE = {
     "fetch_and_update_observations": {
         "task": "vespadb.observations.tasks.observation_sync.fetch_and_update_observations",
@@ -131,15 +140,20 @@ CELERY_BEAT_SCHEDULE = {
         "task": "vespadb.observations.tasks.reservation_cleanup.free_expired_reservations_and_audit_reservation_count",
         "schedule": crontab(hour=5, minute=30),
     },
-    'prewarm-geojson-cache': {
-        'task': "vespadb.observations.tasks.generate_geojson_task",
-        'schedule': crontab(minute='*/13'),  # Geen restrictie meer op uren
-        'args': ({
-            'visible': 'true',
-            'min_observation_datetime': '2024-04-01T00:00:00+02:00'
-        },)
+    "generate-hourly-export": {
+        "task": "vespadb.observations.tasks.generate_export.generate_hourly_export",
+        "schedule": crontab(minute=0, hour="*"),
+    },
+    "cleanup-old-exports": {
+        "task": "vespadb.observations.tasks.generate_export.cleanup_old_exports",
+        "schedule": crontab(minute=0, hour="*/6"),
+    },
+    "cleanup-old-imports": {
+        "task": "vespadb.observations.tasks.generate_import.cleanup_old_imports",
+        "schedule": crontab(minute=0, hour="*/6"),
     },
 }
+CELERY_BEAT_SCHEDULE.update(prewarm_schedule)
 
 AUTH_USER_MODEL = "users.VespaUser"
 
@@ -283,5 +297,18 @@ DEFAULT_FROM_EMAIL = secrets["DEFAULT_FROM_EMAIL"]
 SERVER_EMAIL = secrets["DEFAULT_FROM_EMAIL"]
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-EXPORTS_DIR = os.path.join(MEDIA_ROOT, 'exports')
 CREATED_START_DATE = "2024-06-13"
+# S3 Configuration
+AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME", "vespadb-imports")
+AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME", "eu-west-1")
+AWS_DEFAULT_ACL = None
+AWS_S3_FILE_OVERWRITE = False
+DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+
+# Use LocalStack for local development
+if os.getenv("DEBUG", "False").lower() == "true":
+    AWS_S3_ENDPOINT_URL = "http://localstack:4566"  # LocalStack endpoint
+    AWS_ACCESS_KEY_ID = "test"  # Dummy credentials for LocalStack
+    AWS_SECRET_ACCESS_KEY = "test"
+else:
+    AWS_S3_ENDPOINT_URL = None  # Use real AWS S3 in UAT/production

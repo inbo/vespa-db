@@ -35,24 +35,24 @@ def generate_geojson_task(raw_params):
         elif value == 'false':
             queryset = queryset.filter(visible=False)
 
-    if 'nestType' in params:
-        nest_types = params.pop('nestType')
+    if 'nest_type' in params:
+        nest_types = params.pop('nest_type')
         if nest_types:
             queryset = queryset.filter(nest_type__in=nest_types)
 
-    if 'anbAreasActief' in params:
-        value = params.pop('anbAreasActief')
+    if 'anb_areas_actief' in params:
+        value = params.pop('anb_areas_actief')
         if value is not None:
              queryset = queryset.filter(anb=value)
 
-    if 'nestStatus' in params:
-        statuses = params.pop('nestStatus')
+    if 'nest_status' in params:
+        statuses = params.pop('nest_status')
         if statuses:
             status_q_objects = Q()
             if 'open' in statuses:
                 status_q_objects |= Q(reserved_by__isnull=True, eradication_result__isnull=True)
             if 'reserved' in statuses:
-                status_q_objects |= Q(reserved_by__isnull=False)
+                status_q_objects |= Q(reserved_by__isnull=False, eradication_result__isnull=True)
             if 'eradicated' in statuses:
                 status_q_objects |= Q(eradication_result='successful')
             if 'visited' in statuses:
@@ -96,6 +96,6 @@ def generate_geojson_task(raw_params):
         })
 
     result = {"type": "FeatureCollection", "features": features}
-    cache.set(cache_key, result, 900)
+    cache.set(cache_key, result, 900) # Cache for 15 minutes
     logger.info(f"Celery Task: GeoJSON generated and cached for key: {cache_key}")
     return result

@@ -24,7 +24,7 @@ PUBLIC_FIELDS = [
     "longitude",
     "province",
     "municipality",
-    "anb_domain",
+    "anb",
     "nest_status",
     "eradication_date",
     "eradication_result",
@@ -33,6 +33,10 @@ PUBLIC_FIELDS = [
     "nest_location",
     "nest_height",
     "nest_size",
+    "queen_present",
+    "moth_present",
+    "duplicate_nest",
+    "other_species_nest",
     "notes",
     "source",
     "source_id",
@@ -45,8 +49,10 @@ PUBLIC_FIELDS = [
 
 def get_status(observation: Observation) -> str:
     """Get observation status string."""
-    if observation.eradication_result:
+    if observation.eradication_result == 'successful':
         return "eradicated"
+    if observation.eradication_result is not None:
+        return "visited"
     if observation.reserved_by:
         return "reserved"
     return "untreated"

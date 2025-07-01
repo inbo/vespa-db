@@ -408,6 +408,8 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         """
         try:
             query_params = request.GET.copy()
+            if 'visible' not in query_params:
+                query_params['visible'] = 'true'
             cache_key = get_geojson_cache_key(query_params)
             cached_data = cache.get(cache_key)
             if cached_data:
@@ -991,6 +993,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
 
     @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
     @action(detail=False, methods=["get"], permission_classes=[AllowAny])
+    @swagger_auto_schema(manual_parameters=[])
     def export(self, request: HttpRequest) -> JsonResponse:
         """Export observations using pre-generated S3 files only."""
         # Try to get the latest hourly export from S3

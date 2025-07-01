@@ -16,8 +16,8 @@ from django.db.models.query import QuerySet
 from django.contrib.gis.geos import Point
 from dateutil import parser
 from django.utils import timezone
+from django.db import connection
 from django.views.decorators.csrf import csrf_exempt
-from django.contrib.gis.db.models.functions import Transform
 from django.contrib.gis.geos import GEOSGeometry
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -403,71 +403,108 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
     @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
     @action(detail=False, methods=["get"], url_path="dynamic-geojson")
     def geojson(self, request: Request) -> HttpResponse:
-        """Generate GeoJSON data for the observations."""
+        """
+        Generate GeoJSON data for the observations using a highly optimized raw SQL query.
+        """
         try:
             query_params = request.GET.copy()
-            bbox_str = query_params.pop("bbox", None)
-            
-            if 'visible' not in query_params:
-                query_params['visible'] = 'true'
-                
-            if 'min_observation_datetime' not in query_params:
-                query_params['min_observation_datetime'] = MIN_OBSERVATION_DATETIME # Ensure MIN_OBSERVATION_DATETIME is defined
-            
-            cache_key = get_geojson_cache_key(query_params) # Ensure get_geojson_cache_key is defined
+            cache_key = get_geojson_cache_key(query_params)
             cached_data = cache.get(cache_key)
             if cached_data:
-                logger.info(f"Returning cached GeoJSON data, found cache: {cache_key}") # Ensure logger and cache are imported and configured
+                logger.info(f"Returning cached GeoJSON data, found cache: {cache_key}")
                 return JsonResponse(cached_data, safe=False)
-            
+
             logger.info(f"Cache MISS for key: {cache_key}")
-            bbox = None
-            if bbox_str:
-                bbox_coords = list(map(float, bbox_str.split(",")))
-                BBOX_LENGTH = 4 # Define or import BBOX_LENGTH
-                if len(bbox_coords) == BBOX_LENGTH:
-                    xmin, ymin, xmax, ymax = bbox_coords
-                    bbox_wkt = f"POLYGON(({xmin} {ymin}, {xmin} {ymax}, {xmax} {ymax}, {xmax} {ymin}, {xmin} {ymin}))"
-                    bbox = GEOSGeometry(bbox_wkt, srid=4326) # Ensure GEOSGeometry is imported
-                else:
-                    return HttpResponse("Invalid bbox format", status=400)
 
-            queryset = self.filter_queryset(
-                self.get_queryset().select_related('municipality')
-            ).annotate(point=Transform("location", 4326)) # Ensure Transform is imported
-            if bbox:
-                queryset = queryset.filter(location__within=bbox)
+            # Base query
+            base_query = """
+            SELECT json_build_object(
+                'type', 'FeatureCollection',
+                'features', json_agg(
+                    json_build_object(
+                        'type', 'Feature',
+                        'id', obs.id,
+                        'geometry', ST_AsGeoJSON(obs.location, 6, 0)::json,
+                        'properties', json_build_object(
+                            'id', obs.id,
+                            'status',
+                            CASE
+                                WHEN obs.eradication_result = 'successful' THEN 'eradicated'
+                                WHEN obs.eradication_result IS NOT NULL THEN 'visited'
+                                WHEN obs.reserved_by_id IS NOT NULL THEN 'reserved'
+                                ELSE 'untreated'
+                            END
+                        )
+                    )
+                )
+            )
+            FROM "observations_observation" AS obs
+            """
 
-            def generate_features(qs):
-                for obs in qs.iterator(chunk_size=1000):
-                    # Determine status based on the new rules
-                    current_status = "untreated"  # Default status
-                    if obs.eradication_result == 'successful':
-                        current_status = "eradicated"
-                    elif obs.eradication_result is not None: # eradication_result has a value but is not 'successful'
-                        current_status = "visited"
-                    elif obs.reserved_by is not None:
-                        current_status = "reserved"
-                    
-                    yield {
-                        "type": "Feature",
-                        "properties": {
-                            "id": obs.id,
-                            "status": current_status,
-                        },
-                        "geometry": json.loads(obs.point.geojson) if obs.point else None, # Ensure json is imported
-                    }
+            # Build WHERE clauses from filter parameters
+            filters = []
+            params = {}
 
-            features = list(generate_features(queryset))
-            geojson_response = {"type": "FeatureCollection", "features": features}
-            logger.info(f"Generating GeoJSON in view with cache_key {cache_key}")
-            GEOJSON_REDIS_CACHE_EXPIRATION = 300 # Define or import
+            # Handle all filters from your ObservationFilter class
+            if 'visible' in query_params and query_params.get('visible').lower() != 'all':
+                filters.append("obs.visible = %(visible)s")
+                params['visible'] = query_params.get('visible').lower() == 'true'
+
+            if 'min_observation_datetime' in query_params:
+                filters.append("obs.observation_datetime >= %(min_observation_datetime)s")
+                params['min_observation_datetime'] = query_params['min_observation_datetime']
+
+            if 'max_observation_datetime' in query_params:
+                filters.append("obs.observation_datetime <= %(max_observation_datetime)s")
+                params['max_observation_datetime'] = query_params['max_observation_datetime']
+
+            if 'municipality_id' in query_params:
+                filters.append("obs.municipality_id IN %(municipality_id)s")
+                params['municipality_id'] = tuple(query_params.getlist('municipality_id'))
+            
+            if 'province_id' in query_params:
+                filters.append("obs.province_id IN %(province_id)s")
+                params['province_id'] = tuple(query_params.getlist('province_id'))
+            
+            if 'nest_type' in query_params:
+                filters.append("obs.nest_type IN %(nest_type)s")
+                params['nest_type'] = tuple(query_params.getlist('nest_type'))
+
+            if 'anb' in query_params:
+                filters.append("obs.anb = %(anb)s")
+                params['anb'] = query_params.get('anb').lower() == 'true'
+
+            if 'nest_status' in query_params:
+                status_filters = []
+                status_values = query_params.getlist('nest_status')
+                if 'eradicated' in status_values:
+                    status_filters.append("obs.eradication_result = 'successful'")
+                if 'visited' in status_values:
+                    status_filters.append("(obs.eradication_result IS NOT NULL AND obs.eradication_result != 'successful')")
+                if 'reserved' in status_values:
+                    status_filters.append("obs.reserved_by_id IS NOT NULL")
+                if 'open' in status_values:
+                    status_filters.append("(obs.reserved_by_id IS NULL AND obs.eradication_result IS NULL)")
+                
+                if status_filters:
+                    filters.append(f"({' OR '.join(status_filters)})")
+
+            if filters:
+                base_query += " WHERE " + " AND ".join(filters)
+
+            with connection.cursor() as cursor:
+                cursor.execute(base_query, params)
+                row = cursor.fetchone()
+                geojson_response = row[0] if row else {"type": "FeatureCollection", "features": []}
+
             cache.set(cache_key, geojson_response, GEOJSON_REDIS_CACHE_EXPIRATION)
+            logger.info(f"Generating GeoJSON in view with cache_key {cache_key}")
             return JsonResponse(geojson_response, safe=False)
+
         except Exception as e:
             logger.exception("GeoJSON generation failed")
             return HttpResponse("Error generating GeoJSON", status=500)
-            
+                
     @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
     @action(detail=False, methods=["post"], permission_classes=[IsAdminUser])
     @parser_classes([JSONParser, MultiPartParser, FormParser])

@@ -163,7 +163,7 @@ export default {
         try {
             await vespaStore.updateObservations();
 
-            const observations = vespaStore.observations;
+            const observations = vespaStore.observations || [];
             const existingMarkerIds = new Set(Object.keys(vespaStore.markerCache));
             const newMarkerIds = new Set(observations.map(obs => obs.properties.id.toString()));
 

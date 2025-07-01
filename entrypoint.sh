@@ -20,16 +20,12 @@ echo "Collecting static files..."
 python manage.py collectstatic --noinput
 
 # Load initial data if required
-echo "Loading municipalities, provinces and anb areas..."
-python manage.py load_municipalities
-python manage.py load_provinces
-python manage.py load_anb
-
-echo "Assign provinces to municipalities..."
-python manage.py assign_provinces_to_municipalities
-
+echo "After deployment check if municipalities, provinces, anb areas are loaded in. If not run following commands..."
+echo "python manage.py load_municipalities , python manage.py load_provinces, python manage.py load_anb, python manage.py assign_provinces_to_municipalities"
 echo "Need to update observations? Run python manage.py update_observations..."
-#python manage.py update_observations
+
+echo "If observations need to be reloaded, to update location after new municipality data is loaded (or other changes), run:"
+echo "python manage.py update_observations"
 
 echo "Create django admin user with python manage.py createsuperuser"
 echo "Load waarnemingen observation data via: python manage.py load_waarnemingen_observations"

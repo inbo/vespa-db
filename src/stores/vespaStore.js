@@ -453,66 +453,19 @@ export const useVespaStore = defineStore('vespaStore', {
         
                 const response = await ApiService.get('/observations/export/');
                 const exportData = response.data;
-                const { export_id, status } = exportData;
         
-                // Handle immediate success (pre-generated file available)
-                if (status === 'completed') {
-                    await this.downloadFileFromApi(`/observations/download_export/?export_id=${export_id}`);
-                    return;
+                if (exportData.status === 'completed') {
+                    await this.downloadFileFromApi(`/observations/download_export/?export_id=${exportData.export_id}`);
+                } else {
+                    throw new Error(exportData.error || 'Unexpected export status');
                 }
-        
-                // Handle generation in progress (202 status with generating status)
-                if (status === 'generating') {
-                    // Show user-friendly message about generation
-                    this.modalTitle = 'Export Being Prepared';
-                    this.modalMessage = `${exportData.message || 'Your export is being generated.'} Estimated wait time: ${exportData.estimated_wait_time || '5-10 minutes'}`;
-                    this.isModalVisible = true;
-                    
-                    // Start polling with longer intervals for generation
-                    await this.pollForGeneratedExport(export_id);
-                    return;
-                }
-        
-                // Handle other statuses
-                if (status === 'pending') {
-                    await this.pollForExportCompletion(export_id);
-                    return;
-                }
-        
-                // If we get here, something unexpected happened
-                throw new Error(exportData.error || 'Unexpected export status');
-        
             } catch (error) {
                 console.error('Export error:', error);
-                
-                // Handle HTTP errors specifically
-                if (error.response) {
-                    const statusCode = error.response.status;
-                    const errorData = error.response.data;
-                    
-                    if (statusCode === 202 && errorData.status === 'generating') {
-                        // Handle 202 response (generation triggered)
-                        this.modalTitle = 'Export Being Prepared';
-                        this.modalMessage = `${errorData.message || 'Your export is being generated.'} Estimated wait time: ${errorData.estimated_wait_time || '5-10 minutes'}`;
-                        this.isModalVisible = true;
-                        
-                        try {
-                            await this.pollForGeneratedExport(errorData.export_id);
-                            return;
-                        } catch (pollError) {
-                            this.modalTitle = 'Export Error';
-                            this.modalMessage = pollError.message || 'Failed to generate export';
-                            this.isModalVisible = true;
-                            return;
-                        }
-                    }
-                    
-                    // Handle other HTTP errors
+                if (error.response && error.response.data) {
                     this.modalTitle = 'Export Error';
-                    this.modalMessage = errorData.error || errorData.message || 'Export request failed';
+                    this.modalMessage = error.response.data.error || 'The export could not be completed.';
                     this.isModalVisible = true;
                 } else {
-                    // Handle network or other errors
                     this.modalTitle = 'Export Error';
                     this.modalMessage = error.message || 'An unexpected error occurred';
                     this.isModalVisible = true;

@@ -410,6 +410,14 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             query_params = request.GET.copy()
             if 'visible' not in query_params:
                 query_params['visible'] = 'true'
+            if 'min_observation_datetime' in query_params:
+                try:
+                    dt_obj = parser.parse(query_params['min_observation_datetime'])
+                    query_params['min_observation_datetime'] = dt_obj.strftime('%Y-%m-%d')
+                except (ValueError, TypeError):
+                    logger.warning(
+                        f"Could not parse min_observation_datetime: {query_params['min_observation_datetime']}"
+                    )
             cache_key = get_geojson_cache_key(query_params)
             cached_data = cache.get(cache_key)
             if cached_data:
@@ -990,55 +998,35 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
             
-
     @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
     @action(detail=False, methods=["get"], permission_classes=[AllowAny])
     @swagger_auto_schema(manual_parameters=[])
     def export(self, request: HttpRequest) -> JsonResponse:
-        """Export observations using pre-generated S3 files only."""
-        # Try to get the latest hourly export from S3
-        from vespadb.observations.tasks.generate_export import get_latest_hourly_export, generate_hourly_export
+        """Export observations by providing a link to the latest pre-generated file. Generation is not triggered here."""
+        from vespadb.observations.tasks.generate_export import get_latest_hourly_export
         latest_file = get_latest_hourly_export()
-        
+
         if latest_file:
-            logger.info(f"Using pre-generated hourly export: {latest_file}")
-            # Create an Export record for tracking
-            export = Export.objects.create(
+            logger.info(f"Found pre-generated daily export: {latest_file}")
+            # Create an Export record for tracking the download request
+            export_record = Export.objects.create(
                 user=request.user if request.user.is_authenticated else None,
                 file_path=latest_file,
                 status='completed',
                 completed_at=timezone.now(),
                 progress=100,
             )
-            
             return JsonResponse({
-                'export_id': export.id,
+                'export_id': export_record.id,
                 'status': 'completed',
-                'total_records': 'all',
-                'pre_generated': True
             })
-        
-        # No pre-generated file exists, trigger generation
-        logger.info("No pre-generated export found, triggering hourly export generation")
-        
-        # Trigger the hourly export task
-        task = generate_hourly_export.delay()
-        
-        # Create an Export record to track this request
-        export = Export.objects.create(
-            user=request.user if request.user.is_authenticated else None,
-            status='pending',
-            task_id=task.id,
-        )
-        
+
+        # If no file is found, return an error. Do not generate a new file.
+        logger.warning("No pre-generated export file found on S3 for the export request.")
         return JsonResponse({
-            "error": "No export file is currently available. We're generating a new one now.",
-            "message": "Please try again in a few minutes. The export is being prepared.",
-            "export_id": export.id,
-            "task_id": task.id,
-            "estimated_wait_time": "5-10 minutes",
-            "status": "generating"
-        }, status=202) 
+            'status': 'error',
+            'error': "The daily export file is not yet available. It is generated automatically every day at 5 AM. Please try again later.",
+        }, status=status.HTTP_404_NOT_FOUND)
     
     @action(detail=False, methods=["get"])
     def download_export(self, request: HttpRequest) -> Union[StreamingHttpResponse, HttpResponse]:

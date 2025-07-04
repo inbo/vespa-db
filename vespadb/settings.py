@@ -134,15 +134,15 @@ prewarm_schedule = {
 CELERY_BEAT_SCHEDULE = {
     "fetch_and_update_observations": {
         "task": "vespadb.observations.tasks.observation_sync.fetch_and_update_observations",
-        "schedule": crontab(hour=4, minute=0),
+        "schedule": crontab(hour=2, minute=0),
     },
     "remove_expired_reservations": {
         "task": "vespadb.observations.tasks.reservation_cleanup.free_expired_reservations_and_audit_reservation_count",
-        "schedule": crontab(hour=5, minute=30),
+        "schedule": crontab(hour=1, minute=30),
     },
     "generate-hourly-export": {
         "task": "vespadb.observations.tasks.generate_export.generate_hourly_export",
-        "schedule": crontab(minute=0, hour="*"),
+        "schedule": crontab(hour=3, minute=0),
     },
     "cleanup-old-exports": {
         "task": "vespadb.observations.tasks.generate_export.cleanup_old_exports",

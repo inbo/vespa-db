@@ -55,6 +55,7 @@ from vespadb.observations.tasks.generate_import import process_import
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from vespadb.observations.constants import MIN_OBSERVATION_DATETIME
+from django.conf import settings
 
 from vespadb.observations.cache import invalidate_geojson_cache, invalidate_observation_cache
 from vespadb.observations.filters import ObservationFilter
@@ -1294,24 +1295,23 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             logger.error("Unsupported file format.")
             return Response({"error": "Unsupported file format. Only JSON or CSV allowed."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Save file to S3 under VESPADB/IMPORT/
-        file_path = f"VESPADB/IMPORT/{file.name}"
+        S3_IMPORT_PATH = f"{settings.APP_ENV}/VESPADB/IMPORT"
+        file_path = f"{S3_IMPORT_PATH}/{file.name}"
+        
         try:
-            file_path = default_storage.save(file_path, file)
-            logger.info(f"File saved to S3 at: {file_path}")
+            saved_path = default_storage.save(file_path, file)
+            logger.info(f"File saved to S3 at: {saved_path}")
         except Exception as e:
             logger.exception("Failed to save file to S3")
             return Response({"error": f"Failed to save file: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         logger.info("File saved successfully, creating import record.")
-        # Create Import record
         import_record = Import.objects.create(
             user=request.user if request.user.is_authenticated else None,
-            file_path=file_path,
+            file_path=saved_path,
             status="pending",
         )
 
-        # Trigger Celery task
         logger.info("triggering Celery task for import processing.")
         task = process_import.delay(import_record.id)
         import_record.task_id = task.id

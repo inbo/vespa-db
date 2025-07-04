@@ -35,7 +35,7 @@ secrets = {
     "DJANGO_DEBUG": os.getenv("DJANGO_DEBUG", "False"),
     "DEFAULT_FROM_EMAIL": os.getenv("DEFAULT_FROM_EMAIL", "noreply@uat.vespawatch.be")
 }
-
+APP_ENV = os.getenv('APP_ENV', 'prod').upper()
 # Core settings
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = secrets["DJANGO_SECRET_KEY"]

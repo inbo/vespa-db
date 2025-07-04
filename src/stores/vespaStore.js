@@ -94,7 +94,7 @@ export const useVespaStore = defineStore('vespaStore', {
             try {
                 const response = await ApiService.get(`/observations/dynamic-geojson/?${filterQuery}`);
                 if (response.status === 200) {
-                    this.observations = response.data.features;
+                    this.observations = response.data.features || [];
                     this.setLastAppliedFilters();
                 } else {
                     throw new Error(`Network response was not ok, status code: ${response.status}`);

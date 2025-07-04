@@ -10,10 +10,10 @@ import logging
 from celery import shared_task
 from vespadb.observations.models import Observation, Export
 from vespadb.users.models import VespaUser as User
-import pytz
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
-
+S3_EXPORT_PATH = f"{settings.APP_ENV}/VESPADB/EXPORT"
 class WriterProtocol(Protocol):
     def writerow(self, row: List[str]) -> Any: ...
 
@@ -204,8 +204,8 @@ def cleanup_old_exports() -> None:
     name='vespadb.observations.tasks.generate_export.generate_hourly_export',
     max_retries=3,
     default_retry_delay=60,
-    soft_time_limit=1700,
-    time_limit=1800,
+    soft_time_limit=10500,
+    time_limit=10800,
     acks_late=True
 )
 def generate_hourly_export() -> Dict[str, Any]:
@@ -224,11 +224,11 @@ def generate_hourly_export() -> Dict[str, Any]:
 
         # Generate file path with timestamp
         timestamp = timezone.now().strftime("%Y%m%d_%H%M%S")
-        new_file_path = f"VESPADB/EXPORT/observations_{timestamp}.csv"
+        new_file_path = f"{S3_EXPORT_PATH}/observations_{timestamp}.csv"
 
         # List existing files in S3 export directory
         try:
-            dirs, files = default_storage.listdir("VESPADB/EXPORT/")
+            dirs, files = default_storage.listdir(f"{S3_EXPORT_PATH}/")
             previous_files = [f for f in files if f.startswith("observations_") and f.endswith(".csv")]
         except FileNotFoundError:
             logger.info("Export directory doesn't exist yet, will be created")
@@ -244,7 +244,7 @@ def generate_hourly_export() -> Dict[str, Any]:
         if len(previous_files) > 2:
             files_to_delete = sorted(previous_files)[:-2]  # Keep the 2 most recent
             for old_file in files_to_delete:
-                old_file_path = f"VESPADB/EXPORT/{old_file}"
+                old_file_path = f"{S3_EXPORT_PATH}/{old_file}"
                 try:
                     default_storage.delete(old_file_path)
                     logger.info(f"Deleted old export file: {old_file_path}")
@@ -277,13 +277,13 @@ def generate_hourly_export() -> Dict[str, Any]:
             export.status = 'failed'
             export.error_message = str(e)
             export.save()
-        
         return {"status": "failed", "error": str(e)}
+
 def get_latest_hourly_export() -> str:
     """Get the file path of the latest hourly export."""
     try:
         # List existing files in S3 export directory
-        export_files = default_storage.listdir("VESPADB/EXPORT/")[1]  # Get files only
+        export_files = default_storage.listdir(f"{S3_EXPORT_PATH}/")[1]  # Get files only
         hourly_files = [f for f in export_files if f.startswith("observations_") and f.endswith(".csv")]
         
         if not hourly_files:
@@ -292,7 +292,7 @@ def get_latest_hourly_export() -> str:
             
         # Sort by name (which includes timestamp) to get the latest
         latest_file = sorted(hourly_files, reverse=True)[0]
-        return f"VESPADB/EXPORT/{latest_file}"
+        return f"{S3_EXPORT_PATH}/{latest_file}"
     except Exception as e:
         logger.error(f"Error finding latest hourly export: {str(e)}")
         return None

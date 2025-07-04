@@ -44,9 +44,6 @@ gunicorn --workers 3 \
          --bind 0.0.0.0:8000 \
          vespadb.wsgi:application &
          
-# Wait for Gunicorn to start
-sleep 5
-
 # Start Celery worker
 echo "Starting Celery worker..."
 celery -A vespadb worker --loglevel=info &
@@ -54,32 +51,6 @@ celery -A vespadb worker --loglevel=info &
 # Start Celery beat scheduler
 echo "Starting Celery beat scheduler..."
 celery -A vespadb beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler &
-
-# Wait for celery to start
-sleep 10
-
-# Trigger initial celery tasks using Django management command
-echo "Triggering initial cache warm-up tasks..."
-python manage.py shell << EOF
-from vespadb.observations.tasks.generate_geojson_task import generate_geojson_task
-from vespadb.observations.tasks.generate_export import generate_hourly_export
-
-print('Triggering GeoJSON cache warm-up...')
-try:
-    generate_geojson_task.delay({'visible': 'true', 'min_observation_datetime': '2024-04-01'})
-    print('GeoJSON task queued successfully')
-except Exception as e:
-    print(f'Error queueing GeoJSON task: {e}')
-
-print('Triggering hourly export generation...')
-try:
-    generate_hourly_export.delay()
-    print('Export task queued successfully')
-except Exception as e:
-    print(f'Error queueing export task: {e}')
-
-print('Initial tasks triggered.')
-EOF
 
 # Start Nginx
 echo "Starting Nginx..."

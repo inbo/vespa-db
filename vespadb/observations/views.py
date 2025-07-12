@@ -1000,8 +1000,12 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             )
             
     @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
-    @action(detail=False, methods=["get"], permission_classes=[AllowAny])
-    @swagger_auto_schema(manual_parameters=[])
+    @action(detail=False, methods=["get"], permission_classes=[AllowAny], filterset_class=None)
+    @swagger_auto_schema(
+        manual_parameters=[],
+        query_serializer=None,
+        operation_description="Export observations by providing a link to the latest pre-generated file. No filtering parameters are accepted."
+    )
     def export(self, request: HttpRequest) -> JsonResponse:
         """Export observations by providing a link to the latest pre-generated file. Generation is not triggered here."""
         from vespadb.observations.tasks.generate_export import get_latest_hourly_export

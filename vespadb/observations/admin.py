@@ -28,7 +28,14 @@ from vespadb.observations.models import Import
 from django.urls import reverse
 from django.utils.html import format_html
 
-from vespadb.observations.filters import MunicipalityExcludeFilter, ObserverReceivedEmailFilter, ProvinceFilter
+from vespadb.observations.filters import (
+    MunicipalityExcludeFilter, 
+    ObserverReceivedEmailFilter, 
+    ProvinceFilter, 
+    ModifiedByFilter, 
+    CreatedByFilter, 
+    ReservedByFilter
+)
 from vespadb.observations.forms import SendEmailForm
 from vespadb.observations.models import Municipality, Observation, Province
 from vespadb.observations.utils import check_if_point_in_anb_area, get_municipality_from_coordinates
@@ -178,9 +185,9 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
         "municipality",
         ObserverReceivedEmailFilter,
         MunicipalityExcludeFilter,
-        "reserved_by",
-        "created_by",
-        "modified_by",
+        ReservedByFilter,
+        CreatedByFilter,
+        ModifiedByFilter,
     )
     
     search_fields = ("id", "wn_id", "eradicator_name")
@@ -238,7 +245,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
     def display_created_by(self, obj):
         """Display created by user efficiently."""
         if obj.created_by:
-            return f"{obj.created_by.first_name} {obj.created_by.last_name}".strip() or obj.created_by.username
+            return str(obj.created_by)
         return "-"
     display_created_by.short_description = "Created By"
     display_created_by.admin_order_field = "created_by__username"
@@ -246,7 +253,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
     def display_reserved_by(self, obj):
         """Display reserved by user efficiently."""
         if obj.reserved_by:
-            return f"{obj.reserved_by.first_name} {obj.reserved_by.last_name}".strip() or obj.reserved_by.username
+            return str(obj.reserved_by)
         return "-"
     display_reserved_by.short_description = "Reserved By"
     display_reserved_by.admin_order_field = "reserved_by__username"
@@ -254,7 +261,7 @@ class ObservationAdmin(gis_admin.GISModelAdmin):
     def display_modified_by(self, obj):
         """Display modified by user efficiently."""
         if obj.modified_by:
-            return f"{obj.modified_by.first_name} {obj.modified_by.last_name}".strip() or obj.modified_by.username
+            return str(obj.modified_by)
         return "-"
     display_modified_by.short_description = "Modified By"
     display_modified_by.admin_order_field = "modified_by__username"

@@ -249,3 +249,177 @@ class ObserverReceivedEmailFilter(SimpleListFilter):
         if self.value() == "no":
             return queryset.filter(observer_received_email=False)
         return queryset
+
+
+class ModifiedByFilter(SimpleListFilter):
+    """Custom filter for modified_by field that displays user's full name instead of username."""
+
+    title = _("modified by")
+    parameter_name = "modified_by"
+
+    def lookups(self, request: Any, model_admin: Any) -> list[tuple[int, str]]:
+        """
+        Return a list of tuples for the users who have modified observations.
+        Displays full name or username if name is not available.
+
+        :param request: The current request object
+        :param model_admin: The current model admin instance
+        :return: A list of tuples with user options
+        """
+        # Get users who have modified observations
+        from vespadb.users.models import VespaUser
+        
+        # Cache for 15 minutes
+        cache_key = "admin_modified_by_filter_lookups"
+        cached_users = cache.get(cache_key)
+        
+        if cached_users is None:
+            # Get users who have actually modified observations
+            user_ids = Observation.objects.filter(
+                modified_by__isnull=False
+            ).values_list('modified_by', flat=True).distinct()
+            
+            users = VespaUser.objects.filter(id__in=user_ids).order_by('first_name', 'last_name', 'username')
+            
+            cached_users = []
+            for user in users:
+                # Create display name: prefer full name, fallback to username
+                display_name = f"{user.first_name} {user.last_name}".strip()
+                if not display_name:
+                    display_name = user.username
+                else:
+                    # Add username in parentheses for clarity
+                    display_name = f"{display_name} ({user.username})"
+                cached_users.append((user.id, display_name))
+            
+            cache.set(cache_key, cached_users, 900)  # Cache for 15 minutes
+            
+        return cached_users
+
+    def queryset(self, request: Any, queryset: QuerySet) -> QuerySet | None:
+        """
+        Filter the queryset based on the selected user.
+
+        :param request: The current request object
+        :param queryset: The current queryset
+        :return: The filtered queryset
+        """
+        if self.value():
+            return queryset.filter(modified_by_id=self.value())
+        return queryset
+
+
+class CreatedByFilter(SimpleListFilter):
+    """Custom filter for created_by field that displays user's full name instead of username."""
+
+    title = _("created by")
+    parameter_name = "created_by"
+
+    def lookups(self, request: Any, model_admin: Any) -> list[tuple[int, str]]:
+        """
+        Return a list of tuples for the users who have created observations.
+        Displays full name or username if name is not available.
+
+        :param request: The current request object
+        :param model_admin: The current model admin instance
+        :return: A list of tuples with user options
+        """
+        # Get users who have created observations
+        from vespadb.users.models import VespaUser
+        
+        # Cache for 15 minutes
+        cache_key = "admin_created_by_filter_lookups"
+        cached_users = cache.get(cache_key)
+        
+        if cached_users is None:
+            # Get users who have actually created observations
+            user_ids = Observation.objects.filter(
+                created_by__isnull=False
+            ).values_list('created_by', flat=True).distinct()
+            
+            users = VespaUser.objects.filter(id__in=user_ids).order_by('first_name', 'last_name', 'username')
+            
+            cached_users = []
+            for user in users:
+                # Create display name: prefer full name, fallback to username
+                display_name = f"{user.first_name} {user.last_name}".strip()
+                if not display_name:
+                    display_name = user.username
+                else:
+                    # Add username in parentheses for clarity
+                    display_name = f"{display_name} ({user.username})"
+                cached_users.append((user.id, display_name))
+            
+            cache.set(cache_key, cached_users, 900)  # Cache for 15 minutes
+            
+        return cached_users
+
+    def queryset(self, request: Any, queryset: QuerySet) -> QuerySet | None:
+        """
+        Filter the queryset based on the selected user.
+
+        :param request: The current request object
+        :param queryset: The current queryset
+        :return: The filtered queryset
+        """
+        if self.value():
+            return queryset.filter(created_by_id=self.value())
+        return queryset
+
+
+class ReservedByFilter(SimpleListFilter):
+    """Custom filter for reserved_by field that displays user's full name instead of username."""
+
+    title = _("reserved by")
+    parameter_name = "reserved_by"
+
+    def lookups(self, request: Any, model_admin: Any) -> list[tuple[int, str]]:
+        """
+        Return a list of tuples for the users who have reserved observations.
+        Displays full name or username if name is not available.
+
+        :param request: The current request object
+        :param model_admin: The current model admin instance
+        :return: A list of tuples with user options
+        """
+        # Get users who have reserved observations
+        from vespadb.users.models import VespaUser
+        
+        # Cache for 15 minutes
+        cache_key = "admin_reserved_by_filter_lookups"
+        cached_users = cache.get(cache_key)
+        
+        if cached_users is None:
+            # Get users who have actually reserved observations
+            user_ids = Observation.objects.filter(
+                reserved_by__isnull=False
+            ).values_list('reserved_by', flat=True).distinct()
+            
+            users = VespaUser.objects.filter(id__in=user_ids).order_by('first_name', 'last_name', 'username')
+            
+            cached_users = []
+            for user in users:
+                # Create display name: prefer full name, fallback to username
+                display_name = f"{user.first_name} {user.last_name}".strip()
+                if not display_name:
+                    display_name = user.username
+                else:
+                    # Add username in parentheses for clarity
+                    display_name = f"{display_name} ({user.username})"
+                cached_users.append((user.id, display_name))
+            
+            cache.set(cache_key, cached_users, 900)  # Cache for 15 minutes
+            
+        return cached_users
+
+    def queryset(self, request: Any, queryset: QuerySet) -> QuerySet | None:
+        """
+        Filter the queryset based on the selected user.
+
+        :param request: The current request object
+        :param queryset: The current queryset
+        :return: The filtered queryset
+        """
+        if self.value():
+            return queryset.filter(reserved_by_id=self.value())
+        return queryset

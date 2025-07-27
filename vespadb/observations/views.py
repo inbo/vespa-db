@@ -110,7 +110,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         DistanceToPointFilter,
     ]
     ordering_fields = ["id", "municipality_name", "created_datetime", "modified_datetime"]
-    filterset_fields = ["location", "created_datetime", "modified_datetime"]
+    filterset_fields = ["created_datetime", "modified_datetime"]
     filterset_class = ObservationFilter
     distance_filter_field = "location"
     distance_filter_convert_meters = True

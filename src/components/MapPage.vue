@@ -287,7 +287,7 @@ export default {
       
       if (!vespaStore.filters.min_observation_date) {
           vespaStore.applyFilters({
-              min_observation_date: new Date('2024-04-01T00:00:00.000Z').toISOString(),
+              min_observation_date: new Date('2025-04-01T00:00:00.000Z').toISOString(),
           });
       }
       

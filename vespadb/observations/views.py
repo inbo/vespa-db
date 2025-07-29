@@ -110,7 +110,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
         DistanceToPointFilter,
     ]
     ordering_fields = ["id", "municipality_name", "created_datetime", "modified_datetime"]
-    filterset_fields = ["location", "created_datetime", "modified_datetime"]
+    filterset_fields = ["created_datetime", "modified_datetime"]
     filterset_class = ObservationFilter
     distance_filter_field = "location"
     distance_filter_convert_meters = True
@@ -1000,8 +1000,12 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             )
             
     @method_decorator(ratelimit(key="ip", rate="60/m", method="GET", block=True))
-    @action(detail=False, methods=["get"], permission_classes=[AllowAny])
-    @swagger_auto_schema(manual_parameters=[])
+    @action(detail=False, methods=["get"], permission_classes=[AllowAny], filterset_class=None)
+    @swagger_auto_schema(
+        manual_parameters=[],
+        query_serializer=None,
+        operation_description="Export observations by providing a link to the latest pre-generated file. No filtering parameters are accepted."
+    )
     def export(self, request: HttpRequest) -> JsonResponse:
         """Export observations by providing a link to the latest pre-generated file. Generation is not triggered here."""
         from vespadb.observations.tasks.generate_export import get_latest_hourly_export

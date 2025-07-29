@@ -123,7 +123,7 @@ CELERY_ACCEPT_CONTENT = ["application/json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "Europe/Brussels"
-MIN_OBSERVATION_DATETIME = "2024-04-01T00:00:00+02:00"
+MIN_OBSERVATION_DATETIME = "2025-04-01T00:00:00+02:00"
 prewarm_schedule = {
     f"prewarm-geojson-{config['name']}": {
         'task': 'vespadb.observations.tasks.generate_geojson_task',
@@ -131,28 +131,55 @@ prewarm_schedule = {
         'args': (config['params'],)
     } for config in PREWARM_CONFIGS
 }
-CELERY_BEAT_SCHEDULE = {
-    "fetch_and_update_observations": {
-        "task": "vespadb.observations.tasks.observation_sync.fetch_and_update_observations",
-        "schedule": crontab(hour=2, minute=0),
-    },
-    "remove_expired_reservations": {
-        "task": "vespadb.observations.tasks.reservation_cleanup.free_expired_reservations_and_audit_reservation_count",
-        "schedule": crontab(hour=1, minute=30),
-    },
-    "generate-hourly-export": {
-        "task": "vespadb.observations.tasks.generate_export.generate_hourly_export",
-        "schedule": crontab(hour=3, minute=0),
-    },
-    "cleanup-old-exports": {
-        "task": "vespadb.observations.tasks.generate_export.cleanup_old_exports",
-        "schedule": crontab(minute=0, hour="*/6"),
-    },
-    "cleanup-old-imports": {
-        "task": "vespadb.observations.tasks.generate_import.cleanup_old_imports",
-        "schedule": crontab(minute=0, hour="*/6"),
-    },
-}
+# Configure schedules based on environment
+# UAT servers are only available between 9am-8pm Belgium time
+if APP_ENV == 'UAT':
+    CELERY_BEAT_SCHEDULE = {
+        "fetch_and_update_observations": {
+            "task": "vespadb.observations.tasks.observation_sync.fetch_and_update_observations",
+            "schedule": crontab(hour=10, minute=0),  # 10:00 AM Belgium time
+        },
+        "remove_expired_reservations": {
+            "task": "vespadb.observations.tasks.reservation_cleanup.free_expired_reservations_and_audit_reservation_count",
+            "schedule": crontab(hour=11, minute=30),  # 11:30 AM Belgium time
+        },
+        "generate-hourly-export": {
+            "task": "vespadb.observations.tasks.generate_export.generate_hourly_export",
+            "schedule": crontab(hour=14, minute=0),  # 2:00 PM Belgium time
+        },
+        "cleanup-old-exports": {
+            "task": "vespadb.observations.tasks.generate_export.cleanup_old_exports",
+            "schedule": crontab(hour=16, minute=0),  # 4:00 PM Belgium time (daily instead of every 6 hours)
+        },
+        "cleanup-old-imports": {
+            "task": "vespadb.observations.tasks.generate_import.cleanup_old_imports",
+            "schedule": crontab(hour=17, minute=0),  # 5:00 PM Belgium time (daily instead of every 6 hours)
+        },
+    }
+else:
+    # Production and other environments use nighttime schedules
+    CELERY_BEAT_SCHEDULE = {
+        "fetch_and_update_observations": {
+            "task": "vespadb.observations.tasks.observation_sync.fetch_and_update_observations",
+            "schedule": crontab(hour=2, minute=0),
+        },
+        "remove_expired_reservations": {
+            "task": "vespadb.observations.tasks.reservation_cleanup.free_expired_reservations_and_audit_reservation_count",
+            "schedule": crontab(hour=1, minute=30),
+        },
+        "generate-hourly-export": {
+            "task": "vespadb.observations.tasks.generate_export.generate_hourly_export",
+            "schedule": crontab(hour=3, minute=0),
+        },
+        "cleanup-old-exports": {
+            "task": "vespadb.observations.tasks.generate_export.cleanup_old_exports",
+            "schedule": crontab(minute=0, hour="*/6"),
+        },
+        "cleanup-old-imports": {
+            "task": "vespadb.observations.tasks.generate_import.cleanup_old_imports",
+            "schedule": crontab(minute=0, hour="*/6"),
+        },
+    }
 CELERY_BEAT_SCHEDULE.update(prewarm_schedule)
 
 AUTH_USER_MODEL = "users.VespaUser"

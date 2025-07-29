@@ -247,10 +247,10 @@ export default {
       { name: 'Wel in ANB gebied', value: true },
     ]);
 
-    // Check if any filters are active (excluding the default min_observation_date of 2024-04-01)
+    // Check if any filters are active (excluding the default min_observation_date of 2025-04-01)
     const hasActiveFilters = computed(() => {
       const filters = vespaStore.filters;
-      const defaultMinDate = '2024-04-01';
+      const defaultMinDate = '2025-04-01';
       return (
         (filters.provinces && filters.provinces.length > 0) ||
         (filters.municipalities && filters.municipalities.length > 0) ||
@@ -259,7 +259,7 @@ export default {
         (filters.anbAreasActief !== null && filters.anbAreasActief !== undefined) ||
         (filters.max_observation_date && filters.max_observation_date !== null) ||
         (filters.min_observation_date && filters.min_observation_date !== defaultMinDate)
-        // Note: We include min_observation_date if it differs from the default 2024-04-01
+        // Note: We include min_observation_date if it differs from the default 2025-04-01
       );
     });
 
@@ -294,8 +294,8 @@ export default {
       selectedNestStatus.value = [];
       anbAreasActief.value = null;
       
-      // Set the standard min_observation_date to 2024-04-01
-      const standardMinDate = '2024-04-01';
+      // Set the standard min_observation_date to 2025-04-01
+      const standardMinDate = '2025-04-01';
       
       // Reset filters in store with the standard min_observation_date
       vespaStore.resetFilters({

@@ -48,3 +48,12 @@ class VespaUser(AbstractUser):
             return "logged_in_with_municipality"
         else:
             return "logged_in_without_municipality"
+
+    def __str__(self) -> str:
+        """Return a string representation of the user."""
+        # If first and last name are available, use them with username in parentheses
+        full_name = f"{self.first_name} {self.last_name}".strip()
+        if full_name:
+            return f"{full_name} ({self.username})"
+        # Otherwise, just return the username
+        return self.username

@@ -707,7 +707,7 @@ export const useVespaStore = defineStore('vespaStore', {
         },
         resetFilters(options = {}) {
             this.filters = {
-                min_observation_date: options.min_observation_date || '2024-04-01',
+                min_observation_date: options.min_observation_date || '2025-04-01',
                 max_observation_date: null,
                 provinces: [],
                 municipalities: [],

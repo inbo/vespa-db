@@ -123,7 +123,7 @@ CELERY_ACCEPT_CONTENT = ["application/json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "Europe/Brussels"
-MIN_OBSERVATION_DATETIME = "2024-04-01T00:00:00+02:00"
+MIN_OBSERVATION_DATETIME = "2025-04-01T00:00:00+02:00"
 prewarm_schedule = {
     f"prewarm-geojson-{config['name']}": {
         'task': 'vespadb.observations.tasks.generate_geojson_task',

@@ -42,14 +42,6 @@
     </div>
   </nav>
   
-  <div class="notification-banner">
-    <div class="container-fluid">
-      <p class="notification-text">
-        Dit platform is momenteel nog niet publiek opengesteld. Het is wel reeds toegankelijk voor bestrijders en instanties betrokken in de bestrijding en beheer van Aziatische hoornaars. Indien je een account wil maken: contacteer <a href="mailto:vespawatch@inbo.be" class="notification-link">vespawatch@inbo.be</a>. De publieke lancering vindt plaats nadat alle data van vorige jaren is opgeladen.
-      </p>
-    </div>
-  </div>
-  
   <ModalMessage :title="modalTitle" :message="modalMessage" :isVisible="isModalVisible"
   @close="isModalVisible = false" />
 </template>
@@ -138,39 +130,4 @@ export default {
 </script>
 
 <style>
-.notification-banner {
-  background-color: #fff3cd;
-  border-bottom: 1px solid #ffeeba;
-  padding: 0.5rem 0; /* Smaller padding for mobile */
-  position: relative;
-  z-index: 1050;
-}
-
-.notification-text {
-  margin: 0;
-  font-size: 0.75rem; /* Smaller font size for mobile */
-  color: #856404;
-  text-align: center;
-  line-height: 1.4;
-}
-
-.notification-link {
-  color: #856404;
-  font-weight: bold;
-  text-decoration: underline;
-}
-
-.notification-link:hover {
-  color: #533f03;
-}
-
-@media (min-width: 768px) {
-  .notification-banner {
-    padding: 0.75rem 0;
-  }
-
-  .notification-text {
-    font-size: 0.9rem;
-  }
-}
 </style>

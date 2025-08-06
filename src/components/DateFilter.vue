@@ -60,9 +60,9 @@ export default {
   setup() {
     const vespaStore = useVespaStore();
 
-    // Initialize default date to April 1, 2024 (same as original)
-    const defaultDate = new Date(2024, 3, 1); // Months are 0-indexed, so 3 = April
-    const absoluteMinDate = new Date(2024, 3, 1); // Minimum allowed date for both pickers
+    // Initialize default date to April 1, 2025 (updated to match resetFilters)
+    const defaultDate = new Date(2025, 3, 1); // Months are 0-indexed, so 3 = April
+    const absoluteMinDate = new Date(2025, 3, 1); // Minimum allowed date for both pickers
     const minDate = ref(defaultDate);
     const maxDate = ref(null); // End date remains initially null
 
@@ -141,7 +141,7 @@ export default {
 
     // Clear functions with same logic as original
     const clearMinDate = () => {
-      minDate.value = defaultDate; // Reset to default date (April 1, 2024)
+      minDate.value = defaultDate; // Reset to default date (April 1, 2025)
       minDateString.value = dateToString(defaultDate);
       emitFilterUpdate();
     };
@@ -158,7 +158,7 @@ export default {
       (newFilters) => {
         const newMinDate = newFilters.min_observation_date
           ? new Date(newFilters.min_observation_date)
-          : defaultDate; // Default to April 1, 2024 if no value
+          : defaultDate; // Default to April 1, 2025 if no value
         const newMaxDate = newFilters.max_observation_date
           ? new Date(newFilters.max_observation_date)
           : null;
@@ -175,7 +175,7 @@ export default {
     onMounted(() => {
       const initialMinDate = vespaStore.filters.min_observation_date
         ? new Date(vespaStore.filters.min_observation_date)
-        : defaultDate; // Default to April 1, 2024
+        : defaultDate; // Default to April 1, 2025
       const initialMaxDate = vespaStore.filters.max_observation_date
         ? new Date(vespaStore.filters.max_observation_date)
         : null;

@@ -87,7 +87,7 @@ export const useVespaStore = defineStore('vespaStore', {
             
             // ALWAYS apply min date filter - regardless of login status
             if (!this.filters.min_observation_date) {
-                const defaultMinDate = this.formatDateWithoutTime(new Date('April 1, 2024').toISOString());
+                const defaultMinDate = this.formatDateWithoutTime(new Date('April 1, 2025').toISOString());
                 filterQuery += (filterQuery ? '&' : '') + `min_observation_datetime=${defaultMinDate}`;
             }
         
@@ -107,39 +107,45 @@ export const useVespaStore = defineStore('vespaStore', {
             }
         },
         createFilterQuery() {
-            let params = {};
+            let queryParts = [];
         
             if (this.filters.municipalities.length > 0) {
-                params['municipality_id'] = this.filters.municipalities.join(',');
+                // Add each municipality_id as separate query parameter
+                this.filters.municipalities.forEach(id => {
+                    queryParts.push(`municipality_id=${encodeURIComponent(id)}`);
+                });
             }
         
             if (this.filters.provinces.length > 0) {
-                params['province_id'] = this.filters.provinces.join(',');
+                // Add each province_id as separate query parameter
+                this.filters.provinces.forEach(id => {
+                    queryParts.push(`province_id=${encodeURIComponent(id)}`);
+                });
             }
         
             if (this.filters.anbAreasActief !== null) {
-                params['anb'] = this.filters.anbAreasActief;
+                queryParts.push(`anb=${encodeURIComponent(this.filters.anbAreasActief)}`);
             }
         
             if (this.filters.nestType) {
-                params['nest_type'] = this.filters.nestType;
+                queryParts.push(`nest_type=${encodeURIComponent(this.filters.nestType)}`);
             }
         
             if (this.filters.nestStatus) {
-                params['nest_status'] = this.filters.nestStatus;
+                queryParts.push(`nest_status=${encodeURIComponent(this.filters.nestStatus)}`);
             }
         
             if (this.filters.min_observation_date) {
-                params['min_observation_datetime'] = this.formatDateWithoutTime(this.filters.min_observation_date);
+                queryParts.push(`min_observation_datetime=${encodeURIComponent(this.formatDateWithoutTime(this.filters.min_observation_date))}`);
             } else {
-                params['min_observation_datetime'] = this.formatDateWithoutTime(new Date('April 1, 2024').toISOString());
+                queryParts.push(`min_observation_datetime=${encodeURIComponent(this.formatDateWithoutTime(new Date('April 1, 2025').toISOString()))}`);
             }
         
             if (this.filters.max_observation_date) {
-                params['max_observation_datetime'] = this.formatDateWithEndOfDayTime(this.filters.max_observation_date);
+                queryParts.push(`max_observation_datetime=${encodeURIComponent(this.formatDateWithEndOfDayTime(this.filters.max_observation_date))}`);
             }
         
-            return Object.entries(params).map(([key, value]) => `${key}=${encodeURIComponent(value)}`).join('&');
+            return queryParts.join('&');
         },
         formatDateWithoutTime(date) {
             const d = new Date(date);

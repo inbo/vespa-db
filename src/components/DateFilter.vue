@@ -62,7 +62,7 @@ export default {
 
     // Initialize default date to April 1, 2025 (updated to match resetFilters)
     const defaultDate = new Date(2025, 3, 1); // Months are 0-indexed, so 3 = April
-    const absoluteMinDate = new Date(2025, 3, 1); // Minimum allowed date for both pickers
+    const absoluteMinDate = null; // No minimum date restriction - allow any date
     const minDate = ref(defaultDate);
     const maxDate = ref(null); // End date remains initially null
 
@@ -99,15 +99,12 @@ export default {
     // Computed properties for string representations (for input binding)
     const minDateString = ref(dateToString(defaultDate));
     const maxDateString = ref('');
-    const absoluteMinDateString = computed(() => dateToString(absoluteMinDate));
+    const absoluteMinDateString = computed(() => ''); // No minimum date restriction
     const defaultMinDateString = computed(() => dateToString(defaultDate));
 
     // Computed property for the minimum date of the maxDate picker
     const minDateForMaxPickerString = computed(() => {
-      if (minDate.value && minDate.value > absoluteMinDate) {
-        return dateToString(minDate.value);
-      }
-      return dateToString(absoluteMinDate);
+      return minDate.value ? dateToString(minDate.value) : '';
     });
 
     // Emit filter updates with debouncing (same timing as original)

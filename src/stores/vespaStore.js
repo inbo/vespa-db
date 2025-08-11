@@ -92,9 +92,12 @@ export const useVespaStore = defineStore('vespaStore', {
             }
         
             try {
-                const response = await ApiService.get(`/observations/dynamic-geojson/?${filterQuery}`);
+                const url = `/observations/dynamic-geojson/?${filterQuery}`;
+                console.log('[API CALL DEBUG] Calling URL:', url);
+                const response = await ApiService.get(url);
                 if (response.status === 200) {
                     this.observations = response.data.features || [];
+                    console.log('[API RESPONSE DEBUG] Number of observations received:', this.observations.length);
                     this.setLastAppliedFilters();
                 } else {
                     throw new Error(`Network response was not ok, status code: ${response.status}`);
@@ -110,8 +113,11 @@ export const useVespaStore = defineStore('vespaStore', {
             let queryParts = [];
         
             if (this.filters.municipalities.length > 0) {
+                console.log('[MUNICIPALITY FILTER DEBUG] Number of municipalities:', this.filters.municipalities.length);
+                console.log('[MUNICIPALITY FILTER DEBUG] Municipality IDs:', JSON.stringify(this.filters.municipalities));
                 // Add each municipality_id as separate query parameter
-                this.filters.municipalities.forEach(id => {
+                this.filters.municipalities.forEach((id, index) => {
+                    console.log(`[MUNICIPALITY FILTER DEBUG] Adding municipality ${index + 1}:`, id);
                     queryParts.push(`municipality_id=${encodeURIComponent(id)}`);
                 });
             }
@@ -127,12 +133,20 @@ export const useVespaStore = defineStore('vespaStore', {
                 queryParts.push(`anb=${encodeURIComponent(this.filters.anbAreasActief)}`);
             }
         
-            if (this.filters.nestType) {
-                queryParts.push(`nest_type=${encodeURIComponent(this.filters.nestType)}`);
+            if (this.filters.nestType && this.filters.nestType.length > 0) {
+                console.log('[NEST TYPE DEBUG] Nest types:', JSON.stringify(this.filters.nestType));
+                // Add each nest_type as separate query parameter
+                this.filters.nestType.forEach(type => {
+                    queryParts.push(`nest_type=${encodeURIComponent(type)}`);
+                });
             }
         
-            if (this.filters.nestStatus) {
-                queryParts.push(`nest_status=${encodeURIComponent(this.filters.nestStatus)}`);
+            if (this.filters.nestStatus && this.filters.nestStatus.length > 0) {
+                console.log('[NEST STATUS DEBUG] Nest statuses:', JSON.stringify(this.filters.nestStatus));
+                // Add each nest_status as separate query parameter
+                this.filters.nestStatus.forEach(status => {
+                    queryParts.push(`nest_status=${encodeURIComponent(status)}`);
+                });
             }
         
             if (this.filters.min_observation_date) {
@@ -145,7 +159,11 @@ export const useVespaStore = defineStore('vespaStore', {
                 queryParts.push(`max_observation_datetime=${encodeURIComponent(this.formatDateWithEndOfDayTime(this.filters.max_observation_date))}`);
             }
         
-            return queryParts.join('&');
+            const query = queryParts.join('&');
+            console.log('[FILTER DEBUG] Total query parts:', queryParts.length);
+            console.log('[FILTER DEBUG] Final query string:', query);
+            console.log('[FILTER DEBUG] Query string length:', query.length);
+            return query;
         },
         formatDateWithoutTime(date) {
             const d = new Date(date);
@@ -174,7 +192,10 @@ export const useVespaStore = defineStore('vespaStore', {
             return `${[year, month, day].join('-')} 23:59:59`;
         },
         async applyFilters(filters) {
+            console.log('[APPLY FILTERS DEBUG] Incoming filters:', JSON.stringify(filters));
+            console.log('[APPLY FILTERS DEBUG] Current filters before update:', JSON.stringify(this.filters));
             this.filters = { ...this.filters, ...filters };
+            console.log('[APPLY FILTERS DEBUG] Filters after update:', JSON.stringify(this.filters));
         },
         async fetchProvinces() {
             if (this.provincesFetched) return;  // Skip fetching if data is already available

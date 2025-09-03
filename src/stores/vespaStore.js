@@ -17,6 +17,7 @@ export const useVespaStore = defineStore('vespaStore', {
         provincesFetched: false,
         selectedMunicipalities: [],
         observations: [],
+        allObservationsCache: null, // Cache for client-side filtering
         loadingObservations: false,
         selectedObservation: null,
         markerClusterGroup: null,
@@ -82,6 +83,27 @@ export const useVespaStore = defineStore('vespaStore', {
             // Check if data needs to be reloaded
             if (this.observations.length > 0 && currentFilters === this.lastAppliedFilters) return;
         
+            // Check if only municipality filter changed - use client-side filtering
+            const lastFilters = this.lastAppliedFilters ? JSON.parse(this.lastAppliedFilters) : {};
+            const filtersExceptMunicipality = { ...this.filters };
+            delete filtersExceptMunicipality.municipalities;
+            const lastFiltersExceptMunicipality = { ...lastFilters };
+            delete lastFiltersExceptMunicipality.municipalities;
+            
+            if (this.allObservationsCache && 
+                JSON.stringify(filtersExceptMunicipality) === JSON.stringify(lastFiltersExceptMunicipality)) {
+                // Only municipality filter changed - filter client-side
+                if (this.filters.municipalities && this.filters.municipalities.length > 0) {
+                    this.observations = this.allObservationsCache.filter(obs => 
+                        this.filters.municipalities.includes(obs.properties.municipality_id)
+                    );
+                } else {
+                    this.observations = this.allObservationsCache;
+                }
+                this.setLastAppliedFilters();
+                return;
+            }
+        
             this.loadingObservations = true;
             let filterQuery = this.createFilterQuery();
             
@@ -93,11 +115,22 @@ export const useVespaStore = defineStore('vespaStore', {
         
             try {
                 const url = `/observations/dynamic-geojson/?${filterQuery}`;
-                console.log('[API CALL DEBUG] Calling URL:', url);
                 const response = await ApiService.get(url);
                 if (response.status === 200) {
                     this.observations = response.data.features || [];
-                    console.log('[API RESPONSE DEBUG] Number of observations received:', this.observations.length);
+                    const allData = response.data.features || [];
+                    // Always cache the unfiltered data from server
+                    this.allObservationsCache = allData;
+                    
+                    // Apply municipality filter client-side if present
+                    if (this.filters.municipalities && this.filters.municipalities.length > 0) {
+                        this.observations = allData.filter(obs => 
+                            this.filters.municipalities.includes(obs.properties.municipality_id)
+                        );
+                    } else {
+                        this.observations = allData;
+                    }
+                    
                     this.setLastAppliedFilters();
                 } else {
                     throw new Error(`Network response was not ok, status code: ${response.status}`);
@@ -113,14 +146,16 @@ export const useVespaStore = defineStore('vespaStore', {
             let queryParts = [];
         
             if (this.filters.municipalities.length > 0) {
-                console.log('[MUNICIPALITY FILTER DEBUG] Number of municipalities:', this.filters.municipalities.length);
-                console.log('[MUNICIPALITY FILTER DEBUG] Municipality IDs:', JSON.stringify(this.filters.municipalities));
                 // Add each municipality_id as separate query parameter
                 this.filters.municipalities.forEach((id, index) => {
-                    console.log(`[MUNICIPALITY FILTER DEBUG] Adding municipality ${index + 1}:`, id);
                     queryParts.push(`municipality_id=${encodeURIComponent(id)}`);
                 });
             }
+            // Don't send municipality filter to backend - handle client-side
+            // Municipality filtering happens client-side for better performance
+            // if (this.filters.municipalities.length > 0) {
+            //     params['municipality_id'] = this.filters.municipalities.join(',');
+            // }
         
             if (this.filters.provinces.length > 0) {
                 // Add each province_id as separate query parameter
@@ -742,6 +777,7 @@ export const useVespaStore = defineStore('vespaStore', {
                 nestStatus: null,
                 anbAreasActief: null
             };
+            this.allObservationsCache = null; // Clear cache on reset
             this.getObservationsGeoJson();
         },
         determineStatusFromObservationData(observationData) {

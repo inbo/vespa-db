@@ -90,6 +90,7 @@ def generate_geojson_task(raw_params):
             "type": "Feature",
             "properties": {
                 "id": obs.id,
+                "municipality_id": obs.municipality_id,
                 "status": current_status
             },
             "geometry": json.loads(obs.point.geojson) if obs.point else None,

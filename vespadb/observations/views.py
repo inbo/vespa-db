@@ -438,6 +438,7 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                         'geometry', ST_AsGeoJSON(obs.location, 6, 0)::json,
                         'properties', json_build_object(
                             'id', obs.id,
+                            'municipality_id', obs.municipality_id,
                             'status',
                             CASE
                                 WHEN obs.eradication_result = 'successful' THEN 'eradicated'

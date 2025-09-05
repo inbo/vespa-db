@@ -28,7 +28,9 @@ WORKDIR /workspaces/vespadb/
 
 RUN mkdir -p /root/.cache/pypoetry/ && mkdir -p /root/.config/pypoetry/ && \
     mkdir -p src/vespadb/ && touch src/vespadb/__init__.py && touch README.md && \
-    mkdir -p /workspaces/vespadb/logs && chmod 755 /workspaces/vespadb/logs
+    mkdir -p /workspaces/vespadb/logs && chmod 755 /workspaces/vespadb/logs && \
+    mkdir -p /workspaces/vespadb/static && mkdir -p /workspaces/vespadb/collected_static && \
+    chmod 755 /workspaces/vespadb/static /workspaces/vespadb/collected_static
 
 # Development stage setup
 FROM base AS dev

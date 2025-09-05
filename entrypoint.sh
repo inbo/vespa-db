@@ -3,10 +3,6 @@
 # exit immediately if a command exits with a non-zero status
 set -e
 
-# Ensure static directory exists
-mkdir -p /workspaces/vespadb/static
-mkdir -p /workspaces/vespadb/collected_static
-
 echo "Applying database migrations..."
 python manage.py migrate --noinput
 

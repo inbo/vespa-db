@@ -29,8 +29,7 @@ WORKDIR /workspaces/vespadb/
 RUN mkdir -p /root/.cache/pypoetry/ && mkdir -p /root/.config/pypoetry/ && \
     mkdir -p src/vespadb/ && touch src/vespadb/__init__.py && touch README.md && \
     mkdir -p /workspaces/vespadb/static && mkdir -p /workspaces/vespadb/collected_static && \
-    chmod 755 /workspaces/vespadb/static /workspaces/vespadb/collected_static && \
-    mkdir -p /tmp/logs && ln -s /tmp/logs /workspaces/vespadb/logs
+    chmod 755 /workspaces/vespadb/static /workspaces/vespadb/collected_static
 
 # Development stage setup
 FROM base AS dev
@@ -68,6 +67,10 @@ RUN --mount=type=cache,target=/root/.cache/pypoetry/ \
     poetry install --only main --no-interaction --no-ansi
 
 COPY . .
+
+# Ensure static directories exist and are writable
+RUN mkdir -p /workspaces/vespadb/static /workspaces/vespadb/collected_static && \
+    chmod -R 755 /workspaces/vespadb/static /workspaces/vespadb/collected_static
 
 # Add entrypoint script
 COPY entrypoint.sh /workspaces/vespadb/entrypoint.sh

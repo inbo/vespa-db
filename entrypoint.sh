@@ -3,11 +3,6 @@
 # exit immediately if a command exits with a non-zero status
 set -e
 
-# Migrate the database
-mkdir -p /workspaces/vespadb/logs
-touch /workspaces/vespadb/logs/django.log
-chmod -R 755 /workspaces/vespadb/logs
-
 # Ensure static directory exists
 mkdir -p /workspaces/vespadb/static
 mkdir -p /workspaces/vespadb/collected_static

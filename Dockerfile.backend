@@ -27,7 +27,8 @@ ENV VIRTUAL_ENV /opt/vespadb-env
 WORKDIR /workspaces/vespadb/
 
 RUN mkdir -p /root/.cache/pypoetry/ && mkdir -p /root/.config/pypoetry/ && \
-    mkdir -p src/vespadb/ && touch src/vespadb/__init__.py && touch README.md
+    mkdir -p src/vespadb/ && touch src/vespadb/__init__.py && touch README.md && \
+    mkdir -p /workspaces/vespadb/logs && chmod 755 /workspaces/vespadb/logs
 
 # Development stage setup
 FROM base AS dev

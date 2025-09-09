@@ -6,10 +6,6 @@ set -e
 echo "Applying database migrations..."
 python manage.py migrate --noinput
 
-# Collect static files
-echo "Collecting static files..."
-python manage.py collectstatic --noinput
-
 # Load initial data if required
 echo "After deployment check if municipalities, provinces, anb areas are loaded in. If not run following commands..."
 echo "python manage.py load_municipalities , python manage.py load_provinces, python manage.py load_anb, python manage.py assign_provinces_to_municipalities"

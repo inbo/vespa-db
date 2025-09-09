@@ -72,6 +72,9 @@ COPY . .
 RUN mkdir -p /workspaces/vespadb/static /workspaces/vespadb/collected_static && \
     chmod -R 755 /workspaces/vespadb/static /workspaces/vespadb/collected_static
 
+# Run collectstatic during the build
+RUN python manage.py collectstatic --noinput --clear
+
 # Add entrypoint script
 COPY entrypoint.sh /workspaces/vespadb/entrypoint.sh
 RUN chmod +x /workspaces/vespadb/entrypoint.sh

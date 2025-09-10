@@ -422,7 +422,6 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
             cache_key = get_geojson_cache_key(query_params)
             cached_data = cache.get(cache_key)
             if cached_data:
-                logger.info(f"Returning cached GeoJSON data, found cache: {cache_key}")
                 return JsonResponse(cached_data, safe=False)
 
             logger.info(f"Cache MISS for key: {cache_key}")

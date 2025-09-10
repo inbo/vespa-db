@@ -73,7 +73,8 @@ RUN mkdir -p /workspaces/vespadb/static /workspaces/vespadb/collected_static && 
     chmod -R 755 /workspaces/vespadb/static /workspaces/vespadb/collected_static
 
 # Run collectstatic during the build
-RUN python manage.py collectstatic --noinput --clear
+RUN STATICFILES_STORAGE='whitenoise.storage.CompressedManifestStaticFilesStorage' \
+    python manage.py collectstatic --noinput --clear
 RUN mkdir -p /var/writable_tmp && chmod 777 /var/writable_tmp
 
 # Add entrypoint script

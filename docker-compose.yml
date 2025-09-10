@@ -22,30 +22,32 @@ services:
       - .:/workspaces/vespadb/
 
   app:
-      build:
-        context: .
-        dockerfile: Dockerfile.backend
-        target: app
-      tty: true
-      ports:
-        - "8001:8000"
-      volumes:
-        - .:/workspaces/vespadb/
-      command: >
-        bash -c "chmod +x /workspaces/vespadb/scripts/init_localstack.sh &&
-                /workspaces/vespadb/scripts/init_localstack.sh &&
-                serve --dev"
-      working_dir: /workspaces/vespadb/
-      environment:
-        - PYTHONPATH=/workspaces/vespadb
-        - DEBUG=True
-      depends_on:
-        db:
-          condition: service_healthy
-        localstack:
-          condition: service_started
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      target: app
+    tty: true
+    ports:
+      - "8001:8000"
+    
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/writable_tmp
 
-
+    command: >
+      bash -c "chmod +x /workspaces/vespadb/scripts/init_localstack.sh &&
+              /workspaces/vespadb/scripts/init_localstack.sh &&
+              serve --dev"
+    working_dir: /workspaces/vespadb/
+    environment:
+      - PYTHONPATH=/workspaces/vespadb
+      - DEBUG=True
+    depends_on:
+      db:
+        condition: service_healthy
+      localstack:
+        condition: service_started
 
   db:
     image: postgis/postgis:latest
@@ -121,7 +123,6 @@ services:
 volumes:
   postgres_data:
   localstack_data:
-
 
 networks:
   default:

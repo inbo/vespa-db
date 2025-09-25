@@ -10,9 +10,10 @@ from django.db.models import Q
 
 logger = logging.getLogger(__name__)
 
-@shared_task
+@shared_task(name='vespadb.observations.tasks.generate_geojson_task')
 def generate_geojson_task(raw_params):
     cache_key = get_geojson_cache_key(raw_params)
+    logger.info(f"Celery Task: Generating GeoJSON for key: {cache_key} with params: {raw_params}")
     params = raw_params.copy()
     queryset = Observation.objects.all()
 

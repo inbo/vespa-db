@@ -413,11 +413,19 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 query_params['visible'] = 'true'
             if 'min_observation_datetime' in query_params:
                 try:
-                    dt_obj = parser.parse(query_params['min_observation_datetime'])
-                    query_params['min_observation_datetime'] = dt_obj.strftime('%Y-%m-%d')
+                    dt_obj = parse_and_convert_to_cet(query_params['min_observation_datetime'])
+                    query_params['min_observation_datetime'] = dt_obj.isoformat()
                 except (ValueError, TypeError):
                     logger.warning(
                         f"Could not parse min_observation_datetime: {query_params['min_observation_datetime']}"
+                    )
+            if 'max_observation_datetime' in query_params:
+                try:
+                    dt_obj = parse_and_convert_to_cet(query_params['max_observation_datetime'])
+                    query_params['max_observation_datetime'] = dt_obj.isoformat()
+                except (ValueError, TypeError):
+                    logger.warning(
+                        f"Could not parse max_observation_datetime: {query_params['max_observation_datetime']}"
                     )
             cache_key = get_geojson_cache_key(query_params)
             cached_data = cache.get(cache_key)
@@ -425,7 +433,6 @@ class ObservationsViewSet(ModelViewSet):  # noqa: PLR0904
                 return JsonResponse(cached_data, safe=False)
 
             logger.info(f"Cache MISS for key: {cache_key}")
-
             # Base query
             base_query = """
             SELECT json_build_object(

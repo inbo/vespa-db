@@ -126,7 +126,7 @@ CELERY_TIMEZONE = "Europe/Brussels"
 MIN_OBSERVATION_DATETIME = "2025-04-01T00:00:00+02:00"
 prewarm_schedule = {
     f"prewarm-geojson-{config['name']}": {
-        "task": "vespadb.observations.tasks.generate_geojson_task.generate_geojson_task",
+        'task': 'vespadb.observations.tasks.generate_geojson_task',
         'schedule': config['schedule'],
         'args': (config['params'],)
     } for config in PREWARM_CONFIGS

@@ -3,21 +3,8 @@
 # exit immediately if a command exits with a non-zero status
 set -e
 
-# Migrate the database
-mkdir -p /workspaces/vespadb/logs
-touch /workspaces/vespadb/logs/django.log
-chmod -R 755 /workspaces/vespadb/logs
-
-# Ensure static directory exists
-mkdir -p /workspaces/vespadb/static
-mkdir -p /workspaces/vespadb/collected_static
-
 echo "Applying database migrations..."
 python manage.py migrate --noinput
-
-# Collect static files
-echo "Collecting static files..."
-python manage.py collectstatic --noinput
 
 # Load initial data if required
 echo "After deployment check if municipalities, provinces, anb areas are loaded in. If not run following commands..."

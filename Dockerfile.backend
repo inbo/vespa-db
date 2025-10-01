@@ -27,7 +27,9 @@ ENV VIRTUAL_ENV /opt/vespadb-env
 WORKDIR /workspaces/vespadb/
 
 RUN mkdir -p /root/.cache/pypoetry/ && mkdir -p /root/.config/pypoetry/ && \
-    mkdir -p src/vespadb/ && touch src/vespadb/__init__.py && touch README.md
+    mkdir -p src/vespadb/ && touch src/vespadb/__init__.py && touch README.md && \
+    mkdir -p /workspaces/vespadb/static && mkdir -p /workspaces/vespadb/collected_static && \
+    chmod 755 /workspaces/vespadb/static /workspaces/vespadb/collected_static
 
 # Development stage setup
 FROM base AS dev
@@ -65,6 +67,15 @@ RUN --mount=type=cache,target=/root/.cache/pypoetry/ \
     poetry install --only main --no-interaction --no-ansi
 
 COPY . .
+
+# Ensure static directories exist and are writable
+RUN mkdir -p /workspaces/vespadb/static /workspaces/vespadb/collected_static && \
+    chmod -R 755 /workspaces/vespadb/static /workspaces/vespadb/collected_static
+
+# Run collectstatic during the build
+RUN STATICFILES_STORAGE='whitenoise.storage.CompressedManifestStaticFilesStorage' \
+    python manage.py collectstatic --noinput --clear
+RUN mkdir -p /var/writable_tmp && chmod 777 /var/writable_tmp
 
 # Add entrypoint script
 COPY entrypoint.sh /workspaces/vespadb/entrypoint.sh

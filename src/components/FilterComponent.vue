@@ -208,6 +208,9 @@ export default {
     const selectedNestType = ref([]);
     const selectedNestStatus = ref([]);
     const anbAreasActief = ref(null);
+    
+    // Flag to prevent circular updates when syncing from store
+    const isUpdatingFromStore = ref(false);
 
     // Convert data to multiselect format
     const provinceOptions = computed(() => 
@@ -317,7 +320,9 @@ export default {
     watch(
       [selectedMunicipalities, selectedNestType, selectedNestStatus, anbAreasActief],
       () => {
-        emitFilterUpdate();
+        if (!isUpdatingFromStore.value) {
+          emitFilterUpdate();
+        }
       },
       { deep: true }
     );
@@ -326,9 +331,11 @@ export default {
       if (JSON.stringify(newProvinces) === JSON.stringify(oldProvinces)) {
         return;
       }
-      selectedMunicipalities.value = [];
-      fetchMunicipalitiesByProvinces();
-      emitFilterUpdate();
+      if (!isUpdatingFromStore.value) {
+        selectedMunicipalities.value = [];
+        fetchMunicipalitiesByProvinces();
+        emitFilterUpdate();
+      }
     }, { deep: true });
 
 
@@ -339,6 +346,9 @@ export default {
         const hasChanged = JSON.stringify(newFilters) !== JSON.stringify(oldFilters);
 
         if (hasChanged) {
+          // Set flag to prevent circular updates
+          isUpdatingFromStore.value = true;
+          
           // Convert array values back to multiselect format
           selectedMunicipalities.value = (newFilters.municipalities || []).map(id => 
             municipalityOptions.value.find(m => m.value === id)
@@ -357,6 +367,11 @@ export default {
           ).filter(Boolean);
           
           anbAreasActief.value = newFilters.anbAreasActief ?? null;
+          
+          // Clear flag after updates are complete
+          setTimeout(() => {
+            isUpdatingFromStore.value = false;
+          }, 0);
         }
       },
       { immediate: true, deep: true }
@@ -364,6 +379,7 @@ export default {
 
     onMounted(async () => {
       // Initialize from store filters
+      isUpdatingFromStore.value = true;
       const filters = vespaStore.filters;
       
       selectedMunicipalities.value = (filters.municipalities || []).map(id => 
@@ -383,6 +399,10 @@ export default {
       ).filter(Boolean);
       
       anbAreasActief.value = filters.anbAreasActief;
+      
+      setTimeout(() => {
+        isUpdatingFromStore.value = false;
+      }, 0);
     });
 
     return {

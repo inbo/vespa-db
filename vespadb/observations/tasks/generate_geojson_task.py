@@ -13,8 +13,7 @@ logger = logging.getLogger(__name__)
 @shared_task(name='vespadb.observations.tasks.generate_geojson_task')
 def generate_geojson_task(raw_params):
     cache_key = get_geojson_cache_key(raw_params)
-    logger.info(f"Using cache key: {cache_key}")
-
+    logger.info(f"Celery Task: Generating GeoJSON for key: {cache_key} with params: {raw_params}")
     params = raw_params.copy()
     queryset = Observation.objects.all()
 
@@ -90,6 +89,7 @@ def generate_geojson_task(raw_params):
             "type": "Feature",
             "properties": {
                 "id": obs.id,
+                "municipality_id": obs.municipality_id,
                 "status": current_status
             },
             "geometry": json.loads(obs.point.geojson) if obs.point else None,

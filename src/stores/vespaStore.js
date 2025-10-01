@@ -17,6 +17,7 @@ export const useVespaStore = defineStore('vespaStore', {
         provincesFetched: false,
         selectedMunicipalities: [],
         observations: [],
+        allObservationsCache: null, // Cache for client-side filtering
         loadingObservations: false,
         selectedObservation: null,
         markerClusterGroup: null,
@@ -82,19 +83,54 @@ export const useVespaStore = defineStore('vespaStore', {
             // Check if data needs to be reloaded
             if (this.observations.length > 0 && currentFilters === this.lastAppliedFilters) return;
         
+            // Check if only municipality filter changed - use client-side filtering
+            const lastFilters = this.lastAppliedFilters ? JSON.parse(this.lastAppliedFilters) : {};
+            const filtersExceptMunicipality = { ...this.filters };
+            delete filtersExceptMunicipality.municipalities;
+            const lastFiltersExceptMunicipality = { ...lastFilters };
+            delete lastFiltersExceptMunicipality.municipalities;
+            
+            if (this.allObservationsCache && 
+                JSON.stringify(filtersExceptMunicipality) === JSON.stringify(lastFiltersExceptMunicipality)) {
+                // Only municipality filter changed - filter client-side
+                if (this.filters.municipalities && this.filters.municipalities.length > 0) {
+                    this.observations = this.allObservationsCache.filter(obs => 
+                        this.filters.municipalities.includes(obs.properties.municipality_id)
+                    );
+                } else {
+                    this.observations = this.allObservationsCache;
+                }
+                this.setLastAppliedFilters();
+                return;
+            }
+        
             this.loadingObservations = true;
             let filterQuery = this.createFilterQuery();
             
             // ALWAYS apply min date filter - regardless of login status
             if (!this.filters.min_observation_date) {
-                const defaultMinDate = this.formatDateWithoutTime(new Date('April 1, 2024').toISOString());
+                const defaultMinDate = this.formatDateWithoutTime(new Date('April 1, 2025').toISOString());
                 filterQuery += (filterQuery ? '&' : '') + `min_observation_datetime=${defaultMinDate}`;
             }
         
             try {
-                const response = await ApiService.get(`/observations/dynamic-geojson/?${filterQuery}`);
+                const url = `/observations/dynamic-geojson/?${filterQuery}`;
+                const response = await ApiService.get(url);
                 if (response.status === 200) {
                     this.observations = response.data.features || [];
+                    const allData = response.data.features || [];
+                    // Always cache the unfiltered data from server
+                    this.allObservationsCache = allData;
+                    
+                    // Apply municipality filter client-side if present
+                    if (this.filters.municipalities && this.filters.municipalities.length > 0) {
+                        this.observations = allData.filter(obs => 
+                            this.filters.municipalities.includes(obs.properties.municipality_id)
+                        );
+                    } else {
+                        this.observations = allData;
+                    }
+                    
                     this.setLastAppliedFilters();
                 } else {
                     throw new Error(`Network response was not ok, status code: ${response.status}`);
@@ -107,39 +143,62 @@ export const useVespaStore = defineStore('vespaStore', {
             }
         },
         createFilterQuery() {
-            let params = {};
+            let queryParts = [];
         
             if (this.filters.municipalities.length > 0) {
-                params['municipality_id'] = this.filters.municipalities.join(',');
+                // Add each municipality_id as separate query parameter
+                this.filters.municipalities.forEach((id, index) => {
+                    queryParts.push(`municipality_id=${encodeURIComponent(id)}`);
+                });
             }
+            // Don't send municipality filter to backend - handle client-side
+            // Municipality filtering happens client-side for better performance
+            // if (this.filters.municipalities.length > 0) {
+            //     params['municipality_id'] = this.filters.municipalities.join(',');
+            // }
         
             if (this.filters.provinces.length > 0) {
-                params['province_id'] = this.filters.provinces.join(',');
+                // Add each province_id as separate query parameter
+                this.filters.provinces.forEach(id => {
+                    queryParts.push(`province_id=${encodeURIComponent(id)}`);
+                });
             }
         
             if (this.filters.anbAreasActief !== null) {
-                params['anb'] = this.filters.anbAreasActief;
+                queryParts.push(`anb=${encodeURIComponent(this.filters.anbAreasActief)}`);
             }
         
-            if (this.filters.nestType) {
-                params['nest_type'] = this.filters.nestType;
+            if (this.filters.nestType && this.filters.nestType.length > 0) {
+                console.log('[NEST TYPE DEBUG] Nest types:', JSON.stringify(this.filters.nestType));
+                // Add each nest_type as separate query parameter
+                this.filters.nestType.forEach(type => {
+                    queryParts.push(`nest_type=${encodeURIComponent(type)}`);
+                });
             }
         
-            if (this.filters.nestStatus) {
-                params['nest_status'] = this.filters.nestStatus;
+            if (this.filters.nestStatus && this.filters.nestStatus.length > 0) {
+                console.log('[NEST STATUS DEBUG] Nest statuses:', JSON.stringify(this.filters.nestStatus));
+                // Add each nest_status as separate query parameter
+                this.filters.nestStatus.forEach(status => {
+                    queryParts.push(`nest_status=${encodeURIComponent(status)}`);
+                });
             }
         
             if (this.filters.min_observation_date) {
-                params['min_observation_datetime'] = this.formatDateWithoutTime(this.filters.min_observation_date);
+                queryParts.push(`min_observation_datetime=${encodeURIComponent(this.formatDateWithoutTime(this.filters.min_observation_date))}`);
             } else {
-                params['min_observation_datetime'] = this.formatDateWithoutTime(new Date('April 1, 2024').toISOString());
+                queryParts.push(`min_observation_datetime=${encodeURIComponent(this.formatDateWithoutTime(new Date('April 1, 2025').toISOString()))}`);
             }
         
             if (this.filters.max_observation_date) {
-                params['max_observation_datetime'] = this.formatDateWithEndOfDayTime(this.filters.max_observation_date);
+                queryParts.push(`max_observation_datetime=${encodeURIComponent(this.formatDateWithEndOfDayTime(this.filters.max_observation_date))}`);
             }
         
-            return Object.entries(params).map(([key, value]) => `${key}=${encodeURIComponent(value)}`).join('&');
+            const query = queryParts.join('&');
+            console.log('[FILTER DEBUG] Total query parts:', queryParts.length);
+            console.log('[FILTER DEBUG] Final query string:', query);
+            console.log('[FILTER DEBUG] Query string length:', query.length);
+            return query;
         },
         formatDateWithoutTime(date) {
             const d = new Date(date);
@@ -168,7 +227,10 @@ export const useVespaStore = defineStore('vespaStore', {
             return `${[year, month, day].join('-')} 23:59:59`;
         },
         async applyFilters(filters) {
+            console.log('[APPLY FILTERS DEBUG] Incoming filters:', JSON.stringify(filters));
+            console.log('[APPLY FILTERS DEBUG] Current filters before update:', JSON.stringify(this.filters));
             this.filters = { ...this.filters, ...filters };
+            console.log('[APPLY FILTERS DEBUG] Filters after update:', JSON.stringify(this.filters));
         },
         async fetchProvinces() {
             if (this.provincesFetched) return;  // Skip fetching if data is already available
@@ -715,6 +777,7 @@ export const useVespaStore = defineStore('vespaStore', {
                 nestStatus: null,
                 anbAreasActief: null
             };
+            this.allObservationsCache = null; // Clear cache on reset
             this.getObservationsGeoJson();
         },
         determineStatusFromObservationData(observationData) {
